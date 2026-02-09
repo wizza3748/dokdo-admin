@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { LayoutDashboard } from "lucide-react"
 
 import { AppNav } from "@/components/app/nav"
 import {
@@ -22,10 +21,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
                             <Link href="/">
-                                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground group-hover:scale-110 transition-transform">
-                                    <LayoutDashboard className="size-4" />
+                                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-transparent group-hover:scale-110 transition-transform overflow-hidden">
+                                    <img src="https://admin.dokdo.app/assets/dokdo_256.b304d946.png" alt="Dokdo Admin" className="size-full object-contain" />
                                 </div>
-                                <div className="flex flex-col gap-0.5 leading-none">
+                                <div className="flex flex-col gap-0.5 leading-none group-data-[collapsible=icon]:hidden">
                                     <span className="font-semibold">Dokdo Admin</span>
                                     <span className="text-[11px] opacity-70">Management System</span>
                                 </div>

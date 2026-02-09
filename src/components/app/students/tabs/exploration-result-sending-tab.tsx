@@ -97,36 +97,49 @@ export function ExplorationResultSendingTab() {
         studyType: "전체",
         sendStatus: "전체",
     })
-    const [records, setRecords] = React.useState<SendRecord[]>(MOCK_RECORDS)
+    // Single source of truth for records
+    const [allRecords, setAllRecords] = React.useState<SendRecord[]>(MOCK_RECORDS)
+
+    // Filter state applied to the view
+    const [appliedFilter, setAppliedFilter] = React.useState(filter)
     const [toastVisible, setToastVisible] = React.useState(false)
+
+    // Derived visible records - Source of truth is allRecords
+    const visibleRecords = React.useMemo(() => {
+        let filtered = [...allRecords]
+        if (appliedFilter.studyType !== "전체") {
+            filtered = filtered.filter(r => r.studyTypes.includes(appliedFilter.studyType as StudyType))
+        }
+        if (appliedFilter.sendStatus !== "전체") {
+            filtered = filtered.filter(r => r.sendStatus === appliedFilter.sendStatus)
+        }
+        return filtered
+    }, [allRecords, appliedFilter])
 
     // --- Logic ---
     const handleSearch = React.useCallback(() => {
-        // 실제 환경에서는 여기서 API 호출
-        console.log("Searching with:", filter)
-        // 필터링 시뮬레이션
-        let filtered = [...MOCK_RECORDS]
-        if (filter.studyType !== "전체") {
-            filtered = filtered.filter(r => r.studyTypes.includes(filter.studyType as StudyType))
-        }
-        if (filter.sendStatus !== "전체") {
-            filtered = filtered.filter(r => r.sendStatus === filter.sendStatus)
-        }
-        setRecords(filtered)
+        console.log("Applying search filters:", filter)
+        setAppliedFilter(filter)
     }, [filter])
 
     const handleReset = () => {
-        setFilter({
+        const resetFilter = {
             baseDate: undefined,
             studyType: "전체",
             sendStatus: "전체",
-        })
+        }
+        setFilter(resetFilter)
+        setAppliedFilter(resetFilter)
     }
 
-    // 필터 변경 시 자동 갱신
+    // 필터 변경 시 자동 갱신 (일부 필드)
     React.useEffect(() => {
-        handleSearch()
-    }, [filter.studyType, filter.sendStatus, handleSearch])
+        setAppliedFilter(prev => ({
+            ...prev,
+            studyType: filter.studyType,
+            sendStatus: filter.sendStatus
+        }))
+    }, [filter.studyType, filter.sendStatus])
 
     const handleSendModeChange = (mode: SendMode) => {
         setSendMode(mode)
@@ -137,29 +150,46 @@ export function ExplorationResultSendingTab() {
     const canShowSendButton = (record: SendRecord) => {
         if (sendMode === "자동") return false // 상단 설정이 자동이면 모든 버튼 미노출
 
-        const today = format(new Date(), "yyyy-MM-dd") // Asia/Seoul 가정 (브라우저 로컬)
+        const today = format(new Date(), "yyyy-MM-dd")
         const isToday = record.baseDate === today
 
-        // 12개 조합 규칙 적용
         if (record.sendMode === "자동") return false
         if (record.sendStatus === "발송완료") return false
         if (!isToday) return false
 
-        // 수동 + (발송대기 | 발송실패) + 오늘
         return record.sendMode === "수동" && (record.sendStatus === "발송대기" || record.sendStatus === "발송실패") && isToday
     }
 
-    const handleSend = (record: SendRecord) => {
-        if (window.confirm("해당 학생의 부모님에게 탐험 결과를 발송하시겠어요?")) {
-            alert(`${record.baseDate} 탐험 결과가 발송되었습니다.`)
-            // 발송 성공 처리 시뮬레이션
-            setRecords(prev => prev.map(r =>
-                r.baseDate === record.baseDate
-                    ? { ...r, sendStatus: "발송완료", sentAt: format(new Date(), "yyyy-MM-dd HH:mm:ss") }
-                    : r
-            ))
+    const handleSend = React.useCallback((record: SendRecord, e: React.MouseEvent) => {
+        if (e && e.stopPropagation) e.stopPropagation();
+
+        console.log("handleSend start")
+
+        const result = window.confirm("해당 학생의 부모님에게 탐험 결과를 발송하시겠어요?")
+        console.log("confirm result:", result)
+
+        if (result === false) {
+            console.log("cancelled");
+            return;
         }
-    }
+
+        // 발송 처리 시뮬레이션
+        const now = format(new Date(), "yyyy-MM-dd HH:mm:ss")
+
+        setAllRecords(prev => prev.map(r => {
+            if (r.baseDate === record.baseDate && r.level === record.level) {
+                return {
+                    ...r,
+                    sendStatus: "발송완료",
+                    sentAt: now,
+                    canSend: false
+                }
+            }
+            return r
+        }))
+
+        alert(`${record.baseDate} 탐험 결과가 부모님에게 발송되었습니다.`)
+    }, [])
 
     // --- Render ---
     return (
@@ -321,15 +351,15 @@ export function ExplorationResultSendingTab() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {records.length === 0 ? (
+                        {visibleRecords.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={10} className="h-40 text-center text-slate-300 font-bold">
                                     조회된 데이터가 없습니다.
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            records.map((record, i) => (
-                                <TableRow key={i} className="group hover:bg-slate-50/50 border-b-slate-50 transition-colors">
+                            visibleRecords.map((record: SendRecord, i: number) => (
+                                <TableRow key={`${record.baseDate}-${record.level}-${i}`} className="group hover:bg-slate-50/50 border-b-slate-50 transition-colors">
                                     <TableCell className="font-black text-slate-600 py-5 pl-8">{record.baseDate}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className={cn(
@@ -363,7 +393,7 @@ export function ExplorationResultSendingTab() {
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex gap-1.5 flex-wrap">
-                                            {record.studyTypes.map(st => (
+                                            {record.studyTypes.map((st: StudyType) => (
                                                 <span key={st} className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-md">
                                                     {st}
                                                 </span>
@@ -390,7 +420,7 @@ export function ExplorationResultSendingTab() {
                                             <Button
                                                 size="sm"
                                                 className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white font-black shadow-lg shadow-blue-100 transition-all rounded-lg gap-2"
-                                                onClick={() => handleSend(record)}
+                                                onClick={handleSend.bind(null, record)}
                                             >
                                                 <Send className="w-3.5 h-3.5" />
                                                 발송
