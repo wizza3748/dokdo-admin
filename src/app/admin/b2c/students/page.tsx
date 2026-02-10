@@ -25,7 +25,7 @@ import {
 
 export default function B2CStudentListPage() {
     return (
-        <div className="flex flex-col gap-6 p-4">
+        <div className="flex flex-col gap-6 p-4 min-w-0">
             {/* Multi-layered Filter Section */}
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-[0_4px_25px_-5px_rgba(0,0,0,0.02)] flex flex-col gap-5">
                 {/* Row 1: Search & Service Status */}
@@ -115,7 +115,7 @@ export default function B2CStudentListPage() {
 
             {/* Table Action Bar */}
             <div className="flex justify-between items-center px-2 mt-2">
-                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-3">
                     <div className="w-1.5 h-6 bg-[#002855] rounded-full" />
                     학생 목록
                 </h3>
@@ -151,7 +151,7 @@ export default function B2CStudentListPage() {
                                     { label: "추천인", width: "w-[180px]" },
                                     { label: "편집", width: "w-[80px]" }
                                 ].map((col, idx) => (
-                                    <th key={idx} className={`px-4 py-5 font-bold text-slate-400 text-[13px] uppercase tracking-wider ${col.width}`}>
+                                    <th key={idx} className={`px-4 py-5 font-semibold text-slate-400 text-[13px] uppercase tracking-wider ${col.width}`}>
                                         <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-600 transition-colors">
                                             {col.label}
                                             {col.label !== "편집" && col.label !== "학습타입" && col.label !== "서비스상태" && col.label !== "아이디" && col.label !== "학부모 이름" && col.label !== "연락처" && (
@@ -181,7 +181,7 @@ export default function B2CStudentListPage() {
                                 <tr key={idx} className="hover:bg-slate-50/50 transition-all group border-b border-slate-50/50 last:border-0 font-medium">
                                     <td className="px-4 py-4 text-[14px] text-slate-500">{student.id}</td>
                                     <td className="px-4 py-4 text-[14px]">
-                                        <Link href={`/admin/b2c/students/${student.id}`} className="text-[#002855] font-bold text-[15px] hover:text-blue-700 hover:underline transition-colors">
+                                        <Link href={`/admin/b2c/students/${student.id}`} className="text-[#002855] font-semibold text-[15px] hover:text-blue-700 hover:underline transition-colors">
                                             {student.name}
                                         </Link>
                                     </td>
@@ -190,12 +190,12 @@ export default function B2CStudentListPage() {
                                     <td className="px-4 py-4 text-[14px] text-slate-500">{student.age}</td>
                                     <td className="px-4 py-4 text-[14px] text-slate-500">{student.phone}</td>
                                     <td className="px-4 py-4">
-                                        <Badge className="bg-emerald-50 text-emerald-600 border-none shadow-none font-bold text-[11px] px-2 py-0.5 rounded-md">
+                                        <Badge className="bg-emerald-50 text-emerald-600 border-none shadow-none font-semibold text-[11px] px-2 py-0.5 rounded-md">
                                             {student.type}
                                         </Badge>
                                     </td>
                                     <td className="px-4 py-4">
-                                        <Badge variant="outline" className={`font-bold text-[11px] px-2 py-0.5 rounded-md border-2 ${student.status === "사용중" ? "text-green-500 bg-white border-green-100" :
+                                        <Badge variant="outline" className={`font-semibold text-[11px] px-2 py-0.5 rounded-md border-2 ${student.status === "사용중" ? "text-green-500 bg-white border-green-100" :
                                             student.status === "사용전" ? "text-red-500 bg-white border-red-100" :
                                                 student.status === "서비스 만료" ? "text-slate-400 bg-slate-50 border-slate-100" :
                                                     "text-slate-300 bg-white border-slate-50"

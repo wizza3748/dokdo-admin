@@ -29,14 +29,14 @@ import {
 
 export default function AgencyStudentListPage() {
     return (
-        <div className="flex flex-col gap-6 p-4">
+        <div className="flex flex-col gap-6 p-4 min-w-0">
 
             {/* Complex Filter Section */}
             <div className="bg-white border border-slate-100 rounded-3xl p-6 shadow-[0_4px_25px_-5px_rgba(0,0,0,0.02)] flex flex-col gap-5">
-                <div className="flex flex-wrap items-center gap-x-12 gap-y-4">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
                     {/* Search */}
                     <div className="flex items-center gap-3">
-                        <span className="text-[13px] font-bold text-slate-500 shrink-0 whitespace-nowrap">검색</span>
+                        <span className="text-[13px] font-bold text-slate-500 shrink-0">검색</span>
                         <div className="flex items-center gap-2">
                             <Select defaultValue="name">
                                 <SelectTrigger className="w-[100px] h-10 bg-slate-50 border-slate-100 rounded-xl font-semibold text-xs">
@@ -55,7 +55,7 @@ export default function AgencyStudentListPage() {
 
                     {/* Reading Level */}
                     <div className="flex items-center gap-3">
-                        <span className="text-[13px] font-bold text-slate-500 shrink-0 whitespace-nowrap">책읽기 레벨</span>
+                        <span className="text-[13px] font-bold text-slate-500 shrink-0">책읽기 레벨</span>
                         <Select defaultValue="all">
                             <SelectTrigger className="w-[80px] h-10 bg-slate-50 border-slate-100 rounded-xl font-semibold text-xs">
                                 <SelectValue />
@@ -70,7 +70,7 @@ export default function AgencyStudentListPage() {
 
                     {/* Writing Level */}
                     <div className="flex items-center gap-3">
-                        <span className="text-[13px] font-bold text-slate-500 shrink-0 whitespace-nowrap">글쓰기 레벨</span>
+                        <span className="text-[13px] font-bold text-slate-500 shrink-0">글쓰기 레벨</span>
                         <Select defaultValue="all">
                             <SelectTrigger className="w-[80px] h-10 bg-slate-50 border-slate-100 rounded-xl font-semibold text-xs">
                                 <SelectValue />
@@ -84,10 +84,10 @@ export default function AgencyStudentListPage() {
                     </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-x-12 gap-y-4">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
                     {/* Study Type Buttons */}
                     <div className="flex items-center gap-3">
-                        <span className="text-[13px] font-bold text-slate-500 shrink-0 whitespace-nowrap">학습타입</span>
+                        <span className="text-[13px] font-bold text-slate-500 shrink-0">학습타입</span>
                         <div className="flex flex-wrap gap-1.5 p-1 bg-slate-50/50 border border-slate-100 rounded-xl">
                             {["전체", "책 읽기+글쓰기", "책 읽기", "글쓰기", "책 읽기+도서관", "글쓰기+도서관"].map((type) => (
                                 <Button
@@ -103,7 +103,7 @@ export default function AgencyStudentListPage() {
 
                     {/* Service Status Buttons */}
                     <div className="flex items-center gap-3">
-                        <span className="text-[13px] font-bold text-slate-500 shrink-0 whitespace-nowrap">서비스상태</span>
+                        <span className="text-[13px] font-bold text-slate-500 shrink-0">서비스상태</span>
                         <div className="flex flex-wrap gap-1.5 p-1 bg-slate-50/50 border border-slate-100 rounded-xl">
                             {["전체", "사용전", "사용중", "서비스만료"].map((status) => (
                                 <Button
@@ -116,27 +116,27 @@ export default function AgencyStudentListPage() {
                             ))}
                         </div>
                     </div>
-                </div>
 
-                {/* Search Action Buttons */}
-                <div className="flex justify-end gap-2 mt-2 pt-4 border-t border-slate-50">
-                    <Button variant="outline" className="h-10 px-6 border-slate-200 text-slate-500 font-bold rounded-xl hover:bg-slate-50 transition-all text-xs">재설정</Button>
-                    <Button className="h-10 px-8 bg-[#002855] hover:bg-[#001d3d] text-white font-bold rounded-xl shadow-lg shadow-blue-900/10 transition-all text-xs">검색</Button>
+                    {/* Search Action Buttons */}
+                    <div className="flex gap-2 ml-auto">
+                        <Button variant="outline" className="h-10 px-6 border-slate-200 text-slate-500 font-bold rounded-xl hover:bg-slate-50 transition-all text-xs">재설정</Button>
+                        <Button className="h-10 px-8 bg-[#002855] hover:bg-[#001d3d] text-white font-bold rounded-xl shadow-lg shadow-blue-900/10 transition-all text-xs">검색</Button>
+                    </div>
                 </div>
             </div>
 
             {/* Table Action Bar */}
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 px-2">
-                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+            <div className="flex flex-wrap justify-between items-center gap-4 px-2">
+                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3 shrink-0">
                     <div className="w-1.5 h-6 bg-[#002855] rounded-full" />
                     학생 목록
                 </h3>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Button variant="outline" className="h-9 px-4 border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-lg transition-all text-[13px]">엑셀 업로드</Button>
                     <Button variant="outline" className="h-9 px-4 border-emerald-500 text-emerald-600 hover:bg-emerald-50 font-bold rounded-lg transition-all text-[13px]">엑셀 다운로드</Button>
                     <Button variant="outline" className="h-9 px-4 border-[#002855] text-[#002855] hover:bg-blue-50 font-bold rounded-lg transition-all text-[13px]">학생 일괄 등록</Button>
                     <Button className="h-9 px-5 bg-[#002855] hover:bg-[#001d3d] text-white font-bold rounded-lg shadow-lg shadow-blue-900/10 transition-all text-[13px]">학생 개별 등록</Button>
-                    <div className="flex items-center gap-1 ml-4 border-l border-slate-100 pl-4 text-slate-300">
+                    <div className="flex items-center gap-1 ml-0 md:ml-4 border-l border-slate-100 pl-4 text-slate-300">
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-slate-100"><RotateCcw className="w-4 h-4" /></Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-slate-100"><LayoutGrid className="w-4 h-4" /></Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-slate-100"><Settings className="w-4 h-4 text-slate-600" /></Button>
@@ -144,8 +144,8 @@ export default function AgencyStudentListPage() {
                 </div>
             </div>
 
-            {/* Student Table */}
-            <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-[0_4px_25px_-5px_rgba(0,0,0,0.01)]">
+            {/* Student Table Container */}
+            <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-[0_4px_25px_-5px_rgba(0,0,0,0.01)] w-full max-w-full min-w-0">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse table-fixed min-w-[1400px]">
                         <thead>

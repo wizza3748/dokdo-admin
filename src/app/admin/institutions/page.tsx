@@ -83,7 +83,7 @@ const FilterButtonGroup = ({
 
 export default function InstitutionsPage() {
     return (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 min-w-0">
             {/* Filter Section */}
             <div className="bg-white border border-slate-100 rounded-2xl p-6 flex flex-col gap-4 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)]">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-3">
@@ -129,7 +129,7 @@ export default function InstitutionsPage() {
             </div>
 
             {/* Table Actions */}
-            <div className="flex justify-between items-center mt-8">
+            <div className="flex flex-wrap justify-between items-center mt-8 gap-4">
                 <div className="flex items-center gap-2">
                     <div className="w-1 h-5 bg-[#002855] rounded-full" />
                     <h3 className="text-lg font-bold text-slate-800">기관 데이터 목록</h3>
@@ -161,23 +161,23 @@ export default function InstitutionsPage() {
                     <Table className="min-w-[1600px]">
                         <TableHeader className="bg-slate-50/80 border-b border-slate-100">
                             <TableRow className="hover:bg-transparent border-none">
-                                <TableHead className="text-center w-24 py-5 font-bold text-slate-600">고유번호</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">지사1</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">지사2</TableHead>
-                                <TableHead className="text-center min-w-[180px] py-5 font-bold text-slate-600 border-x border-slate-200/50">기관명</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">가맹 타입</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">서비스 상태</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">교육비 입금일</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">책 그룹</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">전자책 상태</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">전자책 결제</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">결제 예정일</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">자동 결제</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">최소 이용 금액</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">인당 이용료</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">학생 수</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">포인트</TableHead>
-                                <TableHead className="text-center py-5 font-bold text-slate-600">등록일</TableHead>
+                                <TableHead className="text-center w-24 py-5 font-semibold text-slate-600">고유번호</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">지사1</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">지사2</TableHead>
+                                <TableHead className="text-center min-w-[180px] py-5 font-semibold text-slate-600 border-x border-slate-200/50">기관명</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">가맹 타입</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">서비스 상태</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">교육비 입금일</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">책 그룹</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">전자책 상태</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">전자책 결제</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">결제 예정일</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">자동 결제</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">최소 이용 금액</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">인당 이용료</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">학생 수</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">포인트</TableHead>
+                                <TableHead className="text-center py-5 font-semibold text-slate-600">등록일</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -187,7 +187,7 @@ export default function InstitutionsPage() {
                                     <TableCell className="text-blue-500 font-medium py-4">{item.region1}</TableCell>
                                     <TableCell className="text-blue-400 py-4">{item.region2}</TableCell>
                                     <TableCell className="border-x border-slate-50 py-4 group-hover:bg-blue-50/50 transition-colors">
-                                        <Link href={`/admin/institutions/${item.id}`} className="text-[#002855] hover:text-blue-700 hover:underline font-bold text-[15px]">
+                                        <Link href={`/admin/institutions/${item.id}`} className="text-[#002855] hover:text-blue-700 hover:underline font-semibold text-[15px]">
                                             {item.name}
                                         </Link>
                                     </TableCell>
@@ -225,10 +225,10 @@ export default function InstitutionsPage() {
                                             {item.autoPay}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="font-bold text-slate-700 py-4">₩{item.minAmount}</TableCell>
-                                    <TableCell className="font-bold text-slate-700 py-4">₩{item.fee}</TableCell>
+                                    <TableCell className="font-semibold text-slate-700 py-4">₩{item.minAmount}</TableCell>
+                                    <TableCell className="font-semibold text-slate-700 py-4">₩{item.fee}</TableCell>
                                     <TableCell className="font-medium py-4">{item.students}</TableCell>
-                                    <TableCell className={`py-4 ${item.points > 0 ? "text-blue-600 font-bold" : "text-slate-400"}`}>
+                                    <TableCell className={`py-4 ${item.points > 0 ? "text-blue-600 font-semibold" : "text-slate-400"}`}>
                                         {item.points.toLocaleString()}P
                                     </TableCell>
                                     <TableCell className="text-slate-400 text-xs py-4">{item.regDate}</TableCell>
@@ -241,7 +241,7 @@ export default function InstitutionsPage() {
                 {/* Pagination */}
                 <div className="flex items-center justify-between px-8 py-6 bg-slate-50/50 border-t border-slate-100">
                     <div className="text-[13px] text-slate-400 font-medium">
-                        총 <span className="text-slate-700 font-bold">{institutions.length}</span>개의 데이터가 검색되었습니다.
+                        총 <span className="text-slate-700 font-semibold">{institutions.length}</span>개의 데이터가 검색되었습니다.
                     </div>
                     <div className="flex items-center gap-1.5">
                         <Button variant="outline" size="icon" className="h-9 w-9 border-slate-200 text-slate-400 hover:bg-white hover:text-slate-700 rounded-lg transition-all"><ChevronLeft className="h-4 w-4" /></Button>

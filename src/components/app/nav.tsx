@@ -93,7 +93,7 @@ export function AppNav() {
           {navConfig.map((item, index) => {
             if (item.type === "label") {
               return (
-                <SidebarGroupLabel key={index} className="mt-4 first:mt-0 text-sidebar-foreground/60 font-bold tracking-wider">
+                <SidebarGroupLabel key={index} className="mt-4 first:mt-0 text-sidebar-foreground/60 font-semibold tracking-wider">
                   {item.title}
                 </SidebarGroupLabel>
               )

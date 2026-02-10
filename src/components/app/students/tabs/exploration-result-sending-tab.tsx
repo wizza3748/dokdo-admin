@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Search, RotateCcw, ExternalLink, Send, Calendar as CalendarIcon } from "lucide-react"
+import { Search, RotateCcw, ExternalLink, Send, Calendar as CalendarIcon, X, Smartphone, Monitor } from "lucide-react"
 import { format } from "date-fns"
 import { ko } from "date-fns/locale"
 
@@ -104,6 +104,10 @@ export function ExplorationResultSendingTab() {
     const [appliedFilter, setAppliedFilter] = React.useState(filter)
     const [toastVisible, setToastVisible] = React.useState(false)
 
+    // Preview Modal States
+    const [isPreviewOpen, setIsPreviewOpen] = React.useState(false)
+    const [selectedPreviewUrl, setSelectedPreviewUrl] = React.useState("")
+
     // Derived visible records - Source of truth is allRecords
     const visibleRecords = React.useMemo(() => {
         let filtered = [...allRecords]
@@ -140,6 +144,15 @@ export function ExplorationResultSendingTab() {
             sendStatus: filter.sendStatus
         }))
     }, [filter.studyType, filter.sendStatus])
+
+    // ESC key to close preview
+    React.useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setIsPreviewOpen(false)
+        }
+        window.addEventListener("keydown", handleEsc)
+        return () => window.removeEventListener("keydown", handleEsc)
+    }, [])
 
     const handleSendModeChange = (mode: SendMode) => {
         setSendMode(mode)
@@ -195,21 +208,21 @@ export function ExplorationResultSendingTab() {
     return (
         <div className="flex flex-col gap-8 pb-10">
 
-            {/* 1-1. 발송 설정 영역 - 가장 강한 위계 */}
-            <Card className="p-8 border-2 border-slate-200 shadow-md relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-2 h-full bg-blue-600" />
-                <div className="flex items-center justify-between">
-                    <div className="space-y-1.5">
-                        <h3 className="text-xl font-black text-slate-800 tracking-tight">발송 설정</h3>
-                        <p className="text-sm font-semibold text-slate-500">
-                            {sendMode === "자동" ? "자동 발송 시각은 21:00 입니다." : "수동 발송 모드입니다. 목록에서 발송 버튼을 눌러주세요."}
+            {/* 1-1. 발송 설정 영역 - 컴팩트한 설정 바 형태로 단순화 */}
+            <Card className="py-4 px-6 border border-slate-200 shadow-sm relative overflow-hidden">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <h3 className="text-sm font-bold text-slate-800 tracking-tight shrink-0">발송 설정</h3>
+                        <div className="w-[1px] h-3 bg-slate-200" />
+                        <p className="text-xs font-semibold text-slate-500">
+                            자동 발송 시각은 21:00 입니다.
                         </p>
                     </div>
-                    <div className="bg-slate-100 p-1 rounded-xl">
-                        <Tabs value={sendMode} onValueChange={(v) => handleSendModeChange(v as SendMode)} className="w-[180px]">
-                            <TabsList className="grid w-full grid-cols-2 h-9 bg-transparent">
-                                <TabsTrigger value="수동" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-bold">수동</TabsTrigger>
-                                <TabsTrigger value="자동" className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-bold">자동</TabsTrigger>
+                    <div className="bg-slate-100 p-1 rounded-lg">
+                        <Tabs value={sendMode} onValueChange={(v) => handleSendModeChange(v as SendMode)} className="w-[140px]">
+                            <TabsList className="grid w-full grid-cols-2 h-7 bg-transparent border-none p-0">
+                                <TabsTrigger value="수동" className="h-full rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-bold text-[12px]">수동</TabsTrigger>
+                                <TabsTrigger value="자동" className="h-full rounded-md data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm font-bold text-[12px]">자동</TabsTrigger>
                             </TabsList>
                         </Tabs>
                     </div>
@@ -338,16 +351,16 @@ export function ExplorationResultSendingTab() {
                 <Table>
                     <TableHeader className="bg-slate-50/50">
                         <TableRow className="hover:bg-transparent border-b-slate-100">
-                            <TableHead className="w-[120px] font-bold text-slate-400 py-4 pl-8">기준일</TableHead>
-                            <TableHead className="w-[100px] font-bold text-slate-400">발송모드</TableHead>
-                            <TableHead className="w-[120px] font-bold text-slate-400">발송상태</TableHead>
-                            <TableHead className="font-bold text-slate-400">발송시각</TableHead>
-                            <TableHead className="font-bold text-slate-400">학습타입</TableHead>
-                            <TableHead className="text-center font-bold text-slate-400">레벨</TableHead>
-                            <TableHead className="text-center font-bold text-slate-400">첫 탐험</TableHead>
-                            <TableHead className="text-center font-bold text-slate-400">재탐험</TableHead>
-                            <TableHead className="text-center font-bold text-slate-400 w-[120px]">발송</TableHead>
-                            <TableHead className="text-center font-bold text-slate-400 w-[120px] pr-8">미리보기</TableHead>
+                            <TableHead className="w-[120px] font-semibold text-slate-400 py-4 pl-8">기준일</TableHead>
+                            <TableHead className="w-[100px] font-semibold text-slate-400">발송모드</TableHead>
+                            <TableHead className="w-[120px] font-semibold text-slate-400">발송상태</TableHead>
+                            <TableHead className="font-semibold text-slate-400">발송시각</TableHead>
+                            <TableHead className="font-semibold text-slate-400">학습타입</TableHead>
+                            <TableHead className="text-center font-semibold text-slate-400">레벨</TableHead>
+                            <TableHead className="text-center font-semibold text-slate-400">첫 탐험</TableHead>
+                            <TableHead className="text-center font-semibold text-slate-400">재탐험</TableHead>
+                            <TableHead className="text-center font-semibold text-slate-400 w-[120px]">발송</TableHead>
+                            <TableHead className="text-center font-semibold text-slate-400 w-[120px] pr-8">미리보기</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -360,10 +373,10 @@ export function ExplorationResultSendingTab() {
                         ) : (
                             visibleRecords.map((record: SendRecord, i: number) => (
                                 <TableRow key={`${record.baseDate}-${record.level}-${i}`} className="group hover:bg-slate-50/50 border-b-slate-50 transition-colors">
-                                    <TableCell className="font-black text-slate-600 py-5 pl-8">{record.baseDate}</TableCell>
+                                    <TableCell className="font-semibold text-slate-600 py-5 pl-8">{record.baseDate}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className={cn(
-                                            "font-black text-[10px] px-2 py-0.5",
+                                            "font-semibold text-[10px] px-2 py-0.5",
                                             record.sendMode === "자동" ? "text-emerald-500 border-emerald-100 bg-emerald-50" : "text-slate-400 border-slate-200"
                                         )}>
                                             {record.sendMode}
@@ -377,7 +390,7 @@ export function ExplorationResultSendingTab() {
                                                     record.sendStatus === "발송실패" ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : "bg-slate-300"
                                             )} />
                                             <span className={cn(
-                                                "text-sm font-black",
+                                                "text-sm font-semibold",
                                                 record.sendStatus === "발송완료" ? "text-emerald-600" :
                                                     record.sendStatus === "발송실패" ? "text-red-500" : "text-slate-400"
                                             )}>
@@ -394,24 +407,24 @@ export function ExplorationResultSendingTab() {
                                     <TableCell>
                                         <div className="flex gap-1.5 flex-wrap">
                                             {record.studyTypes.map((st: StudyType) => (
-                                                <span key={st} className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-md">
+                                                <span key={st} className="bg-slate-100 text-slate-500 text-[10px] font-semibold px-2 py-0.5 rounded-md">
                                                     {st}
                                                 </span>
                                             ))}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <div className="inline-flex items-center justify-center size-8 bg-slate-50 rounded-lg text-sm font-black text-slate-700">
+                                        <div className="inline-flex items-center justify-center size-8 bg-slate-50 rounded-lg text-sm font-semibold text-slate-700">
                                             {record.level}
                                         </div>
                                     </TableCell>
-                                    <TableCell className="text-center font-bold text-slate-600">
-                                        <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-black">
+                                    <TableCell className="text-center font-medium text-slate-600">
+                                        <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-semibold">
                                             {record.firstCount}
                                         </span>
                                     </TableCell>
-                                    <TableCell className="text-center font-bold text-slate-600">
-                                        <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs font-black">
+                                    <TableCell className="text-center font-medium text-slate-600">
+                                        <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-full text-xs font-semibold">
                                             {record.retryCount}
                                         </span>
                                     </TableCell>
@@ -432,7 +445,10 @@ export function ExplorationResultSendingTab() {
                                             size="sm"
                                             variant="outline"
                                             className="h-9 px-3 text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-blue-600 transition-all rounded-lg gap-1.5 font-bold"
-                                            onClick={() => window.open(record.previewUrl, "_blank")}
+                                            onClick={() => {
+                                                setSelectedPreviewUrl(record.previewUrl)
+                                                setIsPreviewOpen(true)
+                                            }}
                                         >
                                             <ExternalLink className="w-3.5 h-3.5" />
                                             미리보기
@@ -450,8 +466,111 @@ export function ExplorationResultSendingTab() {
                 <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
                     <div className="bg-slate-900/90 backdrop-blur-md text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700/50">
                         <div className="size-2 bg-blue-400 rounded-full animate-pulse" />
-                        <span className="text-sm font-black tracking-tight">발송 설정이 변경되었습니다!</span>
+                        <span className="text-sm font-semibold tracking-tight">발송 설정이 변경되었습니다!</span>
                     </div>
+                </div>
+            )}
+
+            {/* Premium Preview Modal */}
+            {isPreviewOpen && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300 px-4"
+                    onClick={() => setIsPreviewOpen(false)}
+                >
+                    <Card
+                        className="w-full max-w-[500px] bg-white rounded-[32px] shadow-2xl overflow-hidden border-none flex flex-col max-h-[92vh]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 shrink-0">
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 bg-blue-50 rounded-lg">
+                                    <Smartphone className="w-5 h-5 text-blue-600" />
+                                </div>
+                                <h3 className="font-black text-slate-800 tracking-tight">탐험 결과 미리보기</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 rounded-lg text-slate-500 font-bold gap-1.5 border-slate-200"
+                                    onClick={() => window.open(selectedPreviewUrl, "_blank")}
+                                >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                    <span className="text-xs">새 창으로 열기</span>
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400"
+                                    onClick={() => setIsPreviewOpen(false)}
+                                >
+                                    <X className="w-5 h-5" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Modal Body - iPhone Frame */}
+                        <div className="flex-1 bg-slate-50 relative flex justify-center py-8 overflow-hidden">
+                            {/* iPhone Frame Container (Outer Bezel) */}
+                            {/* screen 390px + bezel padding = 420px */}
+                            {/* Force a portrait height explicitly */}
+                            <div className="relative w-[420px] h-[780px] bg-[#1a1a1a] rounded-[54px] p-3 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] border-[3px] border-[#333] flex flex-col overflow-hidden shrink-0 my-auto">
+
+                                {/* Dynamic Island Area (Top centered) */}
+                                <div className="absolute top-6 left-1/2 -translate-x-1/2 w-[110px] h-[30px] bg-black rounded-[20px] z-30 flex items-center justify-center">
+                                    <div className="size-1 rounded-full bg-[#222] mr-6" />
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[#222]" />
+                                </div>
+
+                                {/* Inner Bezel & Screen Container */}
+                                <div className="w-full h-full bg-white rounded-[42px] overflow-hidden relative shadow-inner">
+                                    {/* Scrollable Container (Single Scroll Source) */}
+                                    <div className="w-full h-full overflow-y-auto overflow-x-hidden bg-white custom-scrollbar">
+                                        {/* iframe - fixed 390px forced */}
+                                        <iframe
+                                            src={selectedPreviewUrl}
+                                            className="w-[390px] h-[3500px] border-none"
+                                            title="Preview Content"
+                                            style={{
+                                                width: '390px',
+                                                height: '3500px', // Large height to allow parent container to scroll
+                                                display: 'block',
+                                                margin: '0 auto',
+                                                overflow: 'hidden'
+                                            }}
+                                            scrolling="no"
+                                        />
+                                    </div>
+
+                                    {/* Top Status Bar Decoration */}
+                                    <div className="absolute top-0 left-0 w-full h-8 bg-transparent pointer-events-none z-20" />
+                                </div>
+
+                                {/* Side Button Mocks (Subtle highlights) */}
+                                <div className="absolute top-[120px] -left-[1px] w-[3px] h-[60px] bg-gradient-to-b from-[#555] to-[#222] rounded-r-md z-10" />
+                                <div className="absolute top-[190px] -left-[1px] w-[3px] h-[60px] bg-gradient-to-b from-[#555] to-[#222] rounded-r-md z-10" />
+                                <div className="absolute top-[160px] -right-[1px] w-[3px] h-[100px] bg-gradient-to-b from-[#555] to-[#222] rounded-l-md z-10" />
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Internal Styling for scrollbar hiding and refinement */}
+                    <style jsx global>{`
+                        .custom-scrollbar::-webkit-scrollbar {
+                            width: 6px;
+                        }
+                        .custom-scrollbar::-webkit-scrollbar-track {
+                            background: transparent;
+                        }
+                        .custom-scrollbar::-webkit-scrollbar-thumb {
+                            background: rgba(0,0,0,0.12);
+                            border-radius: 10px;
+                        }
+                        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                            background: rgba(0,0,0,0.25);
+                        }
+                    `}</style>
                 </div>
             )}
         </div>

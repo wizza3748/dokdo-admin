@@ -156,13 +156,13 @@ export default function ParentPreviewPage() {
                 <header className="px-8 pt-12 pb-8 flex flex-col gap-4">
                     {data.student.type === "B2B" && data.student.orgName && (
                         <div className="flex items-center gap-1.5 text-blue-600">
-                            <span className="text-xs font-black tracking-widest uppercase">{data.student.orgName}</span>
+                            <span className="text-xs font-bold tracking-widest uppercase">{data.student.orgName}</span>
                             <div className="size-1 rounded-full bg-blue-200" />
                             <span className="text-xs font-bold text-blue-300">REPORT</span>
                         </div>
                     )}
                     <div className="space-y-1">
-                        <h1 className="text-[28px] font-black text-slate-900 leading-[1.2] tracking-tight">
+                        <h1 className="text-[28px] font-bold text-slate-900 leading-[1.2] tracking-tight">
                             {data.student.name}의<br />
                             <span className="text-blue-600 decoration-blue-100 decoration-8 underline-offset-[-2px] underline">{data.context.baseDate}</span><br />
                             탐험 결과에요!
@@ -182,13 +182,13 @@ export default function ParentPreviewPage() {
                                 <TabsList className="bg-transparent w-full flex justify-center gap-16 h-10 p-0 border-none rounded-none">
                                     <TabsTrigger
                                         value="reading"
-                                        className="relative px-0 h-full rounded-none bg-transparent data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-slate-900 font-extrabold data-[state=active]:font-black text-[18px] transition-all duration-300 border-none tracking-tight"
+                                        className="relative px-0 h-full rounded-none bg-transparent data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-slate-900 font-bold data-[state=active]:font-bold text-[18px] transition-all duration-300 border-none tracking-tight"
                                     >
                                         책 읽기
                                     </TabsTrigger>
                                     <TabsTrigger
                                         value="writing"
-                                        className="relative px-0 h-full rounded-none bg-transparent data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-slate-900 font-extrabold data-[state=active]:font-black text-[18px] transition-all duration-300 border-none tracking-tight"
+                                        className="relative px-0 h-full rounded-none bg-transparent data-[state=active]:bg-transparent text-slate-400 data-[state=active]:text-slate-900 font-bold data-[state=active]:font-bold text-[18px] transition-all duration-300 border-none tracking-tight"
                                     >
                                         글쓰기
                                     </TabsTrigger>
@@ -342,19 +342,16 @@ function ResultCard({ res, type }: { res: any, type: "reading" | "writing" }) {
 
                                 <div className="grid grid-cols-2 gap-4">
                                     {[
-                                        { label: "어휘력", val: res.scores.vocabulary, color: "bg-blue-500", icon: "📖" },
-                                        { label: "문장력", val: res.scores.sentence, color: "bg-emerald-500", icon: "✍️" },
-                                        { label: "글 구성력", val: res.scores.structure, color: "bg-orange-400", icon: "🏗️" },
-                                        { label: "작문 상위인지", val: res.scores.metacognition, color: "bg-purple-500", icon: "🧠" }
+                                        { label: "어휘력", val: res.scores.vocabulary, color: "bg-blue-500" },
+                                        { label: "문장력", val: res.scores.sentence, color: "bg-emerald-500" },
+                                        { label: "글 구성력", val: res.scores.structure, color: "bg-orange-400" },
+                                        { label: "작문 상위 인지", val: res.scores.metacognition, color: "bg-purple-500" }
                                     ].map((s, i) => (
-                                        <div key={i} className="group/score flex flex-col gap-3 p-6 rounded-[2.2rem] bg-white border border-slate-100 shadow-sm transition-all hover:shadow-xl">
-                                            <div className="flex items-center gap-3">
-                                                <div className="size-9 rounded-xl flex items-center justify-center text-lg bg-slate-50">
-                                                    {s.icon}
-                                                </div>
-                                                <span className="text-[15px] font-black text-slate-800 leading-none">{s.label}</span>
+                                        <div key={i} className="group/score flex flex-col gap-3 p-5 rounded-[2.2rem] bg-white border border-slate-100 shadow-sm transition-all hover:shadow-xl">
+                                            <div className="flex items-center">
+                                                <span className="text-[14px] font-black text-slate-800 leading-tight break-keep">{s.label}</span>
                                             </div>
-                                            <div className="flex items-baseline gap-1.5 px-3 py-1.5 bg-slate-50/50 rounded-xl w-fit ml-0.5">
+                                            <div className="flex items-baseline gap-1 px-3 py-1.5 bg-slate-50/50 rounded-xl w-fit">
                                                 <span className="text-2xl font-black text-slate-900">{s.val}</span>
                                                 <span className="text-[12px] font-bold text-slate-400">점</span>
                                             </div>

@@ -43,7 +43,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 
 const FormLabel = ({ children, required = false, className = "" }: { children: React.ReactNode; required?: boolean; className?: string }) => (
-    <Label className={`text-[13px] font-bold text-slate-600 flex items-center gap-1 ${className}`}>
+    <Label className={`text-[13px] font-semibold text-slate-600 flex items-center gap-1 ${className}`}>
         {required && <span className="text-red-500">*</span>}
         {children}
     </Label>
@@ -55,7 +55,7 @@ const InfoItem = ({ label, value, icon: Icon }: { label: string; value: string |
             {Icon && <Icon className="w-3 h-3" />}
             {label}
         </span>
-        <span className="text-[13px] font-bold text-slate-700">{value}</span>
+        <span className="text-[13px] font-semibold text-slate-700">{value}</span>
     </div>
 );
 
@@ -70,8 +70,8 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                 {/* Left: Agency Profile Section */}
                 <div className="flex flex-col items-center xl:items-start gap-3 shrink-0 lg:min-w-[240px] relative">
                     <div className="flex flex-col items-center xl:items-start gap-1">
-                        <h1 className="text-[28px] font-black text-slate-900 tracking-tight leading-tight">진순이학원</h1>
-                        <span className="text-[13px] font-bold text-slate-400/80 uppercase tracking-widest">성남지사</span>
+                        <h1 className="text-[28px] font-bold text-slate-900 tracking-tight leading-tight">진순이학원</h1>
+                        <span className="text-[13px] font-semibold text-slate-400/80 uppercase tracking-widest">성남지사</span>
                     </div>
                     <Button className="w-full bg-[#002855] hover:bg-[#001d3d] text-white font-black rounded-2xl h-12 shadow-lg shadow-blue-900/15 transition-all transform hover:-translate-y-0.5">
                         <ExternalLink className="w-4 h-4 mr-2 opacity-70" />
@@ -89,33 +89,33 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                     <div className="flex flex-col gap-2 group/item">
                         <div className="flex items-center gap-2.5 text-slate-400 group-hover/item:text-indigo-500 transition-colors">
                             <Users className="w-4 h-4" />
-                            <span className="text-[11px] font-black uppercase tracking-wider">선생님 / 학생 수</span>
+                            <span className="text-[11px] font-semibold uppercase tracking-wider">선생님 / 학생 수</span>
                         </div>
                         <div className="flex items-baseline gap-2 ml-[26px]">
-                            <span className="text-xl font-black text-blue-600">2<span className="text-xs ml-0.5 opacity-60">명</span></span>
+                            <span className="text-xl font-bold text-blue-600">2<span className="text-xs ml-0.5 opacity-60">명</span></span>
                             <span className="text-slate-300 font-light">/</span>
-                            <span className="text-xl font-black text-indigo-600">6<span className="text-xs ml-0.5 opacity-60">명</span></span>
+                            <span className="text-xl font-bold text-indigo-600">6<span className="text-xs ml-0.5 opacity-60">명</span></span>
                         </div>
                     </div>
 
                     <div className="flex flex-col gap-2 group/item">
                         <div className="flex items-center gap-2.5 text-slate-400 group-hover/item:text-emerald-500 transition-colors">
                             <Wallet className="w-4 h-4" />
-                            <span className="text-[11px] font-black uppercase tracking-wider">포인트 현황</span>
+                            <span className="text-[11px] font-semibold uppercase tracking-wider">포인트 현황</span>
                         </div>
                         <div className="flex flex-col ml-[26px]">
-                            <span className="text-2xl font-black text-emerald-600">0 <span className="text-xs font-bold text-slate-400">P</span></span>
-                            <span className="text-[10px] font-bold text-slate-300 uppercase">무료: 0</span>
+                            <span className="text-2xl font-bold text-emerald-600">0 <span className="text-xs font-semibold text-slate-400">P</span></span>
+                            <span className="text-[10px] font-semibold text-slate-300 uppercase">무료: 0</span>
                         </div>
                     </div>
 
                     <div className="flex flex-col gap-2 group/item">
                         <div className="flex items-center gap-2.5 text-slate-400 group-hover/item:text-blue-500 transition-colors">
                             <CreditCard className="w-4 h-4" />
-                            <span className="text-[11px] font-black uppercase tracking-wider">단체 코드</span>
+                            <span className="text-[11px] font-semibold uppercase tracking-wider">단체 코드</span>
                         </div>
                         <div className="flex items-center gap-2 ml-[26px]">
-                            <code className="bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-blue-600 font-black text-[13px] tracking-wider shadow-sm">495448</code>
+                            <code className="bg-slate-50 border border-slate-100 px-2.5 py-1 rounded-lg text-blue-600 font-semibold text-[13px] tracking-wider shadow-sm">495448</code>
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-300 hover:text-blue-500 hover:bg-blue-50">
                                 <Copy className="w-3.5 h-3.5" />
                             </Button>
@@ -140,7 +140,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                             <TabsTrigger
                                 key={tab.value}
                                 value={tab.value}
-                                className="px-8 h-full rounded-[1.2rem] data-[state=active]:bg-white data-[state=active]:text-[#002855] data-[state=active]:shadow-[0_4px_15px_-3px_rgba(0,0,0,0.08)] text-slate-400 font-black transition-all hover:text-slate-600 group/tab"
+                                className="px-8 h-full rounded-[1.2rem] data-[state=active]:bg-white data-[state=active]:text-[#002855] data-[state=active]:shadow-[0_4px_15px_-3px_rgba(0,0,0,0.08)] text-slate-400 font-semibold transition-all hover:text-slate-600 group/tab"
                             >
                                 <tab.icon className="w-4 h-4 mr-2.5 transition-transform group-hover/tab:scale-110" />
                                 <span className="text-[14px]">{tab.label}</span>
@@ -154,7 +154,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                         {/* Left Content - Form List */}
                         <div className="flex flex-col gap-10 bg-white border border-slate-100 rounded-3xl p-10 shadow-[0_4px_25px_-5px_rgba(0,0,0,0.02)]">
                             <div>
-                                <h2 className="text-xl font-black text-slate-800 mb-8 flex items-center gap-3">
+                                <h2 className="text-xl font-bold text-slate-800 mb-8 flex items-center gap-3">
                                     <div className="w-1.5 h-6 bg-[#002855] rounded-full" />
                                     진순이학원 상세 정보
                                 </h2>
@@ -162,7 +162,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                 <div className="flex flex-col gap-12">
                                     {/* 기관 정보 섹션 */}
                                     <div className="flex flex-col gap-6">
-                                        <h3 className="text-[14px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2">기관 정보</h3>
+                                        <h3 className="text-[14px] font-semibold text-slate-400 uppercase tracking-widest border-b border-slate-50 pb-2">기관 정보</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
                                             <div className="flex flex-col gap-2">
                                                 <FormLabel required>기관명</FormLabel>
@@ -210,7 +210,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                     {/* 서비스 정보 섹션 */}
                                     <div className="flex flex-col gap-6">
                                         <div className="flex items-center justify-between border-b border-slate-50 pb-2">
-                                            <h3 className="text-[14px] font-bold text-slate-400 uppercase tracking-widest">서비스 정보</h3>
+                                            <h3 className="text-[14px] font-semibold text-slate-400 uppercase tracking-widest">서비스 정보</h3>
                                             <Button variant="ghost" className="h-8 text-amber-600 bg-amber-50 hover:bg-amber-100 font-bold text-[12px] rounded-lg">서비스 변경 예약</Button>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
@@ -311,7 +311,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                     {/* 전자책 정보 섹션 */}
                                     <div className="flex flex-col gap-6">
                                         <div className="flex items-center justify-between border-b border-slate-50 pb-2">
-                                            <h3 className="text-[14px] font-bold text-slate-400 uppercase tracking-widest">전자책 정보</h3>
+                                            <h3 className="text-[14px] font-semibold text-slate-400 uppercase tracking-widest">전자책 정보</h3>
                                             <Button variant="ghost" className="h-8 text-amber-600 bg-amber-50 hover:bg-amber-100 font-bold text-[12px] rounded-lg">전자책 변경 예약</Button>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
@@ -374,7 +374,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
 
                                     {/* 본사관리자 전용 섹션 */}
                                     <div className="flex flex-col gap-6 border-t border-slate-50 pt-8">
-                                        <h3 className="text-[14px] font-bold text-slate-400 uppercase tracking-widest">본사관리자에게만 노출되는 정보</h3>
+                                        <h3 className="text-[14px] font-semibold text-slate-400 uppercase tracking-widest">본사관리자에게만 노출되는 정보</h3>
                                         <div className="flex flex-col gap-4">
                                             <FormLabel>메모</FormLabel>
                                             <Textarea
@@ -396,7 +396,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                         {/* Right Content - Teacher List Sidebar */}
                         <div className="flex flex-col gap-6">
                             <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                                <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                                     <div className="w-1.5 h-6 bg-[#002855] rounded-full" />
                                     선생님 목록
                                 </h3>
@@ -414,12 +414,12 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                         <div className="flex justify-between items-start">
                                             <div className="flex flex-col gap-1.5">
                                                 <div className="flex items-center gap-2.5">
-                                                    <span className="text-xl font-black text-slate-800 tracking-tight">{teacher.name}</span>
-                                                    <Badge className={`${teacher.role === "대표선생님" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"} text-[10px] font-black px-2.5 py-1 rounded-lg border-0 shadow-sm`}>
+                                                    <span className="text-xl font-bold text-slate-800 tracking-tight">{teacher.name}</span>
+                                                    <Badge className={`${teacher.role === "대표선생님" ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"} text-[10px] font-semibold px-2.5 py-1 rounded-lg border-0 shadow-sm`}>
                                                         {teacher.role}
                                                     </Badge>
                                                 </div>
-                                                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-widest">{teacher.id}</span>
+                                                <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-widest">{teacher.id}</span>
                                             </div>
                                             <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
                                                 <Button variant="ghost" size="icon" className="h-9 w-9 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"><Edit2 className="h-4 w-4" /></Button>
@@ -431,7 +431,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                                 <div className="size-8 rounded-xl bg-blue-50 flex items-center justify-center border border-blue-100/50">
                                                     <Phone className="w-3.5 h-3.5 text-blue-500" />
                                                 </div>
-                                                <span className="text-[14px] font-black tracking-tight">{teacher.phone}</span>
+                                                <span className="text-[14px] font-semibold tracking-tight">{teacher.phone}</span>
                                             </div>
                                             {teacher.email && (
                                                 <div className="flex items-center gap-3 text-slate-600">
@@ -443,7 +443,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                             )}
                                         </div>
                                         <div className="flex justify-between items-center pt-5 border-t border-slate-50 mt-1">
-                                            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-300/80 uppercase tracking-wider">
+                                            <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-300/80 uppercase tracking-wider">
                                                 <Calendar className="w-3 h-3" />
                                                 <span>Joined {teacher.regDate}</span>
                                             </div>
@@ -467,11 +467,11 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-2 mb-2">
                                             <div className="w-1 h-4 bg-blue-500 rounded-full" />
-                                            <span className="text-[13px] font-black text-slate-800 uppercase tracking-wider">학생 검색</span>
+                                            <span className="text-[13px] font-semibold text-slate-800 uppercase tracking-wider">학생 검색</span>
                                         </div>
                                         <div className="flex gap-3">
                                             <Select defaultValue="name">
-                                                <SelectTrigger className="w-[140px] h-12 bg-slate-50 border-slate-200 rounded-2xl font-black text-[13px] focus:bg-white focus:ring-blue-100 transition-all">
+                                                <SelectTrigger className="w-[140px] h-12 bg-slate-50 border-slate-200 rounded-2xl font-semibold text-[13px] focus:bg-white focus:ring-blue-100 transition-all">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -492,14 +492,14 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-2 mb-2">
                                             <div className="w-1 h-4 bg-indigo-500 rounded-full" />
-                                            <span className="text-[13px] font-black text-slate-800 uppercase tracking-wider">학습 타입</span>
+                                            <span className="text-[13px] font-semibold text-slate-800 uppercase tracking-wider">학습 타입</span>
                                         </div>
                                         <div className="flex flex-wrap gap-2.5">
                                             {["전체", "책 읽기+글쓰기", "책 읽기", "글쓰기"].map((type) => (
                                                 <Button
                                                     key={type}
                                                     variant="outline"
-                                                    className={`h-12 px-6 rounded-2xl text-[13px] font-black tracking-tight transition-all border-2 ${type === "전체" ? "bg-slate-900 border-slate-900 text-white hover:bg-black hover:text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 border-slate-100 hover:border-slate-300 hover:bg-slate-50"}`}
+                                                    className={`h-12 px-6 rounded-2xl text-[13px] font-semibold tracking-tight transition-all border-2 ${type === "전체" ? "bg-slate-900 border-slate-900 text-white hover:bg-black hover:text-white shadow-md shadow-slate-200" : "bg-white text-slate-500 border-slate-100 hover:border-slate-300 hover:bg-slate-50"}`}
                                                 >
                                                     {type}
                                                 </Button>
@@ -510,8 +510,8 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
 
                                 <div className="flex justify-end pt-4 border-t border-slate-50/50">
                                     <div className="flex gap-3">
-                                        <Button variant="outline" className="h-12 px-8 border-slate-200 text-slate-500 font-black rounded-2xl hover:bg-slate-50 transition-all active:scale-95">초기화</Button>
-                                        <Button className="h-12 px-12 bg-[#002855] hover:bg-[#001d3d] text-white font-black rounded-2xl shadow-xl shadow-blue-900/15 transition-all transform hover:-translate-y-0.5 active:scale-95">검색하기</Button>
+                                        <Button variant="outline" className="h-12 px-8 border-slate-200 text-slate-500 font-semibold rounded-2xl hover:bg-slate-50 transition-all active:scale-95">초기화</Button>
+                                        <Button className="h-12 px-12 bg-[#002855] hover:bg-[#001d3d] text-white font-bold rounded-2xl shadow-xl shadow-blue-900/15 transition-all transform hover:-translate-y-0.5 active:scale-95">검색하기</Button>
                                     </div>
                                 </div>
                             </div>
@@ -524,8 +524,8 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                     <Users className="w-5 h-5 text-blue-600" />
                                 </div>
                                 <div className="flex flex-col">
-                                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">학생 목록</h3>
-                                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Total 9 Students</span>
+                                    <h3 className="text-2xl font-bold text-slate-900 tracking-tight">학생 목록</h3>
+                                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Total 9 Students</span>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -554,7 +554,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                                 { label: "생성일", sortable: false },
                                                 { label: "편집", sortable: false }
                                             ].map((col, idx) => (
-                                                <th key={idx} className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] whitespace-nowrap">
+                                                <th key={idx} className="px-8 py-6 text-[11px] font-semibold text-slate-400 uppercase tracking-[0.15em] whitespace-nowrap">
                                                     <div className="flex items-center gap-2 cursor-pointer hover:text-slate-900 transition-colors group/th">
                                                         {col.label}
                                                         {col.sortable && (
@@ -578,30 +578,30 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                             { id: "24215", name: "최서우", type: "책 읽기+글쓰기", status: "사용중", endDate: "2026-02-28", regDate: "2025-08-18" },
                                         ].map((student, idx) => (
                                             <tr key={idx} className="hover:bg-blue-50/20 transition-all group">
-                                                <td className="px-8 py-5 text-[13px] font-bold text-slate-400 group-hover:text-blue-900 transition-colors uppercase tracking-tight">{student.id}</td>
+                                                <td className="px-8 py-5 text-[13px] font-semibold text-slate-400 group-hover:text-blue-900 transition-colors uppercase tracking-tight">{student.id}</td>
                                                 <td className="px-8 py-5">
                                                     <div className="flex flex-col">
-                                                        <Link href={`/admin/students/${student.id}`} className="text-[15px] font-black text-slate-800 hover:text-blue-600 transition-colors tracking-tight">
+                                                        <Link href={`/admin/students/${student.id}`} className="text-[15px] font-bold text-slate-800 hover:text-blue-600 transition-colors tracking-tight">
                                                             {student.name}
                                                         </Link>
                                                         <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Full Profile</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-5">
-                                                    <Badge className="bg-slate-100 text-slate-600 border-0 font-black text-[11px] px-3 py-1.5 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+                                                    <Badge className="bg-slate-100 text-slate-600 border-0 font-semibold text-[11px] px-3 py-1.5 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
                                                         {student.type}
                                                     </Badge>
                                                 </td>
                                                 <td className="px-8 py-5">
                                                     <div className="flex items-center gap-2">
                                                         <div className={`size-2 rounded-full ${student.status === "사용중" ? "bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]" : student.status === "사용전" ? "bg-amber-500" : "bg-slate-300"}`} />
-                                                        <span className={`font-black text-[12px] tracking-tight ${student.status === "사용중" ? "text-emerald-600" : student.status === "사용전" ? "text-amber-600" : "text-slate-400"}`}>
+                                                        <span className={`font-semibold text-[12px] tracking-tight ${student.status === "사용중" ? "text-emerald-600" : student.status === "사용전" ? "text-amber-600" : "text-slate-400"}`}>
                                                             {student.status}
                                                         </span>
                                                     </div>
                                                 </td>
-                                                <td className="px-8 py-5 text-[13px] font-bold text-slate-500">{student.endDate}</td>
-                                                <td className="px-8 py-5 text-[13px] font-bold text-slate-400">{student.regDate}</td>
+                                                <td className="px-8 py-5 text-[13px] font-semibold text-slate-500">{student.endDate}</td>
+                                                <td className="px-8 py-5 text-[13px] font-semibold text-slate-400">{student.regDate}</td>
                                                 <td className="px-8 py-5">
                                                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all transform translate-x-2 group-hover:translate-x-0">
                                                         <Button variant="ghost" size="icon" className="h-[38px] w-[38px] text-slate-300 hover:text-blue-600 hover:bg-white rounded-xl shadow-none hover:shadow-lg hover:shadow-blue-900/5 transition-all">
@@ -622,7 +622,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                             <div className="p-10 border-t border-slate-50 flex justify-center bg-slate-50/20">
                                 <div className="flex gap-2.5 p-1.5 bg-white rounded-2xl shadow-sm border border-slate-200/50">
                                     {[1, 2, 3, 4, 5].map((p) => (
-                                        <Button key={p} variant="ghost" className={`w-10 h-10 p-0 rounded-xl font-black text-[13px] transition-all ${p === 1 ? "bg-[#002855] text-white hover:bg-[#001d3d] hover:text-white shadow-lg shadow-blue-900/10" : "text-slate-400 hover:text-slate-900 hover:bg-slate-50"}`}>
+                                        <Button key={p} variant="ghost" className={`w-10 h-10 p-0 rounded-xl font-semibold text-[13px] transition-all ${p === 1 ? "bg-[#002855] text-white hover:bg-[#001d3d] hover:text-white shadow-lg shadow-blue-900/10" : "text-slate-400 hover:text-slate-900 hover:bg-slate-50"}`}>
                                             {p}
                                         </Button>
                                     ))}
