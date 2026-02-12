@@ -163,14 +163,10 @@ export function ExplorationResultSendingTab() {
     const canShowSendButton = (record: SendRecord) => {
         if (sendMode === "자동") return false // 상단 설정이 자동이면 모든 버튼 미노출
 
-        const today = format(new Date(), "yyyy-MM-dd")
-        const isToday = record.baseDate === today
-
         if (record.sendMode === "자동") return false
         if (record.sendStatus === "발송완료") return false
-        if (!isToday) return false
 
-        return record.sendMode === "수동" && (record.sendStatus === "발송대기" || record.sendStatus === "발송실패") && isToday
+        return record.sendMode === "수동" && (record.sendStatus === "발송대기" || record.sendStatus === "발송실패")
     }
 
     const handleSend = React.useCallback((record: SendRecord, e: React.MouseEvent) => {
