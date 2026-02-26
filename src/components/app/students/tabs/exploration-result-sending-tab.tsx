@@ -39,7 +39,8 @@ interface SendRecord {
     sendStatus: SendStatus
     sentAt: string | null
     studyTypes: StudyType[]
-    level: number
+    readingLevel: number
+    writingLevel: number
     firstCount: number
     retryCount: number
     previewUrl: string
@@ -54,7 +55,8 @@ const MOCK_RECORDS: SendRecord[] = [
         sendStatus: "발송대기",
         sentAt: null,
         studyTypes: ["책 읽기", "글쓰기"],
-        level: 5,
+        readingLevel: 3,
+        writingLevel: 4,
         firstCount: 1,
         retryCount: 0,
         previewUrl: "/preview/exploration/1",
@@ -67,7 +69,8 @@ const MOCK_RECORDS: SendRecord[] = [
         sendStatus: "발송완료",
         sentAt: "2026-02-05 21:00:12",
         studyTypes: ["책 읽기"],
-        level: 5,
+        readingLevel: 5,
+        writingLevel: 5,
         firstCount: 1,
         retryCount: 1,
         previewUrl: "/preview/exploration/2",
@@ -80,7 +83,8 @@ const MOCK_RECORDS: SendRecord[] = [
         sendStatus: "발송실패",
         sentAt: null,
         studyTypes: ["글쓰기"],
-        level: 4,
+        readingLevel: 4,
+        writingLevel: 4,
         firstCount: 0,
         retryCount: 1,
         previewUrl: "/preview/exploration/3",
@@ -110,14 +114,25 @@ export function ExplorationResultSendingTab() {
 
     // Derived visible records - Source of truth is allRecords
     const visibleRecords = React.useMemo(() => {
-        let filtered = [...allRecords]
+        const todayStr = format(new Date(), "yyyy-MM-dd")
+
+        // 1. 기본 필터링: 완료된 탐험 결과가 있는 것만 (발송 대상 한정)
+        let filtered = allRecords.filter(r => (r.firstCount + r.retryCount) > 0)
+
+        // 2. 적용된 필터 (학습타입, 발송상태)
         if (appliedFilter.studyType !== "전체") {
             filtered = filtered.filter(r => r.studyTypes.includes(appliedFilter.studyType as StudyType))
         }
         if (appliedFilter.sendStatus !== "전체") {
             filtered = filtered.filter(r => r.sendStatus === appliedFilter.sendStatus)
         }
-        return filtered
+
+        // 3. 정렬: 오늘 날짜 최상단, 나머지는 날짜 내림차순
+        return filtered.sort((a, b) => {
+            if (a.baseDate === todayStr) return -1
+            if (b.baseDate === todayStr) return 1
+            return b.baseDate.localeCompare(a.baseDate)
+        })
     }, [allRecords, appliedFilter])
 
     // --- Logic ---
@@ -161,7 +176,12 @@ export function ExplorationResultSendingTab() {
     }
 
     const canShowSendButton = (record: SendRecord) => {
+        const todayStr = format(new Date(), "yyyy-MM-dd")
+
         if (sendMode === "자동") return false // 상단 설정이 자동이면 모든 버튼 미노출
+
+        // 기준일이 지난 내역은 수동 발송 대상에 포함하지 않음
+        if (record.baseDate !== todayStr) return false
 
         if (record.sendMode === "자동") return false
         if (record.sendStatus === "발송완료") return false
@@ -186,7 +206,7 @@ export function ExplorationResultSendingTab() {
         const now = format(new Date(), "yyyy-MM-dd HH:mm:ss")
 
         setAllRecords(prev => prev.map(r => {
-            if (r.baseDate === record.baseDate && r.level === record.level) {
+            if (r.baseDate === record.baseDate && r.readingLevel === record.readingLevel && r.writingLevel === record.writingLevel) {
                 return {
                     ...r,
                     sendStatus: "발송완료",
@@ -368,7 +388,7 @@ export function ExplorationResultSendingTab() {
                             </TableRow>
                         ) : (
                             visibleRecords.map((record: SendRecord, i: number) => (
-                                <TableRow key={`${record.baseDate}-${record.level}-${i}`} className="group hover:bg-slate-50/50 border-b-slate-50 transition-colors">
+                                <TableRow key={`${record.baseDate}-${record.readingLevel}-${record.writingLevel}-${i}`} className="group hover:bg-slate-50/50 border-b-slate-50 transition-colors">
                                     <TableCell className="font-semibold text-slate-600 py-5 pl-8">{record.baseDate}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline" className={cn(
@@ -410,8 +430,21 @@ export function ExplorationResultSendingTab() {
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center">
-                                        <div className="inline-flex items-center justify-center size-8 bg-slate-50 rounded-lg text-sm font-semibold text-slate-700">
-                                            {record.level}
+                                        <div className="flex items-center justify-center gap-1.5">
+                                            {record.readingLevel === record.writingLevel ? (
+                                                <div className="flex items-center justify-center size-8 bg-slate-50 rounded-lg text-sm font-bold text-slate-700 border border-slate-200">
+                                                    {record.readingLevel}
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="flex items-center justify-center size-8 bg-blue-50 rounded-lg text-sm font-bold text-blue-700 border border-blue-100" title="책 읽기 레벨">
+                                                        {record.readingLevel}
+                                                    </div>
+                                                    <div className="flex items-center justify-center size-8 bg-amber-50 rounded-lg text-sm font-bold text-amber-700 border border-amber-100" title="글쓰기 레벨">
+                                                        {record.writingLevel}
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell className="text-center font-medium text-slate-600">
