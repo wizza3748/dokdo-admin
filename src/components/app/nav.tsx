@@ -8,6 +8,7 @@ import {
   ChevronRight,
   GraduationCap,
   LayoutDashboard,
+  Map,
   Users,
   type LucideIcon,
 } from "lucide-react"
@@ -32,6 +33,7 @@ import {
 const icons: Record<string, LucideIcon> = {
   LayoutDashboard,
   Building2,
+  Map,
   Users,
   GraduationCap,
 }
@@ -56,6 +58,11 @@ const navConfig: NavItem[] = [
     title: "B2C관리",
     icon: "Users",
     children: [{ title: "학생목록", href: "/admin/b2c/students" }]
+  },
+  {
+    title: "탐험관리",
+    icon: "Map",
+    children: [{ title: "탐험결과발송 현황", href: "/admin/exploration/send-status" }]
   },
   { title: "[기관관리자]", type: "label" },
   {

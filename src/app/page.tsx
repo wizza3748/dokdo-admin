@@ -35,7 +35,24 @@ export default function Home() {
                   </Link>
                 </div>
               </div>
-              <div className="min-h-[120px] bg-slate-50/20">
+              <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group">
+                <div className="p-5 text-center">
+                  <a
+                    href="https://sloop-dev.atlassian.net/browse/DD-1401"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors underline-offset-4 hover:underline"
+                  >
+                    DD-1401
+                  </a>
+                </div>
+                <div className="p-5 text-[15px] font-semibold text-slate-700 border-l border-slate-50 group-hover:text-[#002855] transition-colors">
+                  <Link href="/admin/exploration/send-status" className="hover:underline">
+                    탐험관리 &gt; 탐험결과발송 현황
+                  </Link>
+                </div>
+              </div>
+              <div className="min-h-[80px] bg-slate-50/20">
               </div>
             </CardContent>
           </Card>
