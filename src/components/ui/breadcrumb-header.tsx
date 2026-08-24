@@ -13,6 +13,12 @@ export function BreadcrumbHeader() {
         if (pathname.startsWith("/admin")) {
             const crumbs = [{ label: "[본사관리자]", href: "#" }]
 
+            if (pathname.startsWith("/admin/online-workbooks")) {
+                crumbs.push({ label: "온라인워크북 관리", href: "/admin/online-workbooks" })
+                crumbs.push({ label: "온라인워크북 현황", href: "#" })
+                return crumbs
+            }
+
             // 기관관리
             if (pathname.includes("/admin/institutions")) {
                 crumbs.push({ label: "기관관리", href: "/admin/institutions" })
@@ -45,6 +51,12 @@ export function BreadcrumbHeader() {
         if (pathname.startsWith("/agency")) {
             const crumbs = [{ label: "[기관관리자]", href: "#" }]
 
+            if (pathname.startsWith("/agency/online-workbooks")) {
+                crumbs.push({ label: "온라인워크북 관리", href: "/agency/online-workbooks" })
+                crumbs.push({ label: "온라인워크북 목록", href: "#" })
+                return crumbs
+            }
+
             // 학생관리
             if (pathname.includes("/agency/students")) {
                 crumbs.push({ label: "학생관리", href: "#" })
@@ -61,6 +73,13 @@ export function BreadcrumbHeader() {
 
         if (pathname === "/") {
             return [{ label: "일감보드", href: "/" }]
+        }
+
+        if (pathname === "/student") {
+            return [
+                { label: "[학생프론트]", href: "#" },
+                { label: "홈", href: "/student" },
+            ]
         }
 
         return [{ label: "Dashboard", href: "/" }]

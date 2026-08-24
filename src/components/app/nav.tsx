@@ -4,9 +4,11 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+  BookOpenCheck,
   Building2,
   ChevronRight,
   GraduationCap,
+  House,
   LayoutDashboard,
   Map,
   Users,
@@ -31,14 +33,17 @@ import {
 } from "@/components/ui/sidebar"
 
 const icons: Record<string, LucideIcon> = {
+  BookOpenCheck,
   LayoutDashboard,
   Building2,
   Map,
   Users,
   GraduationCap,
+  House,
 }
 
 interface NavItem {
+  id: string
   title: string
   href?: string
   icon?: string
@@ -47,29 +52,47 @@ interface NavItem {
 }
 
 const navConfig: NavItem[] = [
-  { title: "일감보드", href: "/", icon: "LayoutDashboard" },
-  { title: "[본사관리자]", type: "label" },
+  { id: "dashboard", title: "일감보드", href: "/", icon: "LayoutDashboard" },
+  { id: "admin-label", title: "[본사관리자]", type: "label" },
   {
+    id: "admin-institutions",
     title: "기관관리",
     icon: "Building2",
     children: [{ title: "기관목록", href: "/admin/institutions" }]
   },
   {
+    id: "admin-b2c",
     title: "B2C관리",
     icon: "Users",
     children: [{ title: "학생목록", href: "/admin/b2c/students" }]
   },
   {
+    id: "admin-exploration",
     title: "탐험관리",
     icon: "Map",
     children: [{ title: "탐험결과발송 현황", href: "/admin/exploration/send-status" }]
   },
-  { title: "[기관관리자]", type: "label" },
   {
+    id: "admin-online-workbooks",
+    title: "온라인워크북 관리",
+    icon: "BookOpenCheck",
+    children: [{ title: "온라인워크북 현황", href: "/admin/online-workbooks" }]
+  },
+  { id: "agency-label", title: "[기관관리자]", type: "label" },
+  {
+    id: "agency-students",
     title: "학생관리",
     icon: "GraduationCap",
     children: [{ title: "학생목록", href: "/agency/students" }]
-  }
+  },
+  {
+    id: "agency-online-workbooks",
+    title: "온라인워크북 관리",
+    icon: "BookOpenCheck",
+    children: [{ title: "온라인워크북 목록", href: "/agency/online-workbooks" }]
+  },
+  { id: "student-label", title: "[학생프론트]", type: "label" },
+  { id: "student-home", title: "홈", href: "/student", icon: "House" }
 ]
 
 export function AppNav() {
@@ -82,25 +105,14 @@ export function AppNav() {
     return pathname.startsWith(href)
   }
 
-  // 경로 변경 시 활성 그룹 자동 확장
-  React.useEffect(() => {
-    const newOpenItems: Record<string, boolean> = { ...openItems }
-    navConfig.forEach(item => {
-      if (item.children && item.children.some(child => isMatch(child.href))) {
-        newOpenItems[item.title] = true
-      }
-    })
-    setOpenItems(newOpenItems)
-  }, [pathname])
-
   return (
     <SidebarContent>
       <SidebarGroup>
         <SidebarMenu>
-          {navConfig.map((item, index) => {
+          {navConfig.map((item) => {
             if (item.type === "label") {
               return (
-                <SidebarGroupLabel key={index} className="mt-4 first:mt-0 text-sidebar-foreground/60 font-semibold tracking-wider">
+                <SidebarGroupLabel key={item.id} className="mt-4 first:mt-0 text-sidebar-foreground/60 font-semibold tracking-wider">
                   {item.title}
                 </SidebarGroupLabel>
               )
@@ -110,7 +122,7 @@ export function AppNav() {
               const Icon = item.icon ? icons[item.icon] : null
               const active = isMatch(item.href)
               return (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton isActive={active} asChild tooltip={item.title}>
                     <Link href={item.href || "#"}>
                       {Icon && <Icon className="h-4 w-4" />}
@@ -123,14 +135,14 @@ export function AppNav() {
 
             const Icon = item.icon ? icons[item.icon] : null
             const isGroupActive = item.children.some(child => isMatch(child.href))
-            const isOpen = openItems[item.title] ?? false
+            const isOpen = openItems[item.id] ?? isGroupActive
 
             return (
               <Collapsible
-                key={item.title}
+                key={item.id}
                 asChild
                 open={isOpen}
-                onOpenChange={(open) => setOpenItems(prev => ({ ...prev, [item.title]: open }))}
+                onOpenChange={(open) => setOpenItems(prev => ({ ...prev, [item.id]: open }))}
                 className="group/collapsible"
               >
                 <SidebarMenuItem>
