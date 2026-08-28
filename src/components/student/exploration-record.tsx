@@ -52,10 +52,8 @@ export function ExplorationRecord() {
     setMounted(true)
     const handleChange = () => refresh()
     window.addEventListener("dokdo-workbook-change", handleChange)
-    window.addEventListener("storage", handleChange)
     return () => {
       window.removeEventListener("dokdo-workbook-change", handleChange)
-      window.removeEventListener("storage", handleChange)
     }
   }, [])
 
@@ -81,7 +79,7 @@ export function ExplorationRecord() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f7f9] text-[#3f4549]">
+    <div className="min-h-screen bg-[#f5f7f9] text-[#3f4549] [&_button:not(:disabled)]:cursor-pointer">
       <StudentHeader />
       <section className="border-b border-[#e5e9ec] bg-white px-4 pb-8 pt-8">
         <div className="mx-auto flex max-w-[920px] items-center justify-center gap-2">

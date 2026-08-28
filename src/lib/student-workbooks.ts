@@ -237,19 +237,10 @@ export const studentWorkbooks: StudentWorkbook[] = [
   },
 ]
 
-const STORAGE_KEY = "dokdo-student-workbooks-v2"
-
-function readStoredStates(): Record<string, Partial<WorkbookRuntimeState>> {
-  if (typeof window === "undefined") return {}
-  try {
-    return JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}") as Record<string, Partial<WorkbookRuntimeState>>
-  } catch {
-    return {}
-  }
-}
+const runtimeStates: Record<string, Partial<WorkbookRuntimeState>> = {}
 
 export function getWorkbookRuntime(workbook: StudentWorkbook): WorkbookRuntimeState {
-  const stored = readStoredStates()[workbook.id]
+  const stored = runtimeStates[workbook.id]
   const selectedTemplateId = stored?.selectedTemplateId ?? workbook.selectedTemplateId
   const template = workbook.templates.find((item) => item.id === selectedTemplateId) ?? workbook.templates[0]
   const sourceAnswers = stored?.answers ?? workbook.answers
@@ -263,9 +254,7 @@ export function getWorkbookRuntime(workbook: StudentWorkbook): WorkbookRuntimeSt
 
 export function saveWorkbookRuntime(id: string, next: Partial<WorkbookRuntimeState>) {
   if (typeof window === "undefined") return
-  const states = readStoredStates()
-  states[id] = { ...states[id], ...next }
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(states))
+  runtimeStates[id] = { ...runtimeStates[id], ...next }
   window.dispatchEvent(new CustomEvent("dokdo-workbook-change", { detail: { id } }))
 }
 

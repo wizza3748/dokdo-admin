@@ -20,6 +20,7 @@ import {
   MessageCircle,
   RefreshCw,
   Save,
+  Search,
   Smartphone,
   Strikethrough,
   Underline,
@@ -38,7 +39,7 @@ import {
 } from "@/lib/student-workbooks"
 
 type ViewMode = "select" | "write" | "rewrite" | "result"
-type ModalMode = "preview" | "start" | "outline" | "switch" | "empty" | "save" | "submit" | "feedback" | null
+type ModalMode = "preview" | "start" | "outline" | "switch" | "save" | "content-empty" | "submit" | "feedback" | null
 
 export function StudentWorkbookFlow({ id }: { id: string }) {
   const router = useRouter()
@@ -95,8 +96,12 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
     persist({ status: "writing", selectedTemplateId: template.id, answers }, "저장되었어요.")
   }
 
-  const completeQuestionMove = (next: number) => {
+  const completeQuestionMove = (next: number, currentAnswers = answers) => {
     if (next >= template.questions.length) {
+      if (currentAnswers.every((answer) => !answer.trim())) {
+        setModal("content-empty")
+        return
+      }
       setView("rewrite")
       return
     }
@@ -110,11 +115,7 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
       setModal("save")
       return
     }
-    if (next > questionIndex && !answers[questionIndex]?.trim()) {
-      setModal("empty")
-      return
-    }
-    completeQuestionMove(next)
+    completeQuestionMove(next, answers)
   }
 
   const saveAndMoveQuestion = () => {
@@ -124,7 +125,16 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
     persist({ status: "writing", selectedTemplateId: template.id, answers })
     setPendingQuestionIndex(null)
     setModal(null)
-    completeQuestionMove(next)
+    completeQuestionMove(next, answers)
+  }
+
+  const discardAndMoveQuestion = () => {
+    if (pendingQuestionIndex === null) return
+    const next = pendingQuestionIndex
+    setAnswers(savedAnswers)
+    setPendingQuestionIndex(null)
+    setModal(null)
+    completeQuestionMove(next, savedAnswers)
   }
 
   const closeSaveConfirm = () => {
@@ -142,7 +152,7 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
   const openFeedback = () => setModal("feedback")
 
   return (
-    <div className="min-h-screen bg-[#f5f7f9] text-[#202326]">
+    <div className="min-h-screen bg-[#f5f7f9] text-[#202326] [&_button:not(:disabled)]:cursor-pointer">
       <StudentHeader section="온라인 워크북" />
       {view === "select" ? (
         <SelectionTitle title={workbook.bookTitle} />
@@ -185,6 +195,7 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
           template={template}
           answers={answers}
           setAnswers={setAnswers}
+          dirty={dirty}
           onPrevious={() => setView("write")}
           onSave={saveAnswers}
           onSubmit={() => setModal("submit")}
@@ -221,16 +232,6 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
           }}
         />
       )}
-      {modal === "empty" && (
-        <ConfirmModal
-          title="작성 내용 확인"
-          description={<>아직 작성한 내용이 없어요.<br />답변을 작성한 뒤 다음으로 이동해 주세요.</>}
-          confirmLabel="확인"
-          single
-          onClose={() => setModal(null)}
-          onConfirm={() => setModal(null)}
-        />
-      )}
       {modal === "save" && (
         <ConfirmModal
           title="저장 확인"
@@ -238,7 +239,18 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
           cancelLabel="아니오"
           confirmLabel="네"
           onClose={closeSaveConfirm}
+          onCancel={discardAndMoveQuestion}
           onConfirm={saveAndMoveQuestion}
+        />
+      )}
+      {modal === "content-empty" && (
+        <ConfirmModal
+          title="내용 확인"
+          description="아직 작성한 내용이 없어요. 내용을 작성한 뒤 확인해 보세요."
+          confirmLabel="확인"
+          single
+          onClose={() => setModal(null)}
+          onConfirm={() => setModal(null)}
         />
       )}
       {modal === "submit" && (
@@ -343,28 +355,26 @@ function Meta({ label, value }: { label: string; value: string }) {
 
 function WritingScreen({ template, answers, questionIndex, setQuestionIndex, setAnswers, dirty, onPrevious, onNext, onSave, onSwitch }: { template: WorkbookTemplate; answers: string[]; questionIndex: number; setQuestionIndex: (value: number) => void; setAnswers: React.Dispatch<React.SetStateAction<string[]>>; dirty: boolean; onPrevious: () => void; onNext: () => void; onSave: () => void; onSwitch: () => void }) {
   const question = template.questions[questionIndex]
-  const firstEmpty = answers.findIndex((answer) => !answer.trim())
-  const lastUnlocked = firstEmpty === -1 ? template.questions.length - 1 : firstEmpty
   return (
     <>
       <main className="mx-auto max-w-[930px] px-0 pb-28 pt-10">
         <section>
           <div className="flex items-center justify-between gap-4">
             <h1 className="flex items-center gap-3 text-[21px] font-black"><span className="grid size-9 place-items-center rounded-full bg-[#087fc8] text-lg text-white">{questionIndex + 1}</span>{question.title}</h1>
-            <QuestionSteps questions={template.questions} current={questionIndex} lastUnlocked={lastUnlocked} onSelect={setQuestionIndex} />
+            <QuestionSteps questions={template.questions} current={questionIndex} onSelect={setQuestionIndex} />
           </div>
           <p className="mt-3 text-[15px] leading-6">{question.description}</p>
           {question.example && <div className="mt-3 rounded-lg border border-[#dfd9ca] bg-[#f8f5ec] px-4 py-4 text-[14px] leading-6"><strong className="mr-2">예시</strong>{question.example}</div>}
           <Editor value={answers[questionIndex] ?? ""} onChange={(value) => setAnswers((current) => current.map((answer, index) => index === questionIndex ? value : answer))} />
         </section>
       </main>
-      <WritingFooter questionIndex={questionIndex} isLast={questionIndex === template.questions.length - 1} dirty={dirty} onPrevious={onPrevious} onNext={onNext} onSave={onSave} onSwitch={onSwitch} />
+      <WritingFooter questionIndex={questionIndex} dirty={dirty} onPrevious={onPrevious} onNext={onNext} onSave={onSave} onSwitch={onSwitch} />
     </>
   )
 }
 
-function QuestionSteps({ questions, current, lastUnlocked, onSelect }: { questions: WorkbookTemplate["questions"]; current: number; lastUnlocked: number; onSelect: (index: number) => void }) {
-  return <div className="flex gap-2">{questions.map((_, index) => <button type="button" key={index} disabled={index > lastUnlocked} onClick={() => onSelect(index)} className={cn("grid size-8 place-items-center rounded-full bg-[#e7ecef] text-[16px] font-black text-[#90999f] disabled:opacity-45", index === current && "bg-[#087fc8] text-white")}>{index + 1}</button>)}</div>
+function QuestionSteps({ questions, current, onSelect }: { questions: WorkbookTemplate["questions"]; current: number; onSelect: (index: number) => void }) {
+  return <div className="flex gap-2">{questions.map((_, index) => <button type="button" key={index} onClick={() => onSelect(index)} className={cn("grid size-8 cursor-pointer place-items-center rounded-full bg-[#e7ecef] text-[16px] font-black text-[#90999f]", index === current && "bg-[#087fc8] text-white")}>{index + 1}</button>)}</div>
 }
 
 function Editor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
@@ -382,25 +392,61 @@ function ToolbarButton({ label, children }: { label: string; children: React.Rea
   return <button type="button" aria-label={label} className="grid size-8 place-items-center rounded hover:bg-white">{children}</button>
 }
 
-function WritingFooter({ questionIndex, isLast, dirty, onPrevious, onNext, onSave, onSwitch }: { questionIndex: number; isLast: boolean; dirty: boolean; onPrevious: () => void; onNext: () => void; onSave: () => void; onSwitch: () => void }) {
+function WritingFooter({ questionIndex, dirty, onPrevious, onNext, onSave, onSwitch }: { questionIndex: number; dirty: boolean; onPrevious: () => void; onNext: () => void; onSave: () => void; onSwitch: () => void }) {
   return (
     <footer className="fixed inset-x-0 bottom-0 z-40 h-[68px] bg-[#4a5e77]">
       <div className="mx-auto flex h-full max-w-[930px] items-center justify-between">
         <div className="flex gap-2"><button type="button" disabled={questionIndex === 0} onClick={onPrevious} className="flex h-11 items-center gap-2 rounded bg-[#34475f] px-5 font-black text-white disabled:opacity-45"><ArrowLeft className="size-4" />이전</button><button type="button" className="flex h-11 items-center gap-2 rounded bg-[#4cc9b8] px-5 font-black text-white"><Smartphone className="size-4" />전자책 보기</button><button type="button" onClick={onSwitch} className="flex h-11 items-center gap-2 rounded bg-[#fa5e8d] px-5 font-black text-white"><RefreshCw className="size-4" />워크북 교체</button></div>
-        <div className="flex gap-2"><button type="button" disabled={!dirty} onClick={onSave} className="flex h-11 items-center gap-2 rounded bg-[#8f86ef] px-5 font-black text-white disabled:opacity-60"><Save className="size-4" />저장하기</button><button type="button" onClick={onNext} className="flex h-11 items-center gap-2 rounded bg-[#249ce0] px-7 font-black text-white">{isLast ? "확인" : "다음"}<ArrowRight className="size-4" /></button></div>
+        <div className="flex gap-2"><button type="button" disabled={!dirty} onClick={onSave} className="flex h-11 items-center gap-2 rounded bg-[#8f86ef] px-5 font-black text-white disabled:opacity-60"><Save className="size-4" />저장하기</button><button type="button" onClick={onNext} className="flex h-11 items-center gap-2 rounded bg-[#249ce0] px-7 font-black text-white">다음<ArrowRight className="size-4" /></button></div>
       </div>
     </footer>
   )
 }
 
-function RewriteScreen({ template, answers, setAnswers, onPrevious, onSave, onSubmit }: { template: WorkbookTemplate; answers: string[]; setAnswers: React.Dispatch<React.SetStateAction<string[]>>; onPrevious: () => void; onSave: () => void; onSubmit: () => void }) {
+function RewriteScreen({ template, answers, setAnswers, dirty, onPrevious, onSave, onSubmit }: { template: WorkbookTemplate; answers: string[]; setAnswers: React.Dispatch<React.SetStateAction<string[]>>; dirty: boolean; onPrevious: () => void; onSave: () => void; onSubmit: () => void }) {
+  const [editingIndex, setEditingIndex] = React.useState<number | null>(null)
+
   return (
     <>
-      <main className="mx-auto max-w-[930px] pb-28 pt-8">
-        <h1 className="text-2xl font-black">고쳐쓰기</h1><p className="mt-2 text-[#667078]">작성한 내용을 다시 읽고 자연스럽게 다듬어 보세요.</p>
-        <div className="mt-5 space-y-4">{template.questions.map((question, index) => <section key={question.title} className="rounded-lg border border-[#dde3e6] bg-white p-5"><h2 className="font-black">{index + 1}. {question.title}</h2><textarea value={answers[index] ?? ""} onChange={(event) => setAnswers((current) => current.map((answer, answerIndex) => answerIndex === index ? event.target.value : answer))} className="mt-3 min-h-28 w-full resize-y border border-[#d6dde1] p-4 leading-7 outline-none focus:border-[#249ce0]" /></section>)}</div>
+      <main className="mx-auto max-w-[930px] pb-28 pt-4">
+        <h1 className="flex items-center gap-2 text-[20px] font-black"><span className="grid size-8 place-items-center rounded-full bg-[#087fc8] text-white"><Search className="size-5 stroke-[3]" /></span>고쳐쓰기</h1>
+        <section className="mt-2 rounded-lg border border-[#dce3e7] bg-white px-8 pb-8 pt-5">
+          <h2 className="text-[27px] font-black">{template.title}</h2>
+          <div className="mt-2 space-y-2">
+            {template.questions.map((question, index) => {
+              const answer = answers[index] ?? ""
+              const editing = editingIndex === index
+
+              if (editing) {
+                return (
+                  <section key={question.title} className="px-1 pb-4 pt-2">
+                    <h3 className="text-[16px] font-black">{index + 1}.{question.title}</h3>
+                    <Editor value={answer} onChange={(value) => setAnswers((current) => current.map((item, answerIndex) => answerIndex === index ? value : item))} />
+                  </section>
+                )
+              }
+
+              if (!answer.trim()) {
+                return (
+                  <section key={question.title} className="px-1 pb-3 pt-2">
+                    <h3 className="text-[16px] font-black">{index + 1}.{question.title}</h3>
+                    <button type="button" onClick={() => setEditingIndex(index)} className="mt-2 grid min-h-24 w-full place-items-center rounded-lg border-2 border-dashed border-[#dce5ea] text-[16px] text-[#a2a7aa] transition hover:border-[#249ce0] hover:bg-[#eef8fe]">클릭하여 작성하세요.</button>
+                  </section>
+                )
+              }
+
+              return (
+                <button type="button" key={question.title} onClick={() => setEditingIndex(index)} className="group relative block w-full rounded-lg border-2 border-transparent px-3 py-2 text-left transition hover:border-[#249ce0] hover:bg-[#eaf6fd]">
+                  <span className="absolute right-2 top-2 rounded-full bg-[#249ce0] px-3 py-1 text-[11px] font-black text-white opacity-0 transition group-hover:opacity-100">클릭하여 편집하기</span>
+                  <strong className="block pr-28 text-[16px]">{index + 1}.{question.title}</strong>
+                  <span className="mt-2 block whitespace-pre-wrap border-b-2 border-dotted border-[#d8e1e6] pb-1 text-[16px] leading-7">{answer}</span>
+                </button>
+              )
+            })}
+          </div>
+        </section>
       </main>
-      <footer className="fixed inset-x-0 bottom-0 z-40 h-[68px] bg-[#4a5e77]"><div className="mx-auto flex h-full max-w-[930px] items-center justify-between"><button type="button" onClick={onPrevious} className="flex h-11 items-center gap-2 rounded bg-[#34475f] px-5 font-black text-white"><ArrowLeft className="size-4" />이전</button><div className="flex gap-2"><button type="button" onClick={onSave} className="flex h-11 items-center gap-2 rounded bg-[#8f86ef] px-5 font-black text-white"><Save className="size-4" />저장하기</button><button type="button" onClick={onSubmit} className="h-11 rounded bg-[#249ce0] px-7 font-black text-white">제출하기</button></div></div></footer>
+      <footer className="fixed inset-x-0 bottom-0 z-40 h-[68px] bg-[#4a5e77]"><div className="mx-auto flex h-full max-w-[930px] items-center justify-between"><button type="button" onClick={onPrevious} className="flex h-11 items-center gap-2 rounded bg-[#34475f] px-5 font-black text-white"><ArrowLeft className="size-4" />이전</button><div className="flex gap-2"><button type="button" disabled={!dirty} onClick={onSave} className="flex h-11 items-center gap-2 rounded bg-[#8f86ef] px-5 font-black text-white disabled:opacity-60"><Save className="size-4" />저장하기</button><button type="button" onClick={onSubmit} className="h-11 rounded bg-[#249ce0] px-7 font-black text-white">제출하기</button></div></div></footer>
     </>
   )
 }
@@ -439,11 +485,11 @@ function OutlineModal({ template, onClose, onStart }: { template: WorkbookTempla
 function PreviewModal({ template, onClose }: { template: WorkbookTemplate; onClose: () => void }) {
   const [index, setIndex] = React.useState(0)
   const question = template.questions[index]
-  return <ModalShell width="810px"><ModalHeader title={template.title} subtitle="이 워크북은 미리보기 전용입니다. 작성은 선택 후 시작할 수 있어요." onClose={onClose} /><div className="px-4 py-4"><div className="flex items-center justify-between"><h3 className="flex items-center gap-3 text-[19px] font-black"><span className="grid size-8 place-items-center rounded-full bg-[#087fc8] text-white">{index + 1}</span>{question.title}</h3><QuestionSteps questions={template.questions} current={index} lastUnlocked={template.questions.length - 1} onSelect={setIndex} /></div><p className="mt-3 text-[15px] leading-6">{question.description}</p>{question.example && <div className="mt-3 rounded-lg border border-[#dfd9ca] bg-[#f8f5ec] px-4 py-4 text-[14px] leading-6"><strong className="mr-2">예시</strong>{question.example}</div>}<div className="pointer-events-none opacity-90"><Editor value="" onChange={() => undefined} /></div><p className="mt-2 text-center text-[#2a9fdf]">미리보기 모드에서는 입력이 비활성화되어 있습니다.</p></div></ModalShell>
+  return <ModalShell width="810px"><ModalHeader title={template.title} subtitle="이 워크북은 미리보기 전용입니다. 작성은 선택 후 시작할 수 있어요." onClose={onClose} /><div className="px-4 py-4"><div className="flex items-center justify-between"><h3 className="flex items-center gap-3 text-[19px] font-black"><span className="grid size-8 place-items-center rounded-full bg-[#087fc8] text-white">{index + 1}</span>{question.title}</h3><QuestionSteps questions={template.questions} current={index} onSelect={setIndex} /></div><p className="mt-3 text-[15px] leading-6">{question.description}</p>{question.example && <div className="mt-3 rounded-lg border border-[#dfd9ca] bg-[#f8f5ec] px-4 py-4 text-[14px] leading-6"><strong className="mr-2">예시</strong>{question.example}</div>}<div className="pointer-events-none opacity-90"><Editor value="" onChange={() => undefined} /></div><p className="mt-2 text-center text-[#2a9fdf]">미리보기 모드에서는 입력이 비활성화되어 있습니다.</p></div></ModalShell>
 }
 
-function ConfirmModal({ title, description, cancelLabel = "취소", confirmLabel, single = false, onClose, onConfirm }: { title: string; description: React.ReactNode; cancelLabel?: string; confirmLabel: string; single?: boolean; onClose: () => void; onConfirm: () => void }) {
-  return <ModalShell><ModalHeader title={title} onClose={onClose} /><div className="grid min-h-[190px] place-items-center px-7 text-center text-[19px] leading-8"><p>{description}</p></div><YellowFooter single={single}>{!single && <button type="button" onClick={onClose}>{cancelLabel}</button>}<button type="button" onClick={onConfirm}>{confirmLabel}</button></YellowFooter></ModalShell>
+function ConfirmModal({ title, description, cancelLabel = "취소", confirmLabel, single = false, onClose, onCancel = onClose, onConfirm }: { title: string; description: React.ReactNode; cancelLabel?: string; confirmLabel: string; single?: boolean; onClose: () => void; onCancel?: () => void; onConfirm: () => void }) {
+  return <ModalShell><ModalHeader title={title} onClose={onClose} /><div className="grid min-h-[190px] place-items-center px-7 text-center text-[19px] leading-8"><p>{description}</p></div><YellowFooter single={single}>{!single && <button type="button" onClick={onCancel}>{cancelLabel}</button>}<button type="button" onClick={onConfirm}>{confirmLabel}</button></YellowFooter></ModalShell>
 }
 
 function YellowFooter({ children, single = false }: { children: React.ReactNode; single?: boolean }) {
