@@ -106,13 +106,13 @@ export function AppNav() {
   }
 
   return (
-    <SidebarContent>
-      <SidebarGroup>
-        <SidebarMenu>
+    <SidebarContent className="bg-white">
+      <SidebarGroup className="px-3 py-4">
+        <SidebarMenu className="gap-1">
           {navConfig.map((item) => {
             if (item.type === "label") {
               return (
-                <SidebarGroupLabel key={item.id} className="mt-4 first:mt-0 text-sidebar-foreground/60 font-semibold tracking-wider">
+                <SidebarGroupLabel key={item.id} className="mt-4 h-8 px-2 text-xs font-semibold tracking-wide text-slate-400 first:mt-0">
                   {item.title}
                 </SidebarGroupLabel>
               )
@@ -123,7 +123,7 @@ export function AppNav() {
               const active = isMatch(item.href)
               return (
                 <SidebarMenuItem key={item.id}>
-                  <SidebarMenuButton isActive={active} asChild tooltip={item.title}>
+                  <SidebarMenuButton isActive={active} asChild tooltip={item.title} className="h-11 rounded-xl px-3 text-[15px] font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 data-[active=true]:bg-blue-50 data-[active=true]:text-blue-600">
                     <Link href={item.href || "#"}>
                       {Icon && <Icon className="h-4 w-4" />}
                       <span>{item.title}</span>
@@ -147,19 +147,19 @@ export function AppNav() {
               >
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
-                    <SidebarMenuButton tooltip={item.title}>
+                    <SidebarMenuButton isActive={isGroupActive} tooltip={item.title} className="h-11 rounded-xl px-3 text-[15px] font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 data-[active=true]:bg-blue-50 data-[active=true]:text-blue-600">
                       {Icon && <Icon className="h-4 w-4" />}
                       <span>{item.title}</span>
                       <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <SidebarMenuSub>
+                    <SidebarMenuSub className="mx-2 gap-1 border-0 px-0 py-1">
                       {item.children.map((subItem) => {
                         const subActive = isMatch(subItem.href)
                         return (
                           <SidebarMenuSubItem key={subItem.title}>
-                            <SidebarMenuSubButton isActive={subActive} asChild>
+                            <SidebarMenuSubButton isActive={subActive} asChild className="h-11 rounded-xl px-9 text-sm font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-600 data-[active=true]:bg-blue-100/70 data-[active=true]:text-blue-600">
                               <Link href={subItem.href}>
                                 <span>{subItem.title}</span>
                               </Link>

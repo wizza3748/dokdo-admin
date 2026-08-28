@@ -53,7 +53,7 @@ export function BreadcrumbHeader() {
 
             if (pathname.startsWith("/agency/online-workbooks")) {
                 crumbs.push({ label: "온라인워크북 관리", href: "/agency/online-workbooks" })
-                crumbs.push({ label: "온라인워크북 목록", href: "#" })
+                crumbs.push({ label: pathname.split("/").length > 3 ? "온라인워크북 상세" : "온라인워크북 목록", href: "#" })
                 return crumbs
             }
 
