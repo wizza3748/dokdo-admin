@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation"
 import { RefreshCw } from "lucide-react"
 
 import { AppSidebar } from "@/components/app-sidebar"
+import { AdminPageTabs } from "@/components/app/admin-page-tabs"
 import { BreadcrumbHeader } from "@/components/ui/breadcrumb-header"
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
@@ -31,6 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <BreadcrumbHeader />
           </div>
         </header>
+        {!isAgency && <AdminPageTabs />}
         <main className={cn("flex min-w-0 max-w-full flex-1 flex-col gap-4 overflow-x-hidden p-4", !isAgency && "lg:p-6")}>
           {children}
         </main>

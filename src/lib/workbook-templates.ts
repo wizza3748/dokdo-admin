@@ -1,3 +1,7 @@
+import { getWorkbookTemplateCopy } from "@/lib/workbook-template-copy-data"
+import { getWorkbookTemplateLiveDetail } from "@/lib/workbook-template-live-data"
+import { WORKBOOK_TEMPLATE_LIST_ROWS } from "@/lib/workbook-template-list-data"
+
 export type WorkbookQuestion = {
   id: number
   title: string
@@ -16,6 +20,11 @@ export type WorkbookTemplateRecord = {
   updatedAt: string
   description: string
   rewriteMode: "items" | "continuous"
+  guides: {
+    writing: string
+    rewrite: string
+    complete: string
+  }
 }
 
 const templateSeeds = [
@@ -99,21 +108,42 @@ const quizQuestions: WorkbookQuestion[] = [
   { id: 8, title: "세 번째 퀴즈 정답과 해설 쓰기", description: "세 번째 퀴즈의 정답과 책에서 찾은 근거를 함께 적어 보세요.", example: "서로의 생각을 존중하는 마음입니다. 마지막 장면의 대화에서 확인할 수 있습니다." },
 ]
 
-export const WORKBOOK_TEMPLATES: WorkbookTemplateRecord[] = Array.from({ length: 74 }, (_, index) => {
+export const DEFAULT_GUIDES = {
+  writing: "※ 안내에 따라 독서 감상문을 작성해 보세요.",
+  rewrite: "※ 지금까지 쓴 내용을 한눈에 볼 수 있어요. 처음부터 끝까지 읽으며 고칠 부분이 있는지 살펴보세요. 문장을 자연스럽게 다듬고, 필요하다면 문단 순서도 바꿔 보세요. 이어주는 말을 넣거나 꼭 필요하지 않은 문장은 줄이면, 처음부터 끝까지 자연스럽게 이어지는 ‘하나의 글’로 완성할 수 있어요. 마지막으로, 전체 내용을 살펴보고 가장 잘 어울리는 제목도 함께 지어 보세요.",
+  complete: "※ 워크북 활동을 마무리하고, 완성된 글을 확인해 보세요.",
+}
+
+export const WORKBOOK_TEMPLATES: WorkbookTemplateRecord[] = WORKBOOK_TEMPLATE_LIST_ROWS.map((row, index) => {
   const seed = templateSeeds[index % templateSeeds.length]
-  const [name, studentTitle, levels, questionCount, connections] = seed
-  const suffix = index >= templateSeeds.length ? ` ${Math.floor(index / templateSeeds.length) + 1}` : ""
+  const liveDetail = getWorkbookTemplateLiveDetail(row.id)
+  const copy = getWorkbookTemplateCopy(row.id)
+  const fallbackStudentTitle = seed?.[1] ?? row.name.replace(/^\[[^\]]+\]\s*/, "")
+  const liveQuestions = liveDetail?.questions.map(([title, description], questionIndex) => ({
+    id: questionIndex + 1,
+    title,
+    description,
+  }))
   return {
-    id: index + 1,
-    name: `${name}${suffix}`,
-    studentTitle,
-    levels: [...levels],
-    questions: index === 32 ? quizQuestions : Array.from({ length: questionCount }, (_, questionIndex) => defaultQuestions[questionIndex % defaultQuestions.length]).map((question, questionIndex) => ({ ...question, id: questionIndex + 1 })),
-    connections,
-    reviewed: index !== 73,
-    updatedAt: index === 0 ? "2026-08-31" : index < 20 ? "2025-09-25" : "2025-09-24",
-    description: index === 32 ? "책 내용을 바탕으로 퀴즈를 만들어 보는 활동이에요. 재미있는 문제를 만들며 책 내용을 다시 떠올려 볼 수 있어요." : "책의 내용을 정리하고, 느낀 점을 담아 나만의 독서록을 만들어 보세요.",
+    id: row.id,
+    name: row.name,
+    studentTitle: copy?.studentTitle ?? (liveDetail ? (liveDetail.studentTitle ?? "") : fallbackStudentTitle),
+    levels: row.levels,
+    questions: liveQuestions?.length
+      ? liveQuestions
+      : row.id === 37
+        ? quizQuestions
+        : Array.from({ length: row.questionCount }, (_, questionIndex) => defaultQuestions[questionIndex % defaultQuestions.length]).map((question, questionIndex) => ({ ...question, id: questionIndex + 1 })),
+    connections: row.connections,
+    reviewed: row.reviewed,
+    updatedAt: row.updatedAt,
+    description: copy?.description ?? (liveDetail ? (liveDetail.description ?? "") : (row.id === 37 ? "책 내용을 바탕으로 퀴즈를 만들어 보는 활동이에요. 재미있는 문제를 만들며 책 내용을 다시 떠올려 볼 수 있어요." : "책의 내용을 정리하고, 느낀 점을 담아 나만의 독서록을 만들어 보세요.")),
     rewriteMode: index % 3 === 0 ? "continuous" : "items",
+    guides: {
+      writing: copy?.guides?.writing || liveDetail?.guides?.writing || DEFAULT_GUIDES.writing,
+      rewrite: copy?.guides?.rewrite || liveDetail?.guides?.rewrite || DEFAULT_GUIDES.rewrite,
+      complete: copy?.guides?.complete || liveDetail?.guides?.complete || DEFAULT_GUIDES.complete,
+    },
   }
 })
 
@@ -131,9 +161,3 @@ export const CONNECTED_BOOKS = [
   [780, "아이작 뉴턴, 운동의 법칙을 밝히다", 4, 2],
   [913, "녹두밭에 앉지 마라", 6, 2],
 ] as const
-
-export const DEFAULT_GUIDES = {
-  writing: "※ 안내에 따라 독서 감상문을 작성해 보세요.",
-  rewrite: "※ 지금까지 쓴 내용을 한눈에 볼 수 있어요. 처음부터 끝까지 읽으며 고칠 부분이 있는지 살펴보세요. 문장을 자연스럽게 다듬고, 필요하다면 문단 순서도 바꿔 보세요. 이어주는 말을 넣거나 꼭 필요하지 않은 문장은 줄이면, 처음부터 끝까지 자연스럽게 이어지는 ‘하나의 글’로 완성할 수 있어요. 마지막으로, 전체 내용을 살펴보고 가장 잘 어울리는 제목도 함께 지어 보세요.",
-  complete: "※ 워크북 활동을 마무리하고, 완성된 글을 확인해 보세요.",
-}

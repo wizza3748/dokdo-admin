@@ -14,9 +14,18 @@ export function BreadcrumbHeader() {
             const crumbs = [{ label: "[본사관리자]", href: "#" }]
 
             if (pathname.startsWith("/admin/exploration")) {
-                crumbs.push({ label: "탐험관리", href: "/admin/exploration/workbook-templates" })
-                if (pathname.includes("/reading/") && pathname.includes("/workbook/")) {
+                crumbs.push({ label: "탐험관리", href: "/admin/exploration/reading" })
+                if (pathname === "/admin/exploration/reading") {
+                    crumbs.push({ label: "책 읽기", href: "/admin/exploration/reading" })
+                    crumbs.push({ label: "책 읽기 목록", href: "#" })
+                } else if (pathname.includes("/reading/") && pathname.includes("/workbook/")) {
+                    crumbs.push({ label: "책 읽기", href: "/admin/exploration/reading" })
+                    crumbs.push({ label: "책 읽기 목록", href: "/admin/exploration/reading" })
                     crumbs.push({ label: "온라인 워크북 설정", href: "#" })
+                } else if (/\/reading\/\d+\/edit$/.test(pathname)) {
+                    crumbs.push({ label: "책 읽기", href: "/admin/exploration/reading" })
+                    crumbs.push({ label: "책 읽기 목록", href: "/admin/exploration/reading" })
+                    crumbs.push({ label: "책 읽기 상세", href: "#" })
                 } else if (pathname.endsWith("/create")) {
                     crumbs.push({ label: "워크북 템플릿 등록", href: "#" })
                 } else if (/\/workbook-templates\/\d+$/.test(pathname)) {
@@ -30,7 +39,8 @@ export function BreadcrumbHeader() {
             }
 
             if (pathname.startsWith("/admin/online-workbooks")) {
-                crumbs.push({ label: "온라인워크북 관리", href: "/admin/online-workbooks" })
+                crumbs.push({ label: "탐험관리", href: "/admin/exploration/reading" })
+                crumbs.push({ label: "책 읽기", href: "/admin/exploration/reading" })
                 crumbs.push({ label: "온라인워크북 현황", href: "#" })
                 return crumbs
             }

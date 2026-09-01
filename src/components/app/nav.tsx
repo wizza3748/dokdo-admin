@@ -48,7 +48,13 @@ interface NavItem {
   href?: string
   icon?: string
   type?: "label"
-  children?: { title: string; href: string }[]
+  children?: NavChild[]
+}
+
+interface NavChild {
+  title: string
+  href?: string
+  children?: NavChild[]
 }
 
 const navConfig: NavItem[] = [
@@ -71,15 +77,20 @@ const navConfig: NavItem[] = [
     title: "탐험관리",
     icon: "Map",
     children: [
+      { title: "글쓰기", href: "#" },
+      {
+        title: "책 읽기",
+        children: [
+          { title: "책그룹 관리", href: "#" },
+          { title: "책 읽기 목록", href: "/admin/exploration/reading" },
+          { title: "온라인워크북 현황", href: "/admin/online-workbooks" },
+        ],
+      },
+      { title: "영상편지", href: "#" },
+      { title: "끊어읽기", href: "#" },
       { title: "워크북 템플릿", href: "/admin/exploration/workbook-templates" },
-      { title: "탐험결과발송 현황", href: "/admin/exploration/send-status" },
+      { title: "탐험결과발송", href: "/admin/exploration/send-status" },
     ]
-  },
-  {
-    id: "admin-online-workbooks",
-    title: "온라인워크북 관리",
-    icon: "BookOpenCheck",
-    children: [{ title: "온라인워크북 현황", href: "/admin/online-workbooks" }]
   },
   { id: "agency-label", title: "[기관관리자]", type: "label" },
   {
@@ -103,9 +114,40 @@ export function AppNav() {
   const [openItems, setOpenItems] = React.useState<Record<string, boolean>>({})
 
   const isMatch = (href?: string) => {
-    if (!href) return false
+    if (!href || href === "#") return false
     if (href === "/") return pathname === "/"
     return pathname.startsWith(href)
+  }
+
+  const isChildActive = (child: NavChild): boolean => isMatch(child.href) || Boolean(child.children?.some(isChildActive))
+
+  const renderChild = (child: NavChild, depth = 0): React.ReactNode => {
+    if (child.children) {
+      const childActive = isChildActive(child)
+      const childKey = `nested-${child.title}`
+      const childOpen = openItems[childKey] ?? childActive
+      return <Collapsible key={child.title} open={childOpen} onOpenChange={(open) => setOpenItems((current) => ({ ...current, [childKey]: open }))} className="group/nested">
+        <SidebarMenuSubItem>
+          <CollapsibleTrigger asChild>
+            <SidebarMenuSubButton isActive={childActive} className="h-11 w-full cursor-pointer rounded-xl px-5 text-sm font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-600 data-[active=true]:bg-transparent data-[active=true]:text-blue-600">
+              <span>{child.title}</span><ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/nested:rotate-90" />
+            </SidebarMenuSubButton>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <SidebarMenuSub className="mx-0 gap-1 border-0 px-0 py-1">
+              {child.children.map((nested) => renderChild(nested, depth + 1))}
+            </SidebarMenuSub>
+          </CollapsibleContent>
+        </SidebarMenuSubItem>
+      </Collapsible>
+    }
+    const active = isMatch(child.href)
+    const content = <span>{child.title}</span>
+    return <SidebarMenuSubItem key={child.title}>
+      <SidebarMenuSubButton isActive={active} asChild={Boolean(child.href && child.href !== "#")} className={`h-11 rounded-xl text-sm font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-600 data-[active=true]:bg-blue-100/70 data-[active=true]:text-blue-600 ${depth ? "px-12" : "px-9"}`}>
+        {child.href && child.href !== "#" ? <Link href={child.href}>{content}</Link> : <button type="button" className="w-full cursor-default text-left">{content}</button>}
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
   }
 
   return (
@@ -137,7 +179,7 @@ export function AppNav() {
             }
 
             const Icon = item.icon ? icons[item.icon] : null
-            const isGroupActive = item.children.some(child => isMatch(child.href)) || (item.id === "admin-exploration" && pathname.startsWith("/admin/exploration"))
+            const isGroupActive = item.children.some(isChildActive) || (item.id === "admin-exploration" && pathname.startsWith("/admin/exploration"))
             const isOpen = openItems[item.id] ?? isGroupActive
 
             return (
@@ -158,18 +200,7 @@ export function AppNav() {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub className="mx-2 gap-1 border-0 px-0 py-1">
-                      {item.children.map((subItem) => {
-                        const subActive = isMatch(subItem.href)
-                        return (
-                          <SidebarMenuSubItem key={subItem.title}>
-                            <SidebarMenuSubButton isActive={subActive} asChild className="h-11 rounded-xl px-9 text-sm font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-600 data-[active=true]:bg-blue-100/70 data-[active=true]:text-blue-600">
-                              <Link href={subItem.href}>
-                                <span>{subItem.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        )
-                      })}
+                      {item.children.map((subItem) => renderChild(subItem))}
                     </SidebarMenuSub>
                   </CollapsibleContent>
                 </SidebarMenuItem>

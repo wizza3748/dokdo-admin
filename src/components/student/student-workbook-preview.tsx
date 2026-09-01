@@ -18,7 +18,7 @@ import {
 import { WORKBOOK_TEMPLATES } from "@/lib/workbook-templates"
 
 const ROUND_PREVIEW_TEMPLATE_IDS: Record<number, number> = {
-  230: 33,
+  230: 37,
 }
 
 export function StudentWorkbookPreview({ previewId }: { previewId: number }) {
@@ -28,7 +28,7 @@ export function StudentWorkbookPreview({ previewId }: { previewId: number }) {
   const [guideOpen, setGuideOpen] = React.useState(true)
   const [answers, setAnswers] = React.useState(() => template.questions.map(() => ""))
   const question = template.questions[questionIndex]
-  const writingGuide = template.id === 33
+  const writingGuide = template.id === 37
     ? "※ 안내에 따라 퀴즈를 작성해 보세요."
     : "※ 안내에 따라 독서 감상문을 작성해 보세요."
 
