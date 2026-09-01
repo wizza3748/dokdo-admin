@@ -83,9 +83,20 @@ const templateSeeds = [
 
 const defaultQuestions: WorkbookQuestion[] = [
   { id: 1, title: "책을 선택한 이유", description: "이 책을 읽게 된 계기나 끌렸던 점을 떠올려 보세요. 친구의 추천, 표지나 제목의 인상, 작가에 대한 관심, 줄거리의 흥미로움 등 무엇이 마음을 움직였는지 자유롭게 적어요." },
-  { id: 2, title: "중심 내용 요약", description: "이야기의 흐름을 중요한 사건 위주로 정리해 보세요. 핵심 사건을 순서대로 적으면 책 내용을 쉽게 다시 기억할 수 있어요." },
-  { id: 3, title: "느낀 점 / 감상", description: "책을 읽고 떠오른 생각이나 감정을 정리해 보세요. 공감된 부분이나 새롭게 의문이 생긴 부분을 솔직하게 적어도 좋아요." },
-  { id: 4, title: "독후 관련 활동 계획", description: "이 책을 읽고 나서 하고 싶은 활동이 있다면 자유롭게 적어 보세요. 비슷한 주제의 다른 책을 찾아봐도 좋아요." },
+  { id: 2, title: "중심 내용 요약", description: "[이야기 책] 이야기의 흐름을 중요한 사건 위주로 정리해 보세요. 이야기를 처음부터 끝까지 떠올려 보고, 핵심 사건들을 순서대로 적어 보면 책 내용을 쉽게 다시 기억할 수 있어요. [정보 책] 책 전체 또는 각 장의 주요 정보를 간략하게 정리해요. 주요 정보 사이의 관계가 잘 드러나도록 표현해요." },
+  { id: 3, title: "느낀 점 / 감상", description: "책을 읽고 떠오른 생각이나 감정을 정리해 보세요. 책 속에서 공감된 부분이나 새롭게 의문이 생긴 부분을 솔직하게 적어도 좋아요." },
+  { id: 4, title: "독후 관련 활동 계획", description: "이 책을 읽고 나서 하고 싶은 활동이 있다면 자유롭게 적어 보세요. 비슷한 주제의 다른 책을 찾아보거나, 관련된 체험 활동을 계획해 봐도 좋아요.", example: "· 이 책을 읽고 난 뒤, 주인공이 겪은 역사적 사건이 궁금해져서 관련 다큐멘터리를 찾아보려고 해요.\n· 책에서 다룬 주제와 비슷한 책을 한 권 더 읽고, 두 책의 공통점과 차이점을 비교해 보고 싶어요." },
+]
+
+const quizQuestions: WorkbookQuestion[] = [
+  { id: 1, title: "퀴즈 제목 정하기", description: "퀴즈에 어울리는 제목을 지어 보세요. 책 제목을 살짝 바꾸거나, 유쾌하고 독특한 표현을 써도 좋아요.", example: "“제대로 읽었니? 정신 차렷! 퀴즈”, “○○를 아는 사람만 풀 수 있음!”, “달빛 속 비밀을 찾아라! 퀴즈”" },
+  { id: 2, title: "퀴즈를 누구에게 풀게 하고 싶은가요?", description: "친구, 가족, 선생님 중에서 내 퀴즈를 풀었으면 하는 사람을 고르고, 그 사람에게 전하고 싶은 말을 짧게 적어 보세요.", example: "우리 반 친구들에게 풀게 하고 싶습니다. 책을 얼마나 자세히 읽었는지 함께 알아보면 재미있을 것 같아요." },
+  { id: 3, title: "첫 번째 퀴즈 (OX)", description: "책의 내용을 떠올려 O 또는 X로 답할 수 있는 문제를 만들어 보세요.", example: "주인공은 처음부터 새로운 도전을 두려워하지 않았다. (O/X)" },
+  { id: 4, title: "첫 번째 퀴즈 정답과 해설 쓰기", description: "첫 번째 퀴즈의 정답과 그 이유를 책의 내용을 근거로 설명해 보세요.", example: "정답은 X입니다. 처음에는 두려워했지만 친구의 도움으로 용기를 냈기 때문입니다." },
+  { id: 5, title: "두 번째 퀴즈 (객관식)", description: "여러 보기 중 하나를 고르는 객관식 문제를 만들어 보세요.", example: "주인공이 문제를 해결하기 위해 가장 먼저 한 일은 무엇일까요?" },
+  { id: 6, title: "두 번째 퀴즈 정답과 해설 쓰기", description: "두 번째 퀴즈의 정답과 다른 보기가 답이 아닌 이유를 간단히 적어 보세요.", example: "정답은 ②번입니다. 책의 세 번째 장면에서 주인공이 먼저 친구를 찾아갔습니다." },
+  { id: 7, title: "세 번째 퀴즈 (주관식)", description: "책을 꼼꼼히 읽은 사람이 답할 수 있는 주관식 문제를 만들어 보세요.", example: "주인공이 마지막에 깨달은 것은 무엇인가요?" },
+  { id: 8, title: "세 번째 퀴즈 정답과 해설 쓰기", description: "세 번째 퀴즈의 정답과 책에서 찾은 근거를 함께 적어 보세요.", example: "서로의 생각을 존중하는 마음입니다. 마지막 장면의 대화에서 확인할 수 있습니다." },
 ]
 
 export const WORKBOOK_TEMPLATES: WorkbookTemplateRecord[] = Array.from({ length: 74 }, (_, index) => {
@@ -97,11 +108,11 @@ export const WORKBOOK_TEMPLATES: WorkbookTemplateRecord[] = Array.from({ length:
     name: `${name}${suffix}`,
     studentTitle,
     levels: [...levels],
-    questions: Array.from({ length: questionCount }, (_, questionIndex) => defaultQuestions[questionIndex % defaultQuestions.length]).map((question, questionIndex) => ({ ...question, id: questionIndex + 1 })),
+    questions: index === 32 ? quizQuestions : Array.from({ length: questionCount }, (_, questionIndex) => defaultQuestions[questionIndex % defaultQuestions.length]).map((question, questionIndex) => ({ ...question, id: questionIndex + 1 })),
     connections,
     reviewed: index !== 73,
     updatedAt: index === 0 ? "2026-08-31" : index < 20 ? "2025-09-25" : "2025-09-24",
-    description: "책의 내용을 정리하고, 느낀 점을 담아 나만의 독서록을 만들어 보세요.",
+    description: index === 32 ? "책 내용을 바탕으로 퀴즈를 만들어 보는 활동이에요. 재미있는 문제를 만들며 책 내용을 다시 떠올려 볼 수 있어요." : "책의 내용을 정리하고, 느낀 점을 담아 나만의 독서록을 만들어 보세요.",
     rewriteMode: index % 3 === 0 ? "continuous" : "items",
   }
 })
@@ -123,6 +134,6 @@ export const CONNECTED_BOOKS = [
 
 export const DEFAULT_GUIDES = {
   writing: "※ 안내에 따라 독서 감상문을 작성해 보세요.",
-  rewrite: "※ 지금까지 쓴 내용을 한눈에 볼 수 있어요. 처음부터 끝까지 읽으며 고칠 부분이 있는지 살펴보세요. 문장을 자연스럽게 다듬고, 필요하다면 문단 순서도 바꿔 보세요.",
+  rewrite: "※ 지금까지 쓴 내용을 한눈에 볼 수 있어요. 처음부터 끝까지 읽으며 고칠 부분이 있는지 살펴보세요. 문장을 자연스럽게 다듬고, 필요하다면 문단 순서도 바꿔 보세요. 이어주는 말을 넣거나 꼭 필요하지 않은 문장은 줄이면, 처음부터 끝까지 자연스럽게 이어지는 ‘하나의 글’로 완성할 수 있어요. 마지막으로, 전체 내용을 살펴보고 가장 잘 어울리는 제목도 함께 지어 보세요.",
   complete: "※ 워크북 활동을 마무리하고, 완성된 글을 확인해 보세요.",
 }

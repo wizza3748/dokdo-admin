@@ -12,9 +12,10 @@ import { cn } from "@/lib/utils"
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isStudentFront = pathname === "/student" || pathname.startsWith("/student/")
+  const isWorkbookPreview = pathname.startsWith("/online-workbook/preview/")
   const isAgency = pathname === "/agency" || pathname.startsWith("/agency/")
 
-  if (isStudentFront) {
+  if (isStudentFront || isWorkbookPreview) {
     return <main className="min-h-screen w-full bg-white">{children}</main>
   }
 
