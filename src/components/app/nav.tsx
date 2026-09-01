@@ -70,7 +70,10 @@ const navConfig: NavItem[] = [
     id: "admin-exploration",
     title: "탐험관리",
     icon: "Map",
-    children: [{ title: "탐험결과발송 현황", href: "/admin/exploration/send-status" }]
+    children: [
+      { title: "워크북 템플릿", href: "/admin/exploration/workbook-templates" },
+      { title: "탐험결과발송 현황", href: "/admin/exploration/send-status" },
+    ]
   },
   {
     id: "admin-online-workbooks",
@@ -134,7 +137,7 @@ export function AppNav() {
             }
 
             const Icon = item.icon ? icons[item.icon] : null
-            const isGroupActive = item.children.some(child => isMatch(child.href))
+            const isGroupActive = item.children.some(child => isMatch(child.href)) || (item.id === "admin-exploration" && pathname.startsWith("/admin/exploration"))
             const isOpen = openItems[item.id] ?? isGroupActive
 
             return (

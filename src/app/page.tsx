@@ -73,18 +73,18 @@ export default function Home() {
               <div className="mx-2 mt-2 grid grid-cols-[150px_minmax(0,1fr)] overflow-hidden rounded-lg border border-amber-300 bg-amber-50/80 transition-colors hover:bg-amber-100/80 group">
                 <div className="flex flex-nowrap items-center justify-center gap-1.5 p-4 text-center">
                   <a
-                    href="https://sloop-dev.atlassian.net/browse/DD-1653"
+                    href="https://sloop-dev.atlassian.net/browse/DD-1654"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="whitespace-nowrap text-sm font-bold text-amber-700 underline underline-offset-4 transition-colors hover:text-amber-900"
                   >
-                    DD-1653
+                    DD-1654
                   </a>
                   <span className="shrink-0 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-black leading-none text-white">NEW</span>
                 </div>
                 <div className="border-l border-amber-200 p-4 text-[14px] font-bold text-amber-700 transition-colors group-hover:text-amber-900">
                   <Link href="/agency/online-workbooks" className="hover:underline">
-                    [공통] 온라인 워크북 2차 작성·피드백 기능 추가
+                    독도 온라인 워크북 첨삭 기능
                   </Link>
                 </div>
               </div>
@@ -126,18 +126,18 @@ export default function Home() {
               <div className="mx-2 mt-2 grid grid-cols-[150px_minmax(0,1fr)] overflow-hidden rounded-lg border border-amber-300 bg-amber-50/80 transition-colors hover:bg-amber-100/80 group">
                 <div className="flex flex-nowrap items-center justify-center gap-1.5 p-4 text-center">
                   <a
-                    href="https://sloop-dev.atlassian.net/browse/DD-1653"
+                    href="https://sloop-dev.atlassian.net/browse/DD-1654"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="whitespace-nowrap text-sm font-bold text-amber-700 underline underline-offset-4 transition-colors hover:text-amber-900"
                   >
-                    DD-1653
+                    DD-1654
                   </a>
                   <span className="shrink-0 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-black leading-none text-white">NEW</span>
                 </div>
                 <div className="border-l border-amber-200 p-4 text-[14px] font-bold text-amber-700 transition-colors group-hover:text-amber-900">
                   <Link href="/student" className="hover:underline">
-                    [공통] 온라인 워크북 2차 작성·피드백 기능 추가
+                    독도 온라인 워크북 첨삭 기능
                   </Link>
                 </div>
               </div>
