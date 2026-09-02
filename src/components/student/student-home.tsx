@@ -2,9 +2,11 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { BookOpen, ClipboardList, PenLine, Shirt, Telescope } from "lucide-react"
+import { useEffect, useState } from "react"
+import { BookOpen, ClipboardList, PenLine, RotateCcw, Shirt, Telescope } from "lucide-react"
 
 import { StudentHeader } from "@/components/student/student-header"
+import { getCompletedReadingRoundCount, resetStudentMockState, subscribeCompletedReadingRoundCount } from "@/lib/student-mock-state"
 
 const shortcuts = [
   { label: "강치 옷장", icon: Shirt },
@@ -42,24 +44,37 @@ function MissionButton({ type, count }: { type: "reading" | "writing"; count: nu
   const reading = type === "reading"
   const Icon = reading ? BookOpen : PenLine
 
-  return (
-    <button
-      type="button"
-      aria-label={`${reading ? "책 읽기" : "글쓰기"} ${count}`}
-      className="group relative flex h-36 w-32 flex-col items-center justify-center gap-3 rounded-[24px] bg-white shadow-[0_12px_32px_rgba(28,78,105,0.18)] transition hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(28,78,105,0.24)] sm:h-44 sm:w-44 lg:h-[176px] lg:w-[176px]"
-    >
+  const content = (
+    <>
       <Icon className={`size-14 stroke-[1.7] sm:size-16 ${reading ? "text-[#9b8cff]" : "text-[#74d9c5]"}`} />
       <strong className="text-xl font-black text-[#252525] sm:text-2xl">
         {reading ? "책 읽기" : "글쓰기"}
       </strong>
-      <span className={`absolute -bottom-5 min-w-16 rounded-full px-5 py-2 text-lg font-black text-white shadow ${count > 0 ? "bg-[#16b790]" : "bg-[#6c747a]"}`}>
+      <span className={`absolute -bottom-5 inline-flex h-11 min-w-16 items-center justify-center rounded-full px-5 text-center text-lg font-black leading-none text-white shadow ${count > 0 ? "bg-[#16b790]" : "bg-[#6c747a]"}`}>
         {count}
       </span>
-    </button>
+    </>
   )
+
+  const className = "group relative flex h-36 w-32 flex-col items-center justify-center gap-3 rounded-[24px] bg-white shadow-[0_12px_32px_rgba(28,78,105,0.18)] transition hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(28,78,105,0.24)] sm:h-44 sm:w-44 lg:h-[176px] lg:w-[176px]"
+  if (reading) return <Link href="/reading/index" aria-label={`책 읽기 ${count}`} className={className}>{content}</Link>
+  return <button type="button" aria-label={`글쓰기 ${count}`} className={className}>{content}</button>
 }
 
 export function StudentHome() {
+  const [readingCount, setReadingCount] = useState(0)
+
+  useEffect(() => {
+    const syncReadingCount = () => setReadingCount(getCompletedReadingRoundCount())
+    syncReadingCount()
+    return subscribeCompletedReadingRoundCount(syncReadingCount)
+  }, [])
+
+  const resetMockState = async () => {
+    await resetStudentMockState()
+    window.location.reload()
+  }
+
   return (
     <div className="min-h-screen overflow-hidden bg-[#87def4]">
       <StudentHeader />
@@ -114,7 +129,7 @@ export function StudentHome() {
         </aside>
 
         <section className="absolute left-1/2 top-[43%] z-10 flex w-full max-w-[1260px] -translate-x-1/2 items-center justify-between px-5 sm:px-12 lg:px-20">
-          <MissionButton type="reading" count={4} />
+          <MissionButton type="reading" count={readingCount} />
 
           <div className="relative flex flex-col items-center">
             <div className="absolute -top-24 left-1/2 w-64 -translate-x-1/2 rounded-xl bg-white px-5 py-3 text-sm font-medium leading-6 text-[#303030] shadow-sm sm:-top-28 sm:w-80">
@@ -142,6 +157,10 @@ export function StudentHome() {
           className="absolute bottom-[18%] left-[21%] hidden h-[140px] w-[280px] lg:block"
         />
         <TreasureGift state="locked" />
+
+        <button type="button" onClick={resetMockState} className="fixed bottom-6 right-7 z-40 inline-flex h-12 items-center gap-2 rounded-full border border-white/70 bg-white/95 px-5 text-sm font-black text-[#4c5a62] shadow-[0_6px_20px_rgba(20,82,110,.2)] transition hover:bg-white" aria-label="학생 목데이터 초기화">
+          <RotateCcw className="size-4" />초기화
+        </button>
 
         <nav aria-label="학생 바로가기" className="fixed bottom-0 left-1/2 z-30 flex -translate-x-1/2 overflow-hidden rounded-t-2xl bg-[#0788d0] text-white shadow-[0_-8px_28px_rgba(0,93,148,.24)]">
           {shortcuts.map(({ label, icon: Icon, href, active }) => {
