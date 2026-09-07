@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation"
 import { CalendarDays, ChevronLeft, ChevronRight, Home } from "lucide-react"
 
 import { StudentHeader } from "@/components/student/student-header"
+import { getTransientReadingExplorationRecords, type TransientReadingExplorationRecord } from "@/lib/student-exploration-history"
 import { cn } from "@/lib/utils"
-import { getWorkbookRuntime, studentWorkbooks, type StudentWorkbook, type WorkbookStatus } from "@/lib/student-workbooks"
+import { getWorkbookById, getWorkbookRuntime, studentWorkbooks, type StudentWorkbook, type WorkbookStatus } from "@/lib/student-workbooks"
 
 type TabName = "전체" | "책 읽기 탐험" | "글쓰기 탐험" | "영상편지" | "온라인 워크북"
 
@@ -28,10 +29,10 @@ interface BasicRecord {
 const tabs: TabName[] = ["전체", "책 읽기 탐험", "글쓰기 탐험", "영상편지", "온라인 워크북"]
 
 const basicRecords: BasicRecord[] = [
-  { id: "r-0825-1", year: 2026, month: 8, day: 25, weekday: "화요일", type: "책 읽기 탐험", level: 4, title: "민주주의를 어떻게 이룰까요?", attempt: "첫 탐험", progress: "1/1", questions: "0/6" },
-  { id: "r-0825-2", year: 2026, month: 8, day: 25, weekday: "화요일", type: "책 읽기 탐험", level: 4, title: "901호 띵똥 아저씨", attempt: "첫 탐험", progress: "1/1", questions: "0/6" },
-  { id: "r-0824-1", year: 2026, month: 8, day: 24, weekday: "월요일", type: "책 읽기 탐험", level: 4, title: "밥.빵.국수 - 아시아의 식탁", attempt: "첫 탐험", progress: "1/1", questions: "1/6" },
-  { id: "r-0824-2", year: 2026, month: 8, day: 24, weekday: "월요일", type: "책 읽기 탐험", level: 4, title: "감은장아기", attempt: "첫 탐험", progress: "1/1", questions: "0/6" },
+  { id: "r-0901-1", year: 2026, month: 9, day: 1, weekday: "화요일", type: "책 읽기 탐험", level: 4, title: "민주주의를 어떻게 이룰까요?", attempt: "첫 탐험", progress: "1/1", questions: "0/6" },
+  { id: "r-0901-2", year: 2026, month: 9, day: 1, weekday: "화요일", type: "책 읽기 탐험", level: 4, title: "901호 띵똥 아저씨", attempt: "첫 탐험", progress: "1/1", questions: "0/6" },
+  { id: "r-0901-3", year: 2026, month: 9, day: 1, weekday: "화요일", type: "책 읽기 탐험", level: 4, title: "밥.빵.국수 - 아시아의 식탁", attempt: "첫 탐험", progress: "1/1", questions: "1/6" },
+  { id: "r-0901-4", year: 2026, month: 9, day: 1, weekday: "화요일", type: "책 읽기 탐험", level: 4, title: "감은장아기", attempt: "첫 탐험", progress: "1/1", questions: "0/6" },
   { id: "r-0728", year: 2026, month: 7, day: 28, weekday: "화요일", type: "책 읽기 탐험", level: 4, title: "나는 개가 아닙니다", attempt: "첫 탐험", progress: "3/3", questions: "1/6" },
   { id: "p-0721", year: 2026, month: 7, day: 21, weekday: "화요일", type: "글쓰기 탐험", level: 3, title: "여름 바다에서 만난 친구", attempt: "첫 탐험", progress: "2/2", questions: "6/6" },
   { id: "v-0715", year: 2026, month: 7, day: 15, weekday: "수요일", type: "영상편지", level: 3, title: "독도에게 보내는 영상편지", attempt: "첫 탐험", progress: "1/1", questions: "-" },
@@ -42,23 +43,39 @@ const statusClass: Record<WorkbookStatus, string> = { before: "text-[#e87916]", 
 
 export function ExplorationRecord() {
   const router = useRouter()
-  const [year, setYear] = React.useState(2026)
-  const [month, setMonth] = React.useState(8)
+  const currentDate = new Date()
+  const currentYear = currentDate.getFullYear()
+  const currentMonth = currentDate.getMonth() + 1
+  const [year, setYear] = React.useState(currentYear)
+  const [month, setMonth] = React.useState(currentMonth)
   const [tab, setTab] = React.useState<TabName>("전체")
   const [mounted, setMounted] = React.useState(false)
+  const [transientReadingRecords, setTransientReadingRecords] = React.useState<TransientReadingExplorationRecord[]>([])
   const [, refresh] = React.useReducer((value) => value + 1, 0)
 
   React.useEffect(() => {
     setMounted(true)
-    const handleChange = () => refresh()
-    window.addEventListener("dokdo-workbook-change", handleChange)
+    setTransientReadingRecords(getTransientReadingExplorationRecords())
+    const handleWorkbookChange = () => refresh()
+    const handleExplorationChange = () => setTransientReadingRecords(getTransientReadingExplorationRecords())
+    window.addEventListener("dokdo-workbook-change", handleWorkbookChange)
+    window.addEventListener("dokdo-exploration-record-change", handleExplorationChange)
     return () => {
-      window.removeEventListener("dokdo-workbook-change", handleChange)
+      window.removeEventListener("dokdo-workbook-change", handleWorkbookChange)
+      window.removeEventListener("dokdo-exploration-record-change", handleExplorationChange)
     }
   }, [])
 
-  const visibleWorkbooks = studentWorkbooks.filter((item) => item.year === year && item.month === month)
-  const visibleBasics = basicRecords.filter((item) => item.year === year && item.month === month && (tab === "전체" || item.type === tab))
+  const includedTransientWorkbookIds = new Set<string>()
+  const transientWorkbooks = transientReadingRecords.flatMap((record) => {
+    if (includedTransientWorkbookIds.has(record.workbookId)) return []
+    includedTransientWorkbookIds.add(record.workbookId)
+    const workbook = getWorkbookById(record.workbookId)
+    return workbook ? [{ ...workbook, year: record.year, month: record.month, day: record.day, weekday: record.weekday }] : []
+  })
+  const transientWorkbookIds = new Set(transientWorkbooks.map((item) => item.id))
+  const visibleWorkbooks = [...transientWorkbooks, ...studentWorkbooks.filter((item) => !transientWorkbookIds.has(item.id))].filter((item) => item.year === year && item.month === month)
+  const visibleBasics = [...transientReadingRecords, ...basicRecords].filter((item) => item.year === year && item.month === month && (tab === "전체" || item.type === tab))
   const rows = [
     ...(tab === "전체" || tab === "온라인 워크북" ? visibleWorkbooks.map((item) => ({ kind: "workbook" as const, item })) : []),
     ...(tab !== "온라인 워크북" ? visibleBasics.map((item) => ({ kind: "basic" as const, item })) : []),
@@ -67,7 +84,7 @@ export function ExplorationRecord() {
     result[row.item.day] = [...(result[row.item.day] ?? []), row]
     return result
   }, {})
-  const canNext = year < 2026 || (year === 2026 && month < 8)
+  const canNext = year < currentYear || (year === currentYear && month < currentMonth)
 
   const moveMonth = (direction: -1 | 1) => {
     let nextMonth = month + direction

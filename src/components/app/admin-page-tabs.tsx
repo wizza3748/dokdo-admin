@@ -59,12 +59,12 @@ export function AdminPageTabs() {
   const closeTab = (event: React.MouseEvent, href: string) => {
     event.preventDefault()
     event.stopPropagation()
-    setTabs((existing) => {
-      const index = existing.findIndex((tab) => tab.href === href)
-      const next = existing.filter((tab) => tab.href !== href)
-      if (href === pathname) router.push((next[Math.max(0, index - 1)] ?? DASHBOARD_TAB).href)
-      return next
-    })
+    const index = tabs.findIndex((tab) => tab.href === href)
+    const next = tabs.filter((tab) => tab.href !== href)
+    const nextHref = (next[Math.max(0, index - 1)] ?? DASHBOARD_TAB).href
+
+    setTabs(next)
+    if (href === pathname) router.push(nextHref)
   }
 
   return <div className="sticky top-[60px] z-20 flex h-12 min-w-0 items-stretch border-b border-slate-200 bg-white">

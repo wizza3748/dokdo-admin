@@ -1,4 +1,8 @@
-import { COMMON_READING_QUIZ, type ReadingQuizQuestion } from "@/lib/reading-exploration"
+import {
+  COMMON_READING_QUIZ,
+  READING_QUESTION_AREAS,
+  type ReadingQuizQuestion,
+} from "@/lib/reading-exploration"
 
 export const READING_QUIZ_OVERRIDE_STORAGE_KEY = "dokdo-reading-quiz-overrides"
 
@@ -9,7 +13,23 @@ function getKey(bookId: number, round: number) {
 }
 
 function cloneQuestions(questions: ReadingQuizQuestion[]) {
-  return questions.map((question) => ({ ...question, options: [...question.options] as ReadingQuizQuestion["options"] }))
+  return questions.map((question, index) => {
+    const fallback = COMMON_READING_QUIZ[index % COMMON_READING_QUIZ.length]
+    const area = READING_QUESTION_AREAS.includes(question.area) ? question.area : fallback.area
+
+    return {
+      ...fallback,
+      ...question,
+      area,
+      options: [...question.options] as ReadingQuizQuestion["options"],
+      explanations: [...(question.explanations ?? fallback.explanations)] as ReadingQuizQuestion["explanations"],
+      pageReferences: (question.pageReferences ?? fallback.pageReferences).map((reference) => ({
+        paper: reference?.paper ?? "-",
+        ebook: reference?.ebook ?? "-",
+      })) as ReadingQuizQuestion["pageReferences"],
+      wrongAnswerHint: question.wrongAnswerHint ?? "",
+    }
+  })
 }
 
 function readOverrides(): QuizOverrides {

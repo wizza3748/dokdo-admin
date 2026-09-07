@@ -128,3 +128,25 @@
     cursor: pointer;
   }
 }
+
+@keyframes reading-kangchi-bob {
+  0%,
+  100% {
+    transform: translate(-50%, 0);
+  }
+
+  50% {
+    transform: translate(-50%, -8px);
+  }
+}
+
+.reading-kangchi-bob {
+  animation: reading-kangchi-bob 2.4s ease-in-out infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reading-kangchi-bob {
+    animation: none;
+  }
+}

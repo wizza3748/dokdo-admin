@@ -116,18 +116,19 @@ export const DEFAULT_GUIDES = {
 
 export const WORKBOOK_TEMPLATES: WorkbookTemplateRecord[] = WORKBOOK_TEMPLATE_LIST_ROWS.map((row, index) => {
   const seed = templateSeeds[index % templateSeeds.length]
+  const matchingSeed = templateSeeds.find(([name]) => name === row.name)
   const liveDetail = getWorkbookTemplateLiveDetail(row.id)
   const copy = getWorkbookTemplateCopy(row.id)
-  const fallbackStudentTitle = seed?.[1] ?? row.name.replace(/^\[[^\]]+\]\s*/, "")
+  const fallbackStudentTitle = matchingSeed?.[1] ?? seed?.[1] ?? row.name.replace(/^\[[^\]]+\]\s*/, "")
   const liveQuestions = liveDetail?.questions.map(([title, description], questionIndex) => ({
     id: questionIndex + 1,
     title,
     description,
-  }))
+  })).filter((question) => question.title.trim() || question.description.trim())
   return {
     id: row.id,
     name: row.name,
-    studentTitle: copy?.studentTitle ?? (liveDetail ? (liveDetail.studentTitle ?? "") : fallbackStudentTitle),
+    studentTitle: copy?.studentTitle || liveDetail?.studentTitle || fallbackStudentTitle,
     levels: row.levels,
     questions: liveQuestions?.length
       ? liveQuestions

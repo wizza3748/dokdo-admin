@@ -11,6 +11,7 @@ import {
   House,
   LayoutDashboard,
   Map,
+  Menu,
   Users,
   type LucideIcon,
 } from "lucide-react"
@@ -37,6 +38,7 @@ const icons: Record<string, LucideIcon> = {
   LayoutDashboard,
   Building2,
   Map,
+  Menu,
   Users,
   GraduationCap,
   House,
@@ -54,6 +56,7 @@ interface NavItem {
 interface NavChild {
   title: string
   href?: string
+  icon?: string
   children?: NavChild[]
 }
 
@@ -77,17 +80,14 @@ const navConfig: NavItem[] = [
     title: "탐험관리",
     icon: "Map",
     children: [
-      { title: "글쓰기", href: "#" },
       {
         title: "책 읽기",
+        icon: "Menu",
         children: [
-          { title: "책그룹 관리", href: "#" },
           { title: "책 읽기 목록", href: "/admin/exploration/reading" },
           { title: "온라인워크북 현황", href: "/admin/online-workbooks" },
         ],
       },
-      { title: "영상편지", href: "#" },
-      { title: "끊어읽기", href: "#" },
       { title: "워크북 템플릿", href: "/admin/exploration/workbook-templates" },
       { title: "탐험결과발송", href: "/admin/exploration/send-status" },
     ]
@@ -123,6 +123,7 @@ export function AppNav() {
 
   const renderChild = (child: NavChild, depth = 0): React.ReactNode => {
     if (child.children) {
+      const ChildIcon = child.icon ? icons[child.icon] : null
       const childActive = isChildActive(child)
       const childKey = `nested-${child.title}`
       const childOpen = openItems[childKey] ?? childActive
@@ -130,6 +131,7 @@ export function AppNav() {
         <SidebarMenuSubItem>
           <CollapsibleTrigger asChild>
             <SidebarMenuSubButton isActive={childActive} className="h-11 w-full cursor-pointer rounded-xl px-5 text-sm font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-600 data-[active=true]:bg-transparent data-[active=true]:text-blue-600">
+              {ChildIcon && <ChildIcon className="h-4 w-4 shrink-0" />}
               <span>{child.title}</span><ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/nested:rotate-90" />
             </SidebarMenuSubButton>
           </CollapsibleTrigger>

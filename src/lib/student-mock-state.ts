@@ -5,6 +5,7 @@ export const STUDENT_MOCK_STORAGE_KEYS = {
   readingQuizOverrides: "dokdo-reading-quiz-overrides",
   explorationRecords: "dokdo-transient-reading-records",
   workbookRuntime: "dokdo-student-workbook-runtime",
+  workbookRoundSettings: "dokdo-workbook-round-settings",
   agencyWorkbookSubmissions: "dokdo-student-agency-workbook-submissions",
 } as const
 

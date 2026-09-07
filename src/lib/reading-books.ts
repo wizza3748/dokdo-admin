@@ -10007,8 +10007,29 @@ export function getReadingBook(bookId: number) {
 }
 
 export function getOnlineWorkbookSettingId(bookId: number) {
-  if (bookId === 730) return 1780
+  const liveSettingIds: Record<number, number> = {
+    730: 1780,
+    729: 1773,
+    728: 1748,
+    727: 1766,
+    726: 1749,
+    725: 1772,
+    724: 1741,
+    723: 1740,
+    722: 1739,
+    721: 1738,
+    720: 1737,
+    718: 1735,
+    717: 1734,
+    716: 1771,
+    715: 1760,
+    714: 1758,
+    713: 1753,
+    712: 1757,
+    711: 1768,
+    710: 1755,
+  }
+  if (liveSettingIds[bookId]) return liveSettingIds[bookId]
   if (bookId === 231 || bookId === 241) return 1456
   return 1400 + (bookId % 381)
 }
-

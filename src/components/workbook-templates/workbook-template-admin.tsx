@@ -28,6 +28,7 @@ import {
 } from "@/lib/workbook-templates"
 import { getConnectedBookSummary, getWorkbookTemplateLiveDetail } from "@/lib/workbook-template-live-data"
 import { getOnlineWorkbookSettingId, getReadingBook } from "@/lib/reading-books"
+import { getWorkbookRoundSetting, saveWorkbookRoundSetting } from "@/lib/workbook-round-settings"
 
 const primaryButton = "inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg bg-[#0877ea] px-4 text-sm font-bold text-white shadow-sm transition hover:bg-[#0567cf]"
 const secondaryButton = "inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
@@ -192,7 +193,7 @@ export function WorkbookTemplateForm({ templateId }: { templateId?: number }) {
       </div>
     </section>
 
-    <div className="fixed bottom-0 left-[var(--sidebar-width)] right-0 z-30 flex h-20 items-center justify-between border-t border-slate-200 bg-white px-8 shadow-[0_-4px_18px_rgba(15,23,42,.06)]"><Link href="/admin/exploration/workbook-templates" className={secondaryButton}>목록</Link><div className="flex items-center gap-3"><span className="text-sm font-bold">검수 상태:</span><StatusSwitch checked={reviewed} onChange={setReviewed} /><span className="mx-2 h-7 w-px bg-slate-200" />{isEdit && <button type="button" onClick={() => showToast("프로토타입에서는 삭제 결과만 표시합니다.")} className={`${secondaryButton} text-rose-500`}>삭제</button>}{isEdit ? <Link href={`/online-workbook/preview/${source!.id}`} target="_blank" rel="noopener noreferrer" className={secondaryButton}><Eye className="h-4 w-4" />미리보기</Link> : <button type="button" onClick={() => setPreviewOpen(true)} className={secondaryButton}><Eye className="h-4 w-4" />미리보기</button>}<button type="button" onClick={() => showToast("워크북 템플릿이 저장되었습니다.")} className={primaryButton}>저장</button></div></div>
+    <div className="fixed bottom-0 left-[var(--admin-fixed-left)] right-0 z-30 flex h-20 items-center justify-between border-t border-slate-200 bg-white px-8 shadow-[0_-4px_18px_rgba(15,23,42,.06)] transition-[left] duration-200"><Link href="/admin/exploration/workbook-templates" className={secondaryButton}>목록</Link><div className="flex items-center gap-3"><span className="text-sm font-bold">검수 상태:</span><StatusSwitch checked={reviewed} onChange={setReviewed} /><span className="mx-2 h-7 w-px bg-slate-200" />{isEdit && <button type="button" onClick={() => showToast("프로토타입에서는 삭제 결과만 표시합니다.")} className={`${secondaryButton} text-rose-500`}>삭제</button>}{isEdit ? <Link href={`/online-workbook/preview/${source!.id}`} target="_blank" rel="noopener noreferrer" className={secondaryButton}><Eye className="h-4 w-4" />미리보기</Link> : <button type="button" onClick={() => setPreviewOpen(true)} className={secondaryButton}><Eye className="h-4 w-4" />미리보기</button>}<button type="button" onClick={() => showToast("워크북 템플릿이 저장되었습니다.")} className={primaryButton}>저장</button></div></div>
     {questionModal && <QuestionDialog question={questionModal.index !== undefined ? questions[questionModal.index] : undefined} onClose={() => setQuestionModal(null)} onConfirm={updateQuestion} onDelete={questionModal.index !== undefined ? () => deleteQuestion(questionModal.index!) : undefined} />}
     {previewOpen && <TemplatePreview template={previewTemplate} onClose={() => setPreviewOpen(false)} />}
     {toast && <Toast message={toast} />}
@@ -283,22 +284,61 @@ function TemplateSettingsDetails({ template, onChange }: { template: SelectedTem
 export function WorkbookRoundSettings({ bookId = 231 }: { bookId?: number }) {
   const book = getReadingBook(bookId)
   const connectedBook = getConnectedBookSummary(bookId)
-  const initialIds = [37,1,14,43,44]
-  const [templates, setTemplates] = React.useState<SelectedTemplate[]>(initialIds.map((id,index) => createSelectedTemplate(WORKBOOK_TEMPLATES.find((item) => item.id === id)!, index === 1 || index === 2 ? "continuous" : "items")))
-  const [priorityId, setPriorityId] = React.useState(templates[0].id)
-  const [reviewed, setReviewed] = React.useState(true)
+  const roundSetting = React.useMemo(() => getWorkbookRoundSetting(bookId), [bookId])
+  const buildInitialTemplates = React.useCallback(() => roundSetting.templates.flatMap(({ templateId, displayMode, questions }) => {
+    const template = WORKBOOK_TEMPLATES.find((item) => item.id === templateId)
+    if (!template) return []
+    const selected = createSelectedTemplate(template, displayMode)
+    return [{
+      ...selected,
+      questions: questions ?? selected.questions,
+      enabledQuestionIds: (questions ?? selected.questions).map((question) => question.id),
+    }]
+  }), [roundSetting])
+  const [templates, setTemplates] = React.useState<SelectedTemplate[]>(buildInitialTemplates)
+  const [priorityId, setPriorityId] = React.useState(roundSetting.priorityTemplateId)
+  const [savedPriorityId, setSavedPriorityId] = React.useState(roundSetting.priorityTemplateId)
+  const [reviewed, setReviewed] = React.useState(roundSetting.reviewed ?? true)
   const [selectionOpen, setSelectionOpen] = React.useState(false)
   const [toast, setToast] = React.useState("")
   const dragIndex = React.useRef<number | null>(null)
   const showToast = (message: string) => { setToast(message); window.setTimeout(() => setToast(""), 1800) }
   const dropTemplate = (toIndex: number) => { if (dragIndex.current === null || dragIndex.current === toIndex) return; setTemplates((current) => { const next=[...current]; const [moved]=next.splice(dragIndex.current!,1); next.splice(toIndex,0,moved); return next }); dragIndex.current=null }
+  const resetToOriginal = () => {
+    setTemplates(buildInitialTemplates())
+    setPriorityId(roundSetting.priorityTemplateId)
+    setSavedPriorityId(roundSetting.priorityTemplateId)
+    setReviewed(roundSetting.reviewed ?? true)
+    showToast("변경 사항이 취소되었습니다.")
+  }
+  const saveRoundSetting = () => {
+    const nextPriorityId = templates.some((template) => template.id === priorityId) ? priorityId : templates[0]?.id
+    if (!nextPriorityId) {
+      showToast("1순위로 사용할 워크북 템플릿을 선택해 주세요.")
+      return
+    }
+    setPriorityId(nextPriorityId)
+    setSavedPriorityId(nextPriorityId)
+    saveWorkbookRoundSetting({
+      ...roundSetting,
+      reviewed,
+      priorityTemplateId: nextPriorityId,
+      templates: templates.map((template) => ({
+        templateId: template.id,
+        displayMode: template.displayMode,
+        questions: template.questions.filter((question) => template.enabledQuestionIds.includes(question.id)),
+      })),
+    })
+    showToast("온라인 워크북 설정이 저장되었습니다.")
+  }
+  const previewHref = `/online-workbook/preview/${roundSetting.previewId}?templateId=${savedPriorityId}`
 
   return <div className="space-y-5 pb-24 text-slate-700">
     <section className="rounded-xl bg-gradient-to-r from-[#647ce8] to-[#7648aa] px-8 py-7 text-white shadow-sm"><h1 className="text-2xl font-extrabold">온라인 워크북</h1><p className="mt-2 text-sm text-blue-100">회차별 온라인 워크북을 설정하고 관리할 수 있습니다.</p></section>
-    <section className="rounded-xl bg-white p-7 shadow-sm"><h2 className="mb-5 border-b border-slate-200 pb-4 text-lg font-extrabold">회차 정보</h2><div className="grid grid-cols-3 gap-5">{[["레벨",`${book?.level ?? connectedBook?.level ?? 4}레벨`],["도서 제목",book?.title ?? connectedBook?.title ?? "대한이는 왜 소한이네 집에 갔을까?"],["회차",`${book?.rounds ?? connectedBook?.rounds ?? 3}회차`]].map(([label,value]) => <div key={label} className="rounded-xl border border-slate-200 py-5 text-center"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-lg font-extrabold text-slate-700">{value}</p></div>)}</div></section>
+    <section className="rounded-xl bg-white p-7 shadow-sm"><h2 className="mb-5 border-b border-slate-200 pb-4 text-lg font-extrabold">회차 정보</h2><div className="grid grid-cols-3 gap-5">{[["레벨",`${book?.level ?? connectedBook?.level ?? 4}레벨`],["도서 제목",book?.title ?? connectedBook?.title ?? "대한이는 왜 소한이네 집에 갔을까?"],["회차",`${roundSetting.round}회차`]].map(([label,value]) => <div key={label} className="rounded-xl border border-slate-200 py-5 text-center"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-lg font-extrabold text-slate-700">{value}</p></div>)}</div></section>
     <section className="rounded-xl bg-white p-7 shadow-sm"><div className="mb-6 flex items-center justify-between"><h2 className="text-lg font-extrabold">워크북 템플릿 목록</h2><button type="button" onClick={() => setSelectionOpen(true)} className={primaryButton}><Plus className="h-4 w-4" />워크북 템플릿 선택하기</button></div><div className="space-y-4">{templates.map((template,index) => <div key={template.id} draggable={!template.open} onDragStart={() => {dragIndex.current=index}} onDragOver={(event) => event.preventDefault()} onDrop={() => dropTemplate(index)} className={`overflow-hidden rounded-xl border bg-white ${template.open ? "border-blue-400" : "border-slate-200"}`}><div className="flex h-16 items-center px-4"><GripVertical className="mr-3 h-5 w-5 cursor-grab text-slate-400" /><span className="mr-4 font-bold">{index+1}.</span><span className="min-w-0 flex-1 truncate font-bold text-blue-600">{template.name}</span><select value={template.displayMode} onChange={(event) => setTemplates((current) => current.map((item) => item.id === template.id ? {...item,displayMode:event.target.value as SelectedTemplate['displayMode']} : item))} className="mr-4 h-9 cursor-pointer rounded-md border border-slate-200 px-3 text-sm"><option value="items">항목별보기</option><option value="continuous">이어보기</option></select><label className="mr-8 flex cursor-pointer items-center gap-2 text-sm"><input type="radio" checked={priorityId === template.id} onChange={() => setPriorityId(template.id)} className="h-5 w-5 accent-blue-600" />1순위</label><button type="button" onClick={() => setTemplates((current) => current.map((item) => item.id===template.id?{...item,open:!item.open}:item))} className="mr-5 cursor-pointer p-2" aria-label={`${template.name} 상세`}><ChevronDown className={`h-5 w-5 transition ${template.open?'rotate-180':''}`} /></button><button type="button" onClick={() => setTemplates((current) => current.filter((item) => item.id !== template.id))} className="cursor-pointer p-2 text-rose-500" aria-label={`${template.name} 삭제`}><Trash2 className="h-5 w-5" /></button></div>{template.open && <TemplateSettingsDetails template={template} onChange={(updated) => setTemplates((current) => current.map((item) => item.id === template.id ? updated : item))} />}</div>)}{templates.length===0&&<div className="rounded-xl border border-dashed border-slate-300 py-16 text-center text-sm text-slate-400">워크북 템플릿을 선택해 주세요.</div>}</div></section>
-    <div className="fixed bottom-0 left-[var(--sidebar-width)] right-0 z-30 flex h-20 items-center justify-between border-t border-slate-200 bg-white px-8 shadow-[0_-4px_18px_rgba(15,23,42,.06)]"><Link href="/admin/exploration/reading" className={secondaryButton}>목록</Link><div className="flex items-center gap-3"><span className="text-sm font-bold">검수 상태:</span><StatusSwitch checked={reviewed} onChange={setReviewed}/><span className="mx-2 h-7 w-px bg-slate-200"/><button type="button" onClick={() => showToast("변경 사항이 취소되었습니다.")} className={secondaryButton}>취소</button><Link href="/online-workbook/preview/230" target="_blank" rel="noopener noreferrer" className={secondaryButton}><Eye className="h-4 w-4"/>미리보기</Link><button type="button" onClick={() => showToast("온라인 워크북 설정이 저장되었습니다.")} className={primaryButton}>저장</button></div></div>
-    {selectionOpen&&<TemplateSelectionDialog selectedIds={templates.map((item)=>item.id)} onClose={()=>setSelectionOpen(false)} onConfirm={(selected)=>{setTemplates(selected.map((item)=>templates.find((current)=>current.id===item.id)??createSelectedTemplate(item)));setSelectionOpen(false)}}/>}
+    <div className="fixed bottom-0 left-[var(--admin-fixed-left)] right-0 z-30 flex h-20 items-center justify-between border-t border-slate-200 bg-white px-8 shadow-[0_-4px_18px_rgba(15,23,42,.06)] transition-[left] duration-200"><Link href="/admin/exploration/reading" className={secondaryButton}>목록</Link><div className="flex items-center gap-3"><span className="text-sm font-bold">검수 상태:</span><StatusSwitch checked={reviewed} onChange={setReviewed}/><span className="mx-2 h-7 w-px bg-slate-200"/><button type="button" onClick={resetToOriginal} className={secondaryButton}>취소</button><Link href={previewHref} target="_blank" rel="noopener noreferrer" className={secondaryButton}><Eye className="h-4 w-4"/>미리보기</Link><button type="button" onClick={saveRoundSetting} className={primaryButton}>저장</button></div></div>
+    {selectionOpen&&<TemplateSelectionDialog selectedIds={templates.map((item)=>item.id)} onClose={()=>setSelectionOpen(false)} onConfirm={(selected)=>{const nextTemplates=selected.map((item)=>templates.find((current)=>current.id===item.id)??createSelectedTemplate(item));setTemplates(nextTemplates);if(!nextTemplates.some((item)=>item.id===priorityId)&&nextTemplates[0])setPriorityId(nextTemplates[0].id);setSelectionOpen(false)}}/>}
     {toast&&<Toast message={toast}/>} 
   </div>
 }

@@ -1,3 +1,9 @@
+import { getReadingBookCover } from "@/lib/reading-book-covers"
+import { getReadingBook } from "@/lib/reading-books"
+import { getWorkbookRoundSetting } from "@/lib/workbook-round-settings"
+import { WORKBOOK_TEMPLATES } from "@/lib/workbook-templates"
+import { STUDENT_MOCK_STORAGE_KEYS } from "@/lib/student-mock-state"
+
 export type WorkbookStatus = "before" | "writing" | "completed" | "feedback"
 
 export interface WorkbookQuestion {
@@ -143,12 +149,12 @@ const democracyTemplates = [kwlTemplate, quizTemplate, discussionTemplate, freeR
 
 export const studentWorkbooks: StudentWorkbook[] = [
   {
-    id: "democracy-0825", year: 2026, month: 8, day: 25, weekday: "화요일", level: 4,
+    id: "democracy-0825", year: 2026, month: 9, day: 1, weekday: "화요일", level: 4,
     bookTitle: "민주주의를 어떻게 이룰까요?", author: "플란텔 팀 글, 마르타 피나 그림", coverSrc: "/student-assets/books/democracy.jpg",
     status: "before", templates: democracyTemplates, answers: ["", "", ""],
   },
   {
-    id: "room901-0825", year: 2026, month: 8, day: 25, weekday: "화요일", level: 2,
+    id: "room901-0825", year: 2026, month: 9, day: 1, weekday: "화요일", level: 2,
     bookTitle: "901호 띵똥 아저씨", author: "이욱재 글", coverSrc: "/student-assets/books/room-901.jpg",
     status: "completed", templates: [sequelTemplate], selectedTemplateId: "sequel",
     answers: [
@@ -159,7 +165,7 @@ export const studentWorkbooks: StudentWorkbook[] = [
     ],
   },
   {
-    id: "asia-table-0824", year: 2026, month: 8, day: 24, weekday: "월요일", level: 4,
+    id: "asia-table-0824", year: 2026, month: 9, day: 1, weekday: "화요일", level: 4,
     bookTitle: "밥.빵.국수 - 아시아의 식탁", author: "이은미 글, 박태희 그림", coverSrc: "/student-assets/books/asia-table.jpg",
     status: "writing", templates: asiaTemplates, selectedTemplateId: "quiz",
     answers: [
@@ -174,11 +180,11 @@ export const studentWorkbooks: StudentWorkbook[] = [
     ],
   },
   {
-    id: "gamunjang-0824", year: 2026, month: 8, day: 24, weekday: "월요일", level: 1,
+    id: "gamunjang-0824", year: 2026, month: 9, day: 1, weekday: "화요일", level: 1,
     bookTitle: "감은장아기", author: "서정오 글, 한태희 그림", coverSrc: "/student-assets/books/gamunjang.jpg",
     status: "feedback", templates: [diaryTemplate], selectedTemplateId: "reading-diary",
     answers: [
-      "2026년 8월 24일",
+      "2026년 9월 1일",
       "감은장아기가 자신의 힘으로 길을 찾아가는 모습처럼 맑고 힘찬 날씨였습니다.",
       "《감은장아기》는 부모에게 쫓겨난 감은장아기가 어려움을 이겨 내고 자신의 삶을 당당하게 만들어 가는 이야기입니다.",
       "감은장아기가 자신을 믿고 새로운 삶을 시작한 장면이 가장 기억에 남았습니다. 어려운 상황에서도 용기를 잃지 않았기 때문입니다.",
@@ -187,7 +193,7 @@ export const studentWorkbooks: StudentWorkbook[] = [
     feedback: {
       reward: 15,
       content: "감은장아기의 줄거리와 주제를 또렷하게 정리했어요. 날씨를 주인공의 모습과 연결한 표현이 특히 인상적이에요. 기억에 남는 장면을 고른 이유와 책에서 얻은 생각도 자연스럽게 이어졌어요. 다음에는 줄거리 요약에 중요한 사건을 한두 가지 더 넣으면 책의 내용이 더욱 선명하게 전달될 거예요.",
-      date: "2026-08-24 13:17:43",
+      date: "2026-09-01 13:17:43",
       seen: false,
     },
   },
@@ -238,10 +244,27 @@ export const studentWorkbooks: StudentWorkbook[] = [
 ]
 
 const runtimeStates: Record<string, Partial<WorkbookRuntimeState>> = {}
+const dynamicWorkbooks: Record<string, StudentWorkbook> = {}
+let runtimeStatesLoaded = false
+
+function ensureRuntimeStatesLoaded() {
+  if (runtimeStatesLoaded || typeof window === "undefined") return
+  runtimeStatesLoaded = true
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(STUDENT_MOCK_STORAGE_KEYS.workbookRuntime) ?? "{}") as Record<string, Partial<WorkbookRuntimeState>>
+    Object.assign(runtimeStates, stored)
+  } catch {
+    window.localStorage.removeItem(STUDENT_MOCK_STORAGE_KEYS.workbookRuntime)
+  }
+}
 
 export function getWorkbookRuntime(workbook: StudentWorkbook): WorkbookRuntimeState {
+  ensureRuntimeStatesLoaded()
   const stored = runtimeStates[workbook.id]
-  const selectedTemplateId = stored?.selectedTemplateId ?? workbook.selectedTemplateId
+  const storedTemplateId = stored?.selectedTemplateId
+  const selectedTemplateId = workbook.templates.some((item) => item.id === storedTemplateId)
+    ? storedTemplateId
+    : workbook.selectedTemplateId
   const template = workbook.templates.find((item) => item.id === selectedTemplateId) ?? workbook.templates[0]
   const sourceAnswers = stored?.answers ?? workbook.answers
   return {
@@ -254,12 +277,54 @@ export function getWorkbookRuntime(workbook: StudentWorkbook): WorkbookRuntimeSt
 
 export function saveWorkbookRuntime(id: string, next: Partial<WorkbookRuntimeState>) {
   if (typeof window === "undefined") return
+  ensureRuntimeStatesLoaded()
   runtimeStates[id] = { ...runtimeStates[id], ...next }
+  window.localStorage.setItem(STUDENT_MOCK_STORAGE_KEYS.workbookRuntime, JSON.stringify(runtimeStates))
   window.dispatchEvent(new CustomEvent("dokdo-workbook-change", { detail: { id } }))
 }
 
 export function getWorkbookById(id: string) {
-  return studentWorkbooks.find((workbook) => workbook.id === id)
+  const stored = studentWorkbooks.find((workbook) => workbook.id === id)
+  if (stored) return stored
+  if (dynamicWorkbooks[id]) return dynamicWorkbooks[id]
+
+  const match = /^reading-(\d+)-round-(\d+)$/.exec(id)
+  if (!match) return undefined
+  const book = getReadingBook(Number(match[1]))
+  const round = Number(match[2])
+  if (!book || round < 1 || round > book.rounds) return undefined
+
+  const setting = getWorkbookRoundSetting(book.id, round)
+  const templates = setting.templates.flatMap(({ templateId, questions }) => {
+    const template = WORKBOOK_TEMPLATES.find((item) => item.id === templateId)
+    return template
+      ? [{
+          id: String(template.id),
+          title: template.studentTitle,
+          description: template.description,
+          recommended: template.id === setting.priorityTemplateId,
+          questions: (questions ?? template.questions).map(({ title, description, example }) => ({ title, description, example })),
+        }]
+      : []
+  })
+
+  const dynamicWorkbook: StudentWorkbook = {
+    id,
+    year: 2026,
+    month: 8,
+    day: 26,
+    weekday: "수요일",
+    level: book.level,
+    bookTitle: book.title,
+    author: `${book.publisher} · ${book.category}`,
+    coverSrc: getReadingBookCover(book.id),
+    status: "before" as const,
+    templates,
+    selectedTemplateId: String(setting.priorityTemplateId),
+    answers: templates[0]?.questions.map(() => "") ?? [],
+  }
+  dynamicWorkbooks[id] = dynamicWorkbook
+  return dynamicWorkbook
 }
 
 export function formatWorkbookDate(workbook: StudentWorkbook) {

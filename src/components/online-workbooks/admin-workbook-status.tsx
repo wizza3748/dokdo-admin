@@ -14,6 +14,10 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  getMergedStudentSubmittedAgencyWorkbooks,
+  subscribeStudentSubmittedAgencyWorkbooks,
+} from "@/lib/online-workbooks"
 import { cn } from "@/lib/utils"
 
 type WorkbookStatus = "작성전" | "작성완료" | "전송완료"
@@ -59,6 +63,7 @@ const selectClass = "h-9 w-full appearance-none rounded-md border border-slate-2
 const labelClass = "w-[88px] shrink-0 text-right text-sm font-semibold text-slate-700"
 
 export function AdminWorkbookStatus() {
+  const [studentRows, setStudentRows] = React.useState<AdminWorkbookRow[]>([])
   const [period, setPeriod] = React.useState<"three" | "all">("all")
   const [institution, setInstitution] = React.useState("all")
   const [level, setLevel] = React.useState("all")
@@ -71,9 +76,37 @@ export function AdminWorkbookStatus() {
   const [page, setPage] = React.useState(1)
   const [notice, setNotice] = React.useState("")
 
+  React.useEffect(() => {
+    let active = true
+    const syncRows = async () => {
+      const records = await getMergedStudentSubmittedAgencyWorkbooks()
+      if (!active) return
+      setStudentRows(records.map((record) => ({
+        id: record.id,
+        institution: record.institution,
+        student: record.studentName,
+        level: record.level,
+        book: record.bookTitle,
+        template: record.templateName,
+        submittedAt: record.submittedAt,
+        feedbackAt: record.feedbackAt ?? "",
+        status: record.status,
+        flowers: record.flowers,
+      })))
+    }
+    void syncRows()
+    const unsubscribe = subscribeStudentSubmittedAgencyWorkbooks(() => void syncRows())
+    const interval = window.setInterval(() => void syncRows(), 1500)
+    return () => {
+      active = false
+      unsubscribe()
+      window.clearInterval(interval)
+    }
+  }, [])
+
   const filteredRows = React.useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    return rows
+    return [...studentRows, ...rows]
       .filter((row) => institution === "all" || row.institution === institution)
       .filter((row) => level === "all" || row.level === Number(level))
       .filter((row) => status === "all" || row.status === status)
@@ -83,7 +116,7 @@ export function AdminWorkbookStatus() {
         const result = a[sort.key].localeCompare(b[sort.key], "ko", { numeric: true })
         return sort.direction === "asc" ? result : -result
       })
-  }, [institution, level, status, flower, query, sort])
+  }, [studentRows, institution, level, status, flower, query, sort])
 
   const toggleSort = (key: SortKey) => setSort((current) => current.key === key
     ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
@@ -114,9 +147,9 @@ export function AdminWorkbookStatus() {
   }
 
   const summaryCards = [
-    { label: "피드백 작성전", count: 734, meta: "72개 기관 / 228명 학생", color: "bg-[#747d8c]" },
-    { label: "피드백 작성완료", count: 9, meta: "7개 기관 / 9명 학생", color: "bg-[#3d82f6]" },
-    { label: "피드백 전송완료", count: 261, meta: "29개 기관 / 125명 학생", color: "bg-[#20c464]" },
+    { label: "피드백 작성전", count: 734 + studentRows.filter((row) => row.status === "작성전").length, meta: "72개 기관 / 228명 학생", color: "bg-[#747d8c]" },
+    { label: "피드백 작성완료", count: 9 + studentRows.filter((row) => row.status === "작성완료").length, meta: "7개 기관 / 9명 학생", color: "bg-[#3d82f6]" },
+    { label: "피드백 전송완료", count: 261 + studentRows.filter((row) => row.status === "전송완료").length, meta: "29개 기관 / 125명 학생", color: "bg-[#20c464]" },
   ]
 
   return (
@@ -145,7 +178,7 @@ export function AdminWorkbookStatus() {
 
         {filtersOpen && <section className="grid gap-x-12 gap-y-3 bg-white px-8 py-5 xl:grid-cols-3">
           <div className="flex items-center gap-3"><span className={labelClass}>집계 기간</span><div className="flex h-9 flex-1 items-center rounded-md border border-slate-200 px-3 text-sm text-slate-600"><span>{period === "all" ? "2025-09-01" : "2026-05-24"}</span><span className="mx-auto text-slate-300">→</span><span>2026-08-24</span><CalendarDays className="ml-3 size-4 text-slate-300" /></div></div>
-          <div className="flex items-center gap-3"><label htmlFor="admin-institution" className={labelClass}>기관</label><select id="admin-institution" value={institution} onChange={(event) => setInstitution(event.target.value)} className={selectClass}><option value="all">기관 선택</option><option value="개발테스트학원">개발테스트학원</option><option value="인천교육청-채 경미">인천교육청-채 경미</option><option value="전주용흥초등학교">전주용흥초등학교</option></select></div>
+          <div className="flex items-center gap-3"><label htmlFor="admin-institution" className={labelClass}>기관</label><select id="admin-institution" value={institution} onChange={(event) => setInstitution(event.target.value)} className={selectClass}><option value="all">기관 선택</option><option value="독도학원">독도학원</option><option value="개발테스트학원">개발테스트학원</option><option value="인천교육청-채 경미">인천교육청-채 경미</option><option value="전주용흥초등학교">전주용흥초등학교</option></select></div>
           <div className="flex items-center gap-3"><label htmlFor="admin-level" className={labelClass}>책 읽기 레벨</label><select id="admin-level" value={level} onChange={(event) => setLevel(event.target.value)} className={selectClass}><option value="all">레벨 선택</option>{[1, 2, 3, 4, 5, 6].map((item) => <option key={item} value={item}>{item}레벨</option>)}</select></div>
           <div className="flex items-center gap-3"><label htmlFor="admin-status" className={labelClass}>피드백 상태</label><select id="admin-status" value={status} onChange={(event) => setStatus(event.target.value)} className={selectClass}><option value="all">상태 선택</option><option value="작성전">작성전</option><option value="작성완료">작성완료</option><option value="전송완료">전송완료</option></select></div>
           <div className="flex items-center gap-3"><label htmlFor="admin-flower" className={labelClass}>섬초롱꽃</label><select id="admin-flower" value={flower} onChange={(event) => setFlower(event.target.value)} className={selectClass}><option value="all">선택</option><option value="yes">지급</option><option value="no">미지급</option></select></div>
@@ -172,7 +205,7 @@ export function AdminWorkbookStatus() {
             </table>
           </div>
 
-          <div className="flex h-12 items-center justify-between px-1 text-xs text-slate-600"><div className="flex items-center gap-4"><span>총 1004 레코드</span><span className="flex items-center gap-2 border-l border-slate-200 pl-4">20 항목/페이지 <ChevronDown className="size-4 text-slate-300" /></span></div><div className="flex items-center gap-3 text-slate-400"><span>│‹</span><span>≪</span><button type="button" onClick={() => setPage(Math.max(1, page - 1))}>‹</button>{[1, 2, 3, 4, 5].map((number) => <button type="button" key={number} onClick={() => setPage(number)} className={cn("grid size-7 place-items-center rounded", page === number && "bg-blue-600 text-white")}>{number}</button>)}<button type="button" onClick={() => setPage(page + 1)}>›</button><span>≫</span><span>›│</span></div></div>
+          <div className="flex h-12 items-center justify-between px-1 text-xs text-slate-600"><div className="flex items-center gap-4"><span>총 {1004 + studentRows.length} 레코드</span><span className="flex items-center gap-2 border-l border-slate-200 pl-4">20 항목/페이지 <ChevronDown className="size-4 text-slate-300" /></span></div><div className="flex items-center gap-3 text-slate-400"><span>│‹</span><span>≪</span><button type="button" onClick={() => setPage(Math.max(1, page - 1))}>‹</button>{[1, 2, 3, 4, 5].map((number) => <button type="button" key={number} onClick={() => setPage(number)} className={cn("grid size-7 place-items-center rounded", page === number && "bg-blue-600 text-white")}>{number}</button>)}<button type="button" onClick={() => setPage(page + 1)}>›</button><span>≫</span><span>›│</span></div></div>
         </section>
       </div>
     </div>

@@ -16,21 +16,31 @@ import {
 } from "lucide-react"
 
 import { WORKBOOK_TEMPLATES } from "@/lib/workbook-templates"
+import { getWorkbookRoundSettingByPreviewId, getWorkbookRoundTemplate } from "@/lib/workbook-round-settings"
 
 const ROUND_PREVIEW_TEMPLATE_IDS: Record<number, number> = {
   230: 37,
 }
 
-export function StudentWorkbookPreview({ previewId }: { previewId: number }) {
-  const templateId = ROUND_PREVIEW_TEMPLATE_IDS[previewId] ?? previewId
-  const template = WORKBOOK_TEMPLATES.find((item) => item.id === templateId) ?? WORKBOOK_TEMPLATES[0]
+export function StudentWorkbookPreview({ previewId, templateId: selectedTemplateId }: { previewId: number; templateId?: number }) {
+  const roundSetting = getWorkbookRoundSettingByPreviewId(previewId)
+  const fallbackTemplateId = ROUND_PREVIEW_TEMPLATE_IDS[previewId] ?? previewId
+  const baseTemplate = selectedTemplateId
+    ? WORKBOOK_TEMPLATES.find((item) => item.id === selectedTemplateId) ?? WORKBOOK_TEMPLATES[0]
+    : roundSetting
+      ? getWorkbookRoundTemplate(roundSetting)
+      : WORKBOOK_TEMPLATES.find((item) => item.id === fallbackTemplateId) ?? WORKBOOK_TEMPLATES[0]
+  const settingTemplate = roundSetting?.templates.find((item) => item.templateId === baseTemplate.id)
+  const template = settingTemplate?.questions
+    ? { ...baseTemplate, questions: settingTemplate.questions }
+    : baseTemplate
   const [questionIndex, setQuestionIndex] = React.useState(0)
   const [guideOpen, setGuideOpen] = React.useState(true)
   const [answers, setAnswers] = React.useState(() => template.questions.map(() => ""))
   const question = template.questions[questionIndex]
-  const writingGuide = template.id === 37
+  const writingGuide = template.name.includes("퀴즈")
     ? "※ 안내에 따라 퀴즈를 작성해 보세요."
-    : "※ 안내에 따라 독서 감상문을 작성해 보세요."
+    : template.guides.writing || "※ 안내에 따라 독서 감상문을 작성해 보세요."
 
   const moveTo = (index: number) => {
     if (index >= 0 && index < template.questions.length) {

@@ -28,6 +28,11 @@ import {
 } from "lucide-react"
 
 import { StudentHeader } from "@/components/student/student-header"
+import {
+  getStudentAgencyWorkbookRecordId,
+  syncStudentSubmittedAgencyWorkbooks,
+  upsertStudentSubmittedAgencyWorkbook,
+} from "@/lib/online-workbooks"
 import { cn } from "@/lib/utils"
 import {
   getWorkbookById,
@@ -39,7 +44,7 @@ import {
 } from "@/lib/student-workbooks"
 
 type ViewMode = "select" | "write" | "rewrite" | "result"
-type ModalMode = "preview" | "start" | "outline" | "switch" | "save" | "content-empty" | "submit" | "feedback" | null
+type ModalMode = "preview" | "start" | "outline" | "switch" | "save" | "content-review" | "content-empty" | "submit" | "feedback" | null
 
 export function StudentWorkbookFlow({ id }: { id: string }) {
   const router = useRouter()
@@ -63,6 +68,7 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
     setAnswers(current.answers)
     setSavedAnswers(current.answers)
     setView(current.status === "before" ? "select" : current.status === "writing" ? "write" : "result")
+    void syncStudentSubmittedAgencyWorkbooks()
   }, [workbook])
 
   if (!workbook) return <NotFound />
@@ -110,6 +116,14 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
 
   const moveQuestion = (next: number) => {
     if (next === questionIndex) return
+    if (next >= template.questions.length) {
+      if (answers.every((answer) => !answer.trim())) {
+        setModal("content-empty")
+        return
+      }
+      setModal("content-review")
+      return
+    }
     if (dirty) {
       setPendingQuestionIndex(next)
       setModal("save")
@@ -142,9 +156,38 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
     setModal(null)
   }
 
-  const confirmSubmit = () => {
+  const confirmContentReview = () => {
+    setSavedAnswers(answers)
+    persist({ status: "writing", selectedTemplateId: template.id, answers })
+    setModal(null)
+    setView("rewrite")
+  }
+
+  const confirmSubmit = async () => {
     setSavedAnswers(answers)
     persist({ status: "completed", selectedTemplateId: template.id, answers }, "제출이 완료되었어요.")
+    const submittedAt = new Date()
+    const submittedDate = `${submittedAt.getFullYear()}-${String(submittedAt.getMonth() + 1).padStart(2, "0")}-${String(submittedAt.getDate()).padStart(2, "0")}`
+    await upsertStudentSubmittedAgencyWorkbook({
+      id: getStudentAgencyWorkbookRecordId(workbook.id),
+      sourceWorkbookId: workbook.id,
+      institution: "독도학원",
+      studentName: "진독도",
+      level: workbook.level,
+      bookTitle: workbook.bookTitle,
+      templateName: template.title,
+      submittedAt: submittedDate,
+      feedbackAt: null,
+      status: "작성전",
+      aiUsed: 0,
+      flowers: 0,
+      anomaly: false,
+      parentSent: false,
+      questions: template.questions.map((question, index) => ({
+        title: question.title,
+        answer: answers[index] ?? "",
+      })),
+    })
     setModal(null)
     setView("result")
   }
@@ -243,6 +286,15 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
           onConfirm={saveAndMoveQuestion}
         />
       )}
+      {modal === "content-review" && (
+        <ConfirmModal
+          title="작성 내용 확인"
+          description={<>지금까지 작성한 내용을 모두 확인해볼까요?<br />고쳐쓰기 단계로 가면 온라인 워크북을 교체할 수 없어요.</>}
+          confirmLabel="확인하기"
+          onClose={() => setModal(null)}
+          onConfirm={confirmContentReview}
+        />
+      )}
       {modal === "content-empty" && (
         <ConfirmModal
           title="내용 확인"
@@ -255,8 +307,8 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
       )}
       {modal === "submit" && (
         <ConfirmModal
-          title="워크북 제출 확인"
-          description={<>작성한 워크북을 제출할까요?<br />제출한 뒤에는 내용을 수정할 수 없어요.</>}
+          title="저장 확인"
+          description="작성한 내용을 제출할까요? 제출하면 다시 수정할 수 없어요."
           confirmLabel="제출하기"
           onClose={() => setModal(null)}
           onConfirm={confirmSubmit}
@@ -336,7 +388,15 @@ function BookPanel({ workbook }: { workbook: StudentWorkbook }) {
   return (
     <aside>
       <div className="relative h-[320px] w-[240px] overflow-hidden rounded-xl border border-[#bfc8cd] bg-white shadow-sm">
-        <Image src={workbook.coverSrc} alt={`${workbook.bookTitle} 표지`} fill sizes="240px" className="object-cover" priority />
+        <Image
+          src={workbook.coverSrc}
+          alt={`${workbook.bookTitle} 표지`}
+          fill
+          sizes="240px"
+          className="object-cover"
+          priority
+          unoptimized={workbook.coverSrc.startsWith("http")}
+        />
         <span className="absolute left-3 top-3 rounded-lg border-2 border-white bg-[#219ced] px-3 py-2 text-lg font-black text-white">Lv.{workbook.level}</span>
         <button type="button" className="absolute bottom-3 left-3 right-3 flex h-11 items-center justify-center gap-2 rounded-lg bg-[#4bc9b8] font-black text-white"><Smartphone className="size-4" />전자책 보기</button>
       </div>

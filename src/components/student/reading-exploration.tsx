@@ -5,12 +5,16 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import {
   ArrowLeft,
+  ArrowRight,
+  BellRing,
   BookOpen,
   Check,
   Clock3,
+  Flag,
   Heart,
   Home,
   LockKeyhole,
+  LogOut,
   Play,
   Search,
   X,
@@ -249,9 +253,9 @@ function SolvePrompt({ onSolve }: { onSolve: () => void }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-5">
       <div className="flex flex-col items-center text-center text-white">
-        <h2 className="text-2xl font-black leading-relaxed">읽기를 완료했어요!<br />이제 문제를 풀어 볼까요?</h2>
-        <Image src="/student-assets/kangchi.svg" width={170} height={170} alt="기뻐하는 강치" className="mt-5 size-44 object-contain" />
-        <button type="button" onClick={onSolve} className="mt-2 cursor-pointer rounded-full bg-[#ff5e94] px-10 py-4 text-xl font-black shadow-xl">문제 풀러 가기</button>
+        <h2 className="text-[28px] font-black leading-[1.5] sm:text-[34px]">읽기를 완료했어요!<br />이제 문제를 풀어 볼까요?</h2>
+        <Image src="/student-assets/kangchi-reading.svg" width={250} height={205} alt="책을 읽는 강치" className="mt-4 h-[205px] w-[250px] object-contain" priority />
+        <button type="button" onClick={onSolve} className="-mt-2 inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#ff5e94] px-9 py-4 text-2xl font-black shadow-xl"><Flag className="size-7" />문제 풀러 가기</button>
       </div>
     </div>
   )
@@ -262,7 +266,7 @@ export function ReadingExploration() {
   const [category, setCategory] = useState<Category>("전체")
   const [query, setQuery] = useState("")
   const [favorites, setFavorites] = useState<Set<number>>(() => new Set([729]))
-  const [completedRounds, setCompletedRounds] = useState<Record<number, number>>(() => getCompletedReadingRoundsByBook())
+  const [completedRounds, setCompletedRounds] = useState<Record<number, number>>({})
   const [selectedBook, setSelectedBook] = useState<ReadingBookRecord | null>(null)
   const [selectedRound, setSelectedRound] = useState(1)
   const [stage, setStage] = useState<Stage>("catalog")
@@ -270,8 +274,7 @@ export function ReadingExploration() {
   const [solvePrompt, setSolvePrompt] = useState(false)
   const [ebookConfirm, setEbookConfirm] = useState(false)
   const [quizIndex, setQuizIndex] = useState(0)
-  const [selectedOption, setSelectedOption] = useState<number | null>(null)
-  const [quizAnswers, setQuizAnswers] = useState<number[]>([])
+  const [quizAnswers, setQuizAnswers] = useState<(number | null)[]>([])
   const [rating, setRating] = useState(0)
   const [isReexploration, setIsReexploration] = useState(false)
   const [storageReady, setStorageReady] = useState(false)
@@ -281,6 +284,7 @@ export function ReadingExploration() {
   )
 
   useEffect(() => {
+    setCompletedRounds(getCompletedReadingRoundsByBook())
     try {
       const storedFavorites = window.localStorage.getItem(STUDENT_MOCK_STORAGE_KEYS.readingFavorites)
       if (storedFavorites !== null) setFavorites(new Set(JSON.parse(storedFavorites) as number[]))
@@ -313,10 +317,10 @@ export function ReadingExploration() {
     return matchesCategory && book.title.toLocaleLowerCase("ko").includes(query.trim().toLocaleLowerCase("ko"))
   }), [category, favorites, query, sortedBooks])
 
-  const completedBookCount = Object.entries(completedRounds).filter(([id, round]) => {
+  const completedBookCount = storageReady ? Object.entries(completedRounds).filter(([id, round]) => {
     const book = READING_BOOKS.find((item) => item.id === Number(id))
     return book && round >= book.rounds
-  }).length
+  }).length : 0
 
   const toggleFavorite = (bookId: number) => setFavorites((current) => {
     const next = new Set(current)
@@ -345,40 +349,42 @@ export function ReadingExploration() {
     setEbookConfirm(false)
     setRating(0)
     setQuizIndex(0)
-    setSelectedOption(null)
-    setQuizAnswers([])
+    setQuizAnswers(Array.from({ length: activeQuiz.length }, () => null))
     setStage("quiz")
   }
 
-  const finishQuizQuestion = (option: number) => {
-    if (!selectedBook) return
-    const nextAnswers = [...quizAnswers, option]
-    setQuizAnswers(nextAnswers)
+  const selectQuizOption = (option: number) => {
+    setQuizAnswers((current) => {
+      const nextAnswers = Array.from({ length: activeQuiz.length }, (_, index) => current[index] ?? null)
+      nextAnswers[quizIndex] = option
+      return nextAnswers
+    })
     if (quizIndex < activeQuiz.length - 1) {
-      setQuizIndex((value) => value + 1)
-      setSelectedOption(null)
-      return
+      setQuizIndex((current) => current + 1)
     }
+  }
+
+  const submitQuiz = () => {
+    if (!selectedBook) return
+    if (quizAnswers.some((answer) => answer === null) || quizAnswers.length !== activeQuiz.length) return
     setCompletedRounds((current) => ({ ...current, [selectedBook.id]: Math.max(current[selectedBook.id] ?? 0, selectedRound) }))
     markReadingRoundCompleted(selectedBook.id, selectedRound, {
-      correctCount: nextAnswers.filter((answer, index) => answer === activeQuiz[index]?.correctOption).length,
+      correctCount: quizAnswers.filter((answer, index) => answer === activeQuiz[index]?.correctOption).length,
       totalQuestions: activeQuiz.length,
     })
-    if (selectedRound < selectedBook.rounds) {
-      setStage("complete")
-      return
+    if (selectedRound >= selectedBook.rounds) {
+      addTransientReadingExplorationRecord({
+        bookId: selectedBook.id,
+        level: selectedBook.level,
+        title: selectedBook.title,
+        attempt: isReexploration ? "재탐험" : "첫 탐험",
+        currentRound: selectedRound,
+        totalRounds: selectedBook.rounds,
+        correctCount: quizAnswers.filter((answer, index) => answer === activeQuiz[index]?.correctOption).length,
+        totalQuestions: activeQuiz.length,
+      })
     }
-    addTransientReadingExplorationRecord({
-      bookId: selectedBook.id,
-      level: selectedBook.level,
-      title: selectedBook.title,
-      attempt: isReexploration ? "재탐험" : "첫 탐험",
-      currentRound: selectedRound,
-      totalRounds: selectedBook.rounds,
-      correctCount: nextAnswers.filter((answer, index) => answer === activeQuiz[index]?.correctOption).length,
-      totalQuestions: activeQuiz.length,
-    })
-    setStage(isReexploration ? "gift" : "rating")
+    setStage("gift")
   }
 
   const returnToCatalog = () => {
@@ -395,35 +401,57 @@ export function ReadingExploration() {
 
     if (stage === "quiz") {
       const question = activeQuiz[quizIndex] ?? activeQuiz[0]
+      const answeredCount = quizAnswers.filter((answer) => answer !== null).length
+      const selectedOption = quizAnswers[quizIndex] ?? null
+      const allAnswered = answeredCount === activeQuiz.length
+      const isLastQuestion = quizIndex === activeQuiz.length - 1
       return (
-        <main className="min-h-screen bg-[#eaf1f5]">
-          <header className="flex h-12 items-center justify-between bg-[#50c3b4] px-5 font-black text-[#173d3b]">
+        <main className="min-h-screen bg-[#e8eff3] text-[#171717]">
+          <header className="flex h-[50px] items-center justify-between bg-[#50c3b4] px-5 font-black text-[#173d3b]">
             <span>{selectedBook.level}레벨&nbsp; {selectedBook.title}&nbsp; {selectedRound}/{selectedBook.rounds}</span>
-            <span className="rounded-full bg-white/90 px-5 py-1 text-sm">{quizIndex + 1}/{activeQuiz.length}</span>
+            <div className="flex items-center gap-5 text-white">
+              <div className="flex h-9 w-[420px] max-w-[48vw] items-center gap-3 rounded-full bg-white px-3 text-sm font-bold text-[#7d8790]">
+                <span className="h-3 flex-1 overflow-hidden rounded-full bg-[#e7eef2]"><span className="block h-full rounded-full bg-[#ff5e94] transition-[width]" style={{ width: `${(answeredCount / activeQuiz.length) * 100}%` }} /></span>
+                <span>{answeredCount}/{activeQuiz.length}</span>
+              </div>
+              <BellRing className="size-7" aria-label="알림" />
+              <LogOut className="size-7" aria-label="나가기" />
+            </div>
           </header>
-          <section className="mx-auto max-w-[1280px] px-5 py-12 sm:py-16">
-            <h1 className="mx-auto max-w-4xl text-center text-2xl font-black leading-relaxed text-[#0782c9] sm:text-3xl">{question.question}</h1>
-            <div className="mt-10 space-y-4">
+          <section className="mx-auto px-5 py-16 sm:px-10 sm:py-20">
+            <h1 className="mx-auto max-w-[1280px] text-center text-2xl font-black leading-relaxed text-[#0782c9] sm:text-[34px]">{question.question}</h1>
+            <div className="mt-12 space-y-5">
               {question.options.map((option, index) => {
                 const optionNumber = index + 1
                 return <button key={option} type="button" onClick={() => {
-                  setSelectedOption(optionNumber)
-                  finishQuizQuestion(optionNumber)
-                }} className={cn("w-full cursor-pointer rounded-2xl border-[3px] bg-white px-6 py-5 text-center text-lg font-bold transition sm:text-2xl", selectedOption === optionNumber ? "border-[#ff5e94] bg-[#fff2f7]" : "border-[#0782c9] hover:bg-[#f4fbff]")}>{option}</button>
+                  selectQuizOption(optionNumber)
+                }} className={cn("w-full cursor-pointer rounded-[18px] border-[4px] px-6 py-5 text-center text-lg font-medium transition sm:text-[26px]", selectedOption === optionNumber ? "border-[#28577d] bg-[#28577d] text-white" : "border-[#9babbe] bg-white hover:border-[#2d9fe7] hover:bg-[#2d9fe7] hover:text-white")}>{option}</button>
               })}
             </div>
+            <div className="mt-5 flex items-center justify-center gap-3">
+              <button type="button" onClick={() => setQuizIndex((value) => Math.max(0, value - 1))} disabled={quizIndex === 0} aria-label="이전 문항" className="grid size-12 cursor-pointer place-items-center rounded-full border-2 border-[#a5a5a5] bg-white text-[#555] disabled:invisible"><ArrowLeft className="size-7" /></button>
+              <span className="min-w-[140px] rounded-full border-2 border-[#aaa] bg-white px-7 py-2 text-center text-2xl font-black"><strong>{quizIndex + 1}</strong><span className="mx-2 text-[#98a2ad]">/</span>{activeQuiz.length}</span>
+              <button type="button" onClick={() => setQuizIndex((value) => Math.min(activeQuiz.length - 1, value + 1))} disabled={isLastQuestion || selectedOption === null} aria-label="다음 문항" className="grid size-12 cursor-pointer place-items-center rounded-full border-2 border-[#a5a5a5] bg-white text-[#555] disabled:cursor-not-allowed disabled:opacity-35"><ArrowRight className="size-7" /></button>
+            </div>
+            {isLastQuestion && allAnswered && <div className="mt-7 text-center"><button type="button" onClick={submitQuiz} className="cursor-pointer rounded-full bg-[#078bd3] px-14 py-3 text-2xl font-black text-white shadow-sm">제출하기</button></div>}
           </section>
         </main>
       )
     }
 
     if (stage === "gift") {
+      const giftQuestion = activeQuiz.at(-1) ?? activeQuiz[0]
+      const giftSelectedOption = quizAnswers.at(-1) ?? null
       return (
-        <main className="grid min-h-screen place-items-center bg-black/65 p-5 text-white">
-          <section className="text-center">
-            <h1 className="text-2xl font-black leading-relaxed">책 읽기 탐험이 끝났어요!<br />강치가 선물을 줄 거예요!</h1>
-            <Image src="/student-assets/kangchi-gift.svg" width={250} height={210} alt="선물을 안고 있는 강치" className="mx-auto mt-5 h-[210px] w-[250px] object-contain" priority />
-          </section>
+        <main className="min-h-screen bg-[#e8eff3] text-[#171717]">
+          <header className="flex h-[50px] items-center justify-between bg-[#50c3b4] px-5 font-black text-[#173d3b]"><span>{selectedBook.level}레벨&nbsp; {selectedBook.title}&nbsp; {selectedRound}/{selectedBook.rounds}</span><div className="flex items-center gap-5 text-white"><div className="flex h-9 w-[420px] max-w-[48vw] items-center gap-3 rounded-full bg-white px-3 text-sm font-bold text-[#7d8790]"><span className="h-3 flex-1 overflow-hidden rounded-full bg-[#e7eef2]"><span className="block h-full w-full rounded-full bg-[#ff5e94]" /></span><span>{activeQuiz.length}/{activeQuiz.length}</span></div><BellRing className="size-7" /><LogOut className="size-7" /></div></header>
+          <section className="mx-auto px-5 py-16 sm:px-10 sm:py-20"><h1 className="mx-auto max-w-[1280px] text-center text-2xl font-black leading-relaxed text-[#0782c9] sm:text-[34px]">{giftQuestion.question}</h1><div className="mt-12 space-y-5">{giftQuestion.options.map((option, index) => <div key={option} className={cn("w-full rounded-[18px] border-[4px] px-6 py-5 text-center text-lg font-medium sm:text-[26px]", giftSelectedOption === index + 1 ? "border-[#28577d] bg-[#28577d] text-white" : "border-[#9babbe] bg-white")}>{option}</div>)}</div><div className="mt-5 flex items-center justify-center gap-3"><span className="grid size-12 place-items-center rounded-full border-2 border-[#a5a5a5] bg-white"><ArrowLeft className="size-7" /></span><span className="min-w-[140px] rounded-full border-2 border-[#aaa] bg-white px-7 py-2 text-center text-2xl font-black">{activeQuiz.length}<span className="mx-2 text-[#98a2ad]">/</span>{activeQuiz.length}</span><span className="grid size-12 place-items-center rounded-full border-2 border-[#a5a5a5] bg-white opacity-35"><ArrowRight className="size-7" /></span></div><div className="mt-7 text-center"><span className="inline-block rounded-full bg-[#078bd3] px-14 py-3 text-2xl font-black text-white">제출하기</span></div></section>
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-5 text-white">
+            <section className="text-center">
+              <h1 className="text-[28px] font-black leading-[1.45] sm:text-[34px]">책 읽기 탐험이 끝났어요!<br />강치가 선물을 줄 거예요!</h1>
+              <Image src="/student-assets/kangchi-gift.svg" width={250} height={210} alt="선물을 안고 있는 강치" className="mx-auto mt-5 h-[210px] w-[250px] object-contain" priority />
+            </section>
+          </div>
         </main>
       )
     }
@@ -507,7 +535,8 @@ export function ReadingExploration() {
             <div className="relative h-[75vh] w-[45%] bg-white shadow-2xl"><div className="absolute inset-0 grid place-items-center p-10 text-center text-[#333]"><div><BookOpen className="mx-auto size-20 text-[#078bd3]" /><h2 className="mt-6 text-2xl font-black">{selectedBook.title}</h2><p className="mt-3 text-slate-500">{selectedRound}회차 전자책 미리보기</p></div></div></div>
             <div className="relative h-[75vh] w-[45%] overflow-hidden bg-white shadow-2xl"><Cover book={selectedBook} /></div>
           </div>
-          {ebookConfirm && <div className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-5"><div className="w-full max-w-md rounded-[28px] bg-white p-8 text-center text-[#222]"><h2 className="text-2xl font-black">정말로 다 읽었나요?</h2><p className="mt-3 text-slate-500">다 읽었다면 문제를 풀러 가요.</p><div className="mt-7 grid grid-cols-2 gap-3"><button type="button" onClick={() => setEbookConfirm(false)} className="h-13 cursor-pointer rounded-full border font-bold">더 읽을래요</button><button type="button" onClick={beginQuiz} className="h-13 cursor-pointer rounded-full bg-[#078bd3] font-black text-white">다 읽었어요!</button></div></div></div>}
+          {ebookConfirm && <div className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-5"><div role="dialog" aria-modal="true" aria-label="읽기 완료 확인" className="w-full max-w-[700px] overflow-hidden rounded-[30px] bg-white text-center text-[#222] shadow-2xl"><div className="flex h-16 items-center justify-end border-b border-dashed border-slate-300 px-6"><button type="button" onClick={() => setEbookConfirm(false)} className="grid size-10 cursor-pointer place-items-center text-[#555]" aria-label="닫기"><X className="size-8" /></button></div><div className="flex min-h-[325px] flex-col items-center justify-center px-8 py-7"><Image src="/student-assets/kangchi.svg" width={190} height={145} alt="웃고 있는 강치" className="h-[145px] w-[190px] object-contain" priority /><h2 className="mt-7 text-[30px] font-medium">정말로 끝까지 다 읽었나요?</h2></div><div className="grid grid-cols-2 bg-[#ffd51f] text-[24px] font-black"><button type="button" onClick={() => setEbookConfirm(false)} className="h-20 cursor-pointer border-r border-[#e8bd16]">더 읽을게요</button><button type="button" onClick={() => { setEbookConfirm(false); setSolvePrompt(true) }} className="h-20 cursor-pointer">다 읽었어요!</button></div></div></div>}
+          {solvePrompt && <SolvePrompt onSolve={beginQuiz} />}
         </main>
       )
     }
@@ -575,7 +604,7 @@ export function ReadingExploration() {
             <label className="flex h-12 w-full shrink-0 items-center gap-3 rounded-full bg-white px-5 shadow-sm lg:max-w-md"><Search className="size-5 text-[#078bd3]" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="책 제목 검색" className="min-w-0 flex-1 bg-transparent text-base outline-none" /></label>
           </div>
           <p className="mt-6 text-sm font-bold text-[#71808a]">검색 결과 {filteredBooks.length}권</p>
-          {filteredBooks.length ? <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{filteredBooks.map((book) => <BookCard key={book.id} book={book} favorite={favorites.has(book.id)} completed={(completedRounds[book.id] ?? 0) >= book.rounds} onFavorite={() => toggleFavorite(book.id)} onOpen={() => openBook(book)} />)}</div> : <div className="mt-8 rounded-[28px] bg-white py-24 text-center"><Search className="mx-auto size-12 text-slate-300" /><p className="mt-4 font-bold text-slate-500">조건에 맞는 책이 없어요.</p></div>}
+          {filteredBooks.length ? <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-9 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">{filteredBooks.map((book) => <BookCard key={book.id} book={book} favorite={favorites.has(book.id)} completed={storageReady && (completedRounds[book.id] ?? 0) >= book.rounds} onFavorite={() => toggleFavorite(book.id)} onOpen={() => openBook(book)} />)}</div> : <div className="mt-8 rounded-[28px] bg-white py-24 text-center"><Search className="mx-auto size-12 text-slate-300" /><p className="mt-4 font-bold text-slate-500">조건에 맞는 책이 없어요.</p></div>}
         </section>
       </main>
       <Link href="/student" className="fixed bottom-6 left-6 z-30 grid size-12 place-items-center rounded-full bg-white text-[#078bd3] shadow-xl" aria-label="학생 홈"><Home /></Link>
