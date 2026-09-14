@@ -25,8 +25,10 @@ import { getReadingBookCover } from "@/lib/reading-book-covers"
 import { READING_BOOKS, type ReadingBookRecord } from "@/lib/reading-books"
 import { COMMON_READING_QUIZ, getBookSummary, getRoundPages, sortStudentReadingBooks } from "@/lib/reading-exploration"
 import { getReadingRoundQuiz } from "@/lib/reading-quiz-settings"
+import { useReviews } from "@/lib/review-client"
 import { addTransientReadingExplorationRecord } from "@/lib/student-exploration-history"
 import { getCompletedReadingRoundsByBook, getReadingRoundResultsByBook, markReadingRoundCompleted, STUDENT_MOCK_STORAGE_KEYS, type ReadingRoundResult } from "@/lib/student-mock-state"
+import { getWorkbookById, getWorkbookRuntime } from "@/lib/student-workbooks"
 import { cn } from "@/lib/utils"
 
 const categories = ["전체", "찜한책", "인문", "문학", "사회", "과학/수학", "예체능"] as const
@@ -262,6 +264,7 @@ function SolvePrompt({ onSolve }: { onSolve: () => void }) {
 }
 
 export function ReadingExploration() {
+  const reviewHook = useReviews()
   const sortedBooks = useMemo(() => sortStudentReadingBooks(READING_BOOKS), [])
   const [category, setCategory] = useState<Category>("전체")
   const [query, setQuery] = useState("")
@@ -293,6 +296,19 @@ export function ReadingExploration() {
     } finally {
       setStorageReady(true)
     }
+  }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const bookId = Number(params.get("bookId"))
+    const book = READING_BOOKS.find((item) => item.id === bookId)
+    if (!book) return
+    const requestedRound = Number(params.get("round"))
+    const round = Number.isInteger(requestedRound) ? Math.min(Math.max(requestedRound, 1), book.rounds) : 1
+    setSelectedBook(book)
+    setSelectedRound(round)
+    setIsReexploration(true)
+    setStage(params.get("mode") === "paper" ? "paper-ready" : "ebook")
   }, [])
 
   useEffect(() => {
@@ -371,6 +387,8 @@ export function ReadingExploration() {
     markReadingRoundCompleted(selectedBook.id, selectedRound, {
       correctCount: quizAnswers.filter((answer, index) => answer === activeQuiz[index]?.correctOption).length,
       totalQuestions: activeQuiz.length,
+      questionAreas: activeQuiz.map((question) => question.area),
+      questionResults: activeQuiz.map((question, index) => quizAnswers[index] === question.correctOption),
     })
     if (selectedRound >= selectedBook.rounds) {
       addTransientReadingExplorationRecord({
@@ -382,9 +400,11 @@ export function ReadingExploration() {
         totalRounds: selectedBook.rounds,
         correctCount: quizAnswers.filter((answer, index) => answer === activeQuiz[index]?.correctOption).length,
         totalQuestions: activeQuiz.length,
+        questionAreas: activeQuiz.map((question) => question.area),
+        questionResults: activeQuiz.map((question, index) => quizAnswers[index] === question.correctOption),
       })
     }
-    setStage("gift")
+    setStage(selectedRound >= selectedBook.rounds ? "rating" : "gift")
   }
 
   const returnToCatalog = () => {
@@ -398,6 +418,11 @@ export function ReadingExploration() {
     const pages = getRoundPages(selectedBook, selectedRound)
     const allRoundsComplete = Math.max(completedRounds[selectedBook.id] ?? 0, stage === "rating" || stage === "gift" || stage === "complete" ? selectedRound : 0) >= selectedBook.rounds
     const correctCount = quizAnswers.filter((answer, index) => answer === activeQuiz[index]?.correctOption).length
+    const sourceWorkbookId = `reading-${selectedBook.id}-round-${selectedRound}`
+    const legacyWorkbook = getWorkbookById(sourceWorkbookId)
+    const alreadyStartedReview = reviewHook.db.reviews.some((review) => review.sourceWorkbookId === sourceWorkbookId)
+      || Boolean(legacyWorkbook && getWorkbookRuntime(legacyWorkbook).status !== "before")
+    const canStartOnlineReview = reviewHook.loaded && allRoundsComplete && selectedBook.activeOnlineCount > 0 && !alreadyStartedReview
 
     if (stage === "quiz") {
       const question = activeQuiz[quizIndex] ?? activeQuiz[0]
@@ -509,12 +534,12 @@ export function ReadingExploration() {
               </div>
               <div className="mt-5 text-center"><span className="rounded-full bg-[#073c68] px-6 py-2 text-xl font-black text-white">⭐ +{Math.max(1, correctCount)}</span><p className="mt-4 font-black text-[#078bd3]">{allRoundsComplete ? "책 한 권을 끝까지 해냈어요!" : `${selectedRound}회차를 완료했어요!`}</p></div>
             </div>
-            <div className={cn("grid bg-[#ffd51f]", allRoundsComplete && selectedBook.activeOnlineCount > 0 ? "grid-cols-3" : "grid-cols-2")}>
+            <div className={cn("grid bg-[#ffd51f]", canStartOnlineReview ? "grid-cols-3" : "grid-cols-2")}>
               <button type="button" onClick={() => {
                 setIsReexploration(true)
                 beginQuiz()
               }} className="h-20 cursor-pointer border-r border-[#e9bd13] text-lg font-black">만점 도전하기</button>
-              {allRoundsComplete && selectedBook.activeOnlineCount > 0 && <Link href={`/student/online-workbook/reading-${selectedBook.id}-round-${selectedRound}`} className="grid h-20 place-items-center border-r border-[#e9bd13] text-lg font-black">온라인 워크북</Link>}
+              {canStartOnlineReview && <Link href={`/student/online-workbook/${sourceWorkbookId}`} className="grid h-20 place-items-center border-r border-[#e9bd13] text-lg font-black">온라인 독후감</Link>}
               <button type="button" onClick={() => {
                 if (selectedRound < selectedBook.rounds) {
                   setSelectedRound(selectedRound + 1)

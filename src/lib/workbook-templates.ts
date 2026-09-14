@@ -10,6 +10,7 @@ export type WorkbookQuestion = {
 }
 
 export type WorkbookTemplateRecord = {
+  reportEnabled?: boolean
   id: number
   name: string
   studentTitle: string
@@ -109,9 +110,15 @@ const quizQuestions: WorkbookQuestion[] = [
 ]
 
 export const DEFAULT_GUIDES = {
-  writing: "※ 안내에 따라 독서 감상문을 작성해 보세요.",
+  writing: "※ 안내에 따라 온라인 독후감을 작성해 보세요.",
   rewrite: "※ 지금까지 쓴 내용을 한눈에 볼 수 있어요. 처음부터 끝까지 읽으며 고칠 부분이 있는지 살펴보세요. 문장을 자연스럽게 다듬고, 필요하다면 문단 순서도 바꿔 보세요. 이어주는 말을 넣거나 꼭 필요하지 않은 문장은 줄이면, 처음부터 끝까지 자연스럽게 이어지는 ‘하나의 글’로 완성할 수 있어요. 마지막으로, 전체 내용을 살펴보고 가장 잘 어울리는 제목도 함께 지어 보세요.",
-  complete: "※ 워크북 활동을 마무리하고, 완성된 글을 확인해 보세요.",
+  complete: "※ 온라인 독후감 활동을 마무리하고, 완성된 글을 확인해 보세요.",
+}
+
+// Production settings captured from the HQ template editor. Some templates do
+// not mention their rewrite mode in the guide copy, so it cannot be inferred.
+const PRODUCTION_REWRITE_MODES: Partial<Record<number, WorkbookTemplateRecord["rewriteMode"]>> = {
+  64: "items",
 }
 
 export const WORKBOOK_TEMPLATES: WorkbookTemplateRecord[] = WORKBOOK_TEMPLATE_LIST_ROWS.map((row, index) => {
@@ -127,6 +134,7 @@ export const WORKBOOK_TEMPLATES: WorkbookTemplateRecord[] = WORKBOOK_TEMPLATE_LI
   })).filter((question) => question.title.trim() || question.description.trim())
   return {
     id: row.id,
+    ...(row.id === 43 ? { reportEnabled: true } : {}),
     name: row.name,
     studentTitle: copy?.studentTitle || liveDetail?.studentTitle || fallbackStudentTitle,
     levels: row.levels,
@@ -138,8 +146,12 @@ export const WORKBOOK_TEMPLATES: WorkbookTemplateRecord[] = WORKBOOK_TEMPLATE_LI
     connections: row.connections,
     reviewed: row.reviewed,
     updatedAt: row.updatedAt,
-    description: copy?.description ?? (liveDetail ? (liveDetail.description ?? "") : (row.id === 37 ? "책 내용을 바탕으로 퀴즈를 만들어 보는 활동이에요. 재미있는 문제를 만들며 책 내용을 다시 떠올려 볼 수 있어요." : "책의 내용을 정리하고, 느낀 점을 담아 나만의 독서록을 만들어 보세요.")),
-    rewriteMode: index % 3 === 0 ? "continuous" : "items",
+    description: copy?.description || liveDetail?.description || (row.id === 68 ? "책을 읽고 느낀 점을 일기로 써 보는 활동이에요." : liveDetail ? "" : row.id === 37 ? "책 내용을 바탕으로 퀴즈를 만들어 보는 활동이에요. 재미있는 문제를 만들며 책 내용을 다시 떠올려 볼 수 있어요." : "책의 내용을 정리하고, 느낀 점을 담아 나만의 독서록을 만들어 보세요."),
+    // Captured template guidance takes precedence over the old synthetic demo mode.
+    rewriteMode: PRODUCTION_REWRITE_MODES[row.id]
+      ?? ((copy?.guides?.rewrite || liveDetail?.guides?.rewrite || "").includes("항목별") ? "items"
+      : (copy?.guides?.rewrite || liveDetail?.guides?.rewrite || "").includes("하나의 글") ? "continuous"
+      : index % 3 === 0 ? "continuous" : "items"),
     guides: {
       writing: copy?.guides?.writing || liveDetail?.guides?.writing || DEFAULT_GUIDES.writing,
       rewrite: copy?.guides?.rewrite || liveDetail?.guides?.rewrite || DEFAULT_GUIDES.rewrite,

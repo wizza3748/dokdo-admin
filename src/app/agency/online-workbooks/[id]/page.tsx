@@ -1,6 +1,7 @@
 import { WorkbookDetail } from "@/components/online-workbooks/workbook-detail"
 
-export default async function AgencyOnlineWorkbookDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AgencyOnlineWorkbookDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ role?: string }> }) {
   const { id } = await params
-  return <WorkbookDetail id={id} />
+  const { role } = await searchParams
+  return <WorkbookDetail id={id} role={role === "admin" ? "admin" : role === "class" ? "class" : "agency"} />
 }

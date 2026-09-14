@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import { ReviewTeacherDetail } from "./review-teacher-detail"
+import { readReviews } from "@/lib/review-client"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -108,7 +110,18 @@ function buildContinuousFeedback(record: OnlineWorkbook, questions: FeedbackQues
   return `💌선생님의 편지\n\n1. 총평\n『${record.bookTitle}』을 읽고 자신의 생각을 한 편의 글로 정리했군요. 책에서 기억에 남는 내용을 중심으로 차분하게 글을 이어 가려는 모습이 보여요.\n\n2. 세부 내용\n① 글 전체 수준\n🌟 책의 중심 내용과 자신의 생각을 연결하려고 노력했어요.\n🔧 ${completeness}\n\n② 문단 수준\n🌟 문단마다 말하고 싶은 내용을 구분해 표현했어요.\n🔧 문단의 첫 문장에 중심 생각을 먼저 쓰면 내용이 더 분명해져요.\n\n③ 문장 수준\n🌟 자신의 느낌을 쉬운 문장으로 표현했어요.\n🔧 문장을 다시 읽으며 맞춤법과 문장 연결을 한 번 더 확인해 보세요.`
 }
 
-export function WorkbookDetail({ id }: { id: string }) {
+export function WorkbookDetail({ id, role = "agency" }: { id: string; role?: "agency" | "class" | "admin" }) {
+  const [reviewId, setReviewId] = React.useState<string | null | undefined>(id.startsWith("review-") ? id : undefined)
+  React.useEffect(() => {
+    if (id.startsWith("review-")) { setReviewId(id); return }
+    let active = true
+    void readReviews(role).then(db => { if (active) { const common = db.reviews.find(c => c.legacyRecordId === id); setReviewId(common ? db.records.find(r => r.reviewId === common.id && r.round === 1)?.id ?? null : null) } }).catch(() => { if (active) setReviewId(null) })
+    return () => { active = false }
+  }, [id, role])
+  if (reviewId === undefined) return <p className="p-6">불러오는 중…</p>
+  return reviewId ? <ReviewTeacherDetail id={reviewId} role={role} /> : role === "admin" ? <p role="alert" className="p-6">조회할 수 없는 독후감입니다.</p> : <LegacyWorkbookDetail id={id} />
+}
+function LegacyWorkbookDetail({ id }: { id: string }) {
   const router = useRouter()
   const [record, setRecord] = React.useState(() => AGENCY_ONLINE_WORKBOOKS.find((item) => item.id === id) ?? AGENCY_ONLINE_WORKBOOKS[0])
   const questions: FeedbackQuestion[] = record.questions?.length
@@ -225,7 +238,7 @@ export function WorkbookDetail({ id }: { id: string }) {
       <section className="bg-white px-4 pb-4 pt-5">
         <div className="flex items-start gap-2">
           <Button variant="ghost" size="icon" asChild className="-ml-1 -mt-1 text-blue-600"><Link href="/agency/online-workbooks" aria-label="목록으로 돌아가기"><ArrowLeft className="size-5" /></Link></Button>
-          <div><h1 className="text-2xl font-semibold text-slate-800">온라인 워크북 피드백</h1><p className="mt-4 text-sm text-slate-500">학생이 제출한 워크북을 확인하고 피드백을 작성하세요.</p></div>
+          <div><h1 className="text-2xl font-semibold text-slate-800">온라인 독후감 피드백</h1><p className="mt-4 text-sm text-slate-500">학생이 제출한 온라인 독후감을 확인하고 피드백을 작성하세요.</p></div>
         </div>
 
         <div className="mt-5 overflow-x-auto rounded-[10px] border border-slate-200">
@@ -240,7 +253,7 @@ export function WorkbookDetail({ id }: { id: string }) {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-5 flex items-center justify-between"><h2 className="text-sm font-normal text-slate-600">학생 작성 워크북</h2><span className="text-sm text-slate-500">보기모드: {displayMode === "continuous" ? "이어보기" : "항목별보기"}</span></div>
+          <div className="mb-5 flex items-center justify-between"><h2 className="text-sm font-normal text-slate-600">학생 작성 온라인 독후감</h2><span className="text-sm text-slate-500">보기모드: {displayMode === "continuous" ? "이어보기" : "항목별보기"}</span></div>
           <h3 className="mb-6 text-center text-xl font-semibold text-slate-800">{record.templateName}</h3>
           <div className="space-y-7">
             {questions.map((question) => <section key={question.title}>
@@ -254,7 +267,7 @@ export function WorkbookDetail({ id }: { id: string }) {
 
         <Card className="h-fit gap-0 border-slate-200 bg-white p-6 shadow-sm xl:sticky xl:top-20">
           <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2"><Pencil className="size-5 text-slate-600" /><h2 className="text-xl font-semibold text-slate-800">피드백 작성</h2></div><Button onClick={handleAiFeedback} className="gap-2 bg-violet-600 hover:bg-violet-700"><Bot className="size-4" />AI 자동 작성</Button></div>
-          <div className="mt-3 space-y-1 text-xs leading-5 text-slate-500"><p>학생에게 전달할 피드백을 작성해주세요. (최소 10자 이상)</p><p>AI 자동 작성 기능은 워크북당 최대 2회까지 사용 가능합니다.</p><p>AI는 실수를 할 수 있으니 반드시 확인 후 직접 첨삭해 주세요.</p><p>AI 자동 작성은 생성만으로 횟수가 차감되며, 저장하지 않고 나가면 기록이 남지 않습니다.</p></div>
+          <div className="mt-3 space-y-1 text-xs leading-5 text-slate-500"><p>학생에게 전달할 피드백을 작성해주세요. (최소 10자 이상)</p><p>AI 자동 작성 기능은 차수별 최대 2회까지 사용 가능합니다.</p><p>AI는 실수를 할 수 있으니 반드시 확인 후 직접 첨삭해 주세요.</p><p>AI 자동 작성은 생성만으로 횟수가 차감되며, 저장하지 않고 나가면 기록이 남지 않습니다.</p></div>
           <div className="mt-4 overflow-hidden rounded-xl border border-slate-200"><div className="flex gap-1 border-b border-slate-200 bg-slate-50 p-2"><Button variant="ghost" size="sm" disabled={feedbackLocked} className="font-black">B</Button><Button variant="ghost" size="sm" disabled={feedbackLocked} className="italic">I</Button><Button variant="ghost" size="sm" disabled={feedbackLocked} className="underline">U</Button></div><Textarea value={feedback} readOnly={feedbackLocked} onChange={(event) => { setFeedback(event.target.value); setSaved(false) }} placeholder="학생에게 전달할 피드백을 작성해주세요..." className={cn("min-h-72 resize-y rounded-none border-0 shadow-none focus-visible:ring-0", feedbackLocked && "cursor-default bg-slate-50 text-slate-600")} /></div>
           <div className="mt-2 flex justify-between text-xs"><span className={feedbackValid ? "text-emerald-600" : "text-rose-500"}>{feedback.length}/10자 이상 입력</span><span className="text-slate-400">AI 사용 {aiUsed}/2회</span></div>
           <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -262,7 +275,7 @@ export function WorkbookDetail({ id }: { id: string }) {
             {status === "작성전" && <Button variant="outline" onClick={() => setModal("reject")} className="gap-2 border-rose-300 bg-white text-rose-600 shadow-sm hover:bg-rose-50"><Undo2 className="size-4" />학생 반려</Button>}
             <Button variant="outline" onClick={() => { setSelectedFlower(null); setModal("flower") }} disabled={flowerAmount > 0} className="gap-2 border-amber-300 bg-white text-amber-700 shadow-sm hover:bg-amber-50 disabled:border-slate-200 disabled:text-slate-400"><Flower2 className="size-4" />섬초롱꽃 지급</Button>
             <Button onClick={saveFeedback} disabled={!feedbackValid || saved || feedbackLocked} className="gap-2 bg-slate-700 text-white shadow-sm hover:bg-slate-800 disabled:bg-slate-400"><Save className="size-4" />저장</Button>
-            <Button onClick={sendFeedback} disabled={!saved || status !== "작성완료"} className="gap-2 bg-blue-600 text-white shadow-sm hover:bg-blue-700 disabled:bg-[#8ba7ef]"><Send className="size-4" />피드백 전송</Button>
+            <Button onClick={sendFeedback} disabled={!saved || status !== "작성완료"} className="gap-2 bg-blue-600 text-white shadow-sm hover:bg-blue-700 disabled:bg-[#8ba7ef]"><Send className="size-4" />학생에게 전송</Button>
             <Button onClick={() => setModal("parent")} disabled={status !== "전송완료" || parentSent || !parentContactRegistered} className="gap-2 bg-[#79cfba] text-white shadow-sm hover:bg-[#65bea9] disabled:bg-[#8fd6c5]"><CheckCircle2 className="size-4" />학부모 발송</Button>
           </div>
         </Card>
@@ -270,9 +283,9 @@ export function WorkbookDetail({ id }: { id: string }) {
 
       {modal === "aiOverwrite" && <AiAlertModal title="AI 자동 작성" onClose={() => setModal(null)} onConfirm={generateSampleFeedback} cancelable><p>기존 작성된 내용을 새로 작성된 내용으로 덮어쓰시겠습니까? (남은 횟수: 1회)</p><p>※ 확인을 누르면 이전 내용은 되돌릴 수 없습니다. 필요하면 별도로 저장해 두세요.</p><p>AI 자동 작성은 생성만으로 횟수가 차감되며, 저장하지 않고 나가면 기록이 남지 않습니다.</p></AiAlertModal>}
 
-      {modal === "aiUnavailable" && <AiAlertModal title="AI 자동 작성 불가" onClose={() => setModal(null)} onConfirm={() => setModal(null)}><p>AI 자동 작성 기능은 워크북당 최대 2회까지만 이용할 수 있습니다.</p><p>AI 자동 작성은 생성만으로 횟수가 차감되며, 저장하지 않고 나가면 기록이 남지 않습니다.</p></AiAlertModal>}
+      {modal === "aiUnavailable" && <AiAlertModal title="AI 자동 작성 불가" onClose={() => setModal(null)} onConfirm={() => setModal(null)}><p>AI 자동 작성 기능은 차수별 최대 2회까지만 이용할 수 있습니다.</p><p>AI 자동 작성은 생성만으로 횟수가 차감되며, 저장하지 않고 나가면 기록이 남지 않습니다.</p></AiAlertModal>}
 
-      {modal === "reject" && <Modal title="학생 워크북 반려" onClose={() => setModal(null)}><p className="text-sm leading-6 text-slate-600">반려 처리 시 제출 내용이 사라집니다. 학생이 제출한 워크북은 목록에서 사라지고, 학생은 다시 작성 가능한 상태로 돌아갑니다. 계속 진행하시겠어요?</p><div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={() => setModal(null)}>취소</Button><Button variant="destructive" onClick={confirmReject}>반려하기</Button></div></Modal>}
+      {modal === "reject" && <Modal title="학생 온라인 독후감 반려" onClose={() => setModal(null)}><p className="text-sm leading-6 text-slate-600">반려 처리 시 제출 내용이 사라집니다. 학생이 제출한 온라인 독후감은 목록에서 사라지고, 학생은 다시 작성 가능한 상태로 돌아갑니다. 계속 진행하시겠어요?</p><div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={() => setModal(null)}>취소</Button><Button variant="destructive" onClick={confirmReject}>반려하기</Button></div></Modal>}
 
       {modal === "flower" && <Modal title="섬초롱꽃을 지급할까요?" onClose={() => setModal(null)}><p className="text-sm text-slate-600">지급된 섬초롱꽃은 되돌릴 수 없습니다. 지급 개수를 확인해 주세요.</p><p className="mt-5 text-sm font-black text-slate-800">지급 개수</p><div className="mt-3 grid grid-cols-2 gap-2">{flowerCriteria.map((item) => <button key={item.amount} type="button" role="radio" aria-checked={selectedFlower === item.amount} onClick={() => setSelectedFlower(item.amount)} className={cn("rounded-lg border px-4 py-3 text-center transition-colors", selectedFlower === item.amount ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:border-blue-300")}><span className="font-semibold">🌻　{item.amount}개</span></button>)}</div><div className="mt-5 space-y-2 rounded-xl bg-[#eef6ff] p-4"><p className="text-sm font-black text-slate-800">권장 기준 안내</p>{flowerCriteria.map((item) => <p key={item.amount} className="text-xs leading-5 text-slate-600">{item.medal} <strong>{item.amount}개:</strong> {item.description}</p>)}</div><div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={() => setModal(null)}>취소</Button><Button disabled={!selectedFlower} onClick={confirmFlower} className="bg-blue-600 hover:bg-blue-700">확인</Button></div></Modal>}
 

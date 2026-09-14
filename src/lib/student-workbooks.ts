@@ -1,8 +1,10 @@
 import { getReadingBookCover } from "@/lib/reading-book-covers"
-import { getReadingBook } from "@/lib/reading-books"
+import { getReadingBook, READING_BOOKS } from "@/lib/reading-books"
 import { getWorkbookRoundSetting } from "@/lib/workbook-round-settings"
-import { WORKBOOK_TEMPLATES } from "@/lib/workbook-templates"
+import { getConfiguredTemplates } from "@/lib/workbook-template-settings"
 import { STUDENT_MOCK_STORAGE_KEYS } from "@/lib/student-mock-state"
+import { getTransientReadingExplorationRecords } from "@/lib/student-exploration-history"
+import { reviewActivityDate, type ReviewCommon } from "@/lib/review-domain"
 
 export type WorkbookStatus = "before" | "writing" | "completed" | "feedback"
 
@@ -14,10 +16,16 @@ export interface WorkbookQuestion {
 
 export interface WorkbookTemplate {
   id: string
+  reportEnabled?: boolean
   title: string
   description: string
   recommended?: boolean
   questions: WorkbookQuestion[]
+  guides?: {
+    writing: string
+    rewrite: string
+    complete: string
+  }
 }
 
 export interface StudentWorkbook {
@@ -286,7 +294,10 @@ export function saveWorkbookRuntime(id: string, next: Partial<WorkbookRuntimeSta
 export function getWorkbookById(id: string) {
   const stored = studentWorkbooks.find((workbook) => workbook.id === id)
   if (stored) return stored
-  if (dynamicWorkbooks[id]) return dynamicWorkbooks[id]
+  const explorationRecord = getTransientReadingExplorationRecords().find(record => record.workbookId === id)
+  if (dynamicWorkbooks[id]) return explorationRecord
+    ? { ...dynamicWorkbooks[id], year: explorationRecord.year, month: explorationRecord.month, day: explorationRecord.day, weekday: explorationRecord.weekday }
+    : dynamicWorkbooks[id]
 
   const match = /^reading-(\d+)-round-(\d+)$/.exec(id)
   if (!match) return undefined
@@ -295,14 +306,17 @@ export function getWorkbookById(id: string) {
   if (!book || round < 1 || round > book.rounds) return undefined
 
   const setting = getWorkbookRoundSetting(book.id, round)
+  const configuredTemplates = getConfiguredTemplates()
   const templates = setting.templates.flatMap(({ templateId, questions }) => {
-    const template = WORKBOOK_TEMPLATES.find((item) => item.id === templateId)
+    const template = configuredTemplates.find((item) => item.id === templateId)
     return template
       ? [{
           id: String(template.id),
           title: template.studentTitle,
           description: template.description,
+          reportEnabled: template.reportEnabled,
           recommended: template.id === setting.priorityTemplateId,
+          guides: template.guides,
           questions: (questions ?? template.questions).map(({ title, description, example }) => ({ title, description, example })),
         }]
       : []
@@ -310,10 +324,10 @@ export function getWorkbookById(id: string) {
 
   const dynamicWorkbook: StudentWorkbook = {
     id,
-    year: 2026,
-    month: 8,
-    day: 26,
-    weekday: "수요일",
+    year: explorationRecord?.year ?? 2026,
+    month: explorationRecord?.month ?? 8,
+    day: explorationRecord?.day ?? 26,
+    weekday: explorationRecord?.weekday ?? "수요일",
     level: book.level,
     bookTitle: book.title,
     author: `${book.publisher} · ${book.category}`,
@@ -329,4 +343,20 @@ export function getWorkbookById(id: string) {
 
 export function formatWorkbookDate(workbook: StudentWorkbook) {
   return `${String(workbook.month).padStart(2, "0")}월 ${String(workbook.day).padStart(2, "0")}일 ${workbook.weekday}`
+}
+
+/** Seed and shared-record routes retain the same student book panel instead of a separate layout. */
+export function getWorkbookForReview(common: ReviewCommon): StudentWorkbook {
+  const book = READING_BOOKS.find(b => b.title === common.bookTitle)
+  const fixture = studentWorkbooks.find(w => w.bookTitle === common.bookTitle)
+  const configuredTemplate = getConfiguredTemplates().find(t => String(t.id) === common.template.id)
+  const activity = reviewActivityDate(common)
+  return getWorkbookById(common.sourceWorkbookId) ?? {
+    id: common.sourceWorkbookId, year: activity.year, month: activity.month,
+    day: activity.day, weekday: "", level: common.level,
+    bookTitle: common.bookTitle, author: common.bookAuthor ?? fixture?.author ?? (book ? book.publisher : ""), coverSrc: common.bookCoverSrc ?? fixture?.coverSrc ?? (book ? getReadingBookCover(book.id) : "/student-assets/books/democracy.jpg"),
+    status: "completed", selectedTemplateId: common.template.id,
+    templates: (book ? getWorkbookById(`reading-${book.id}-round-1`)?.templates : undefined) ?? [{ id: common.template.id, title: common.template.title, description: configuredTemplate?.description ?? "", guides: configuredTemplate?.guides, reportEnabled: common.reportEnabled, questions: common.template.items }],
+    answers: [],
+  }
 }

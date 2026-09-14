@@ -85,10 +85,10 @@ const navConfig: NavItem[] = [
         icon: "Menu",
         children: [
           { title: "책 읽기 목록", href: "/admin/exploration/reading" },
-          { title: "온라인워크북 현황", href: "/admin/online-workbooks" },
+          { title: "온라인 독후감 현황", href: "/admin/online-workbooks" },
         ],
       },
-      { title: "워크북 템플릿", href: "/admin/exploration/workbook-templates" },
+      { title: "독후감 템플릿", href: "/admin/exploration/workbook-templates" },
       { title: "탐험결과발송", href: "/admin/exploration/send-status" },
     ]
   },
@@ -101,9 +101,9 @@ const navConfig: NavItem[] = [
   },
   {
     id: "agency-online-workbooks",
-    title: "온라인워크북 관리",
+    title: "온라인 독후감 관리",
     icon: "BookOpenCheck",
-    children: [{ title: "온라인워크북 목록", href: "/agency/online-workbooks" }]
+    children: [{ title: "온라인 독후감 목록", href: "/agency/online-workbooks" }]
   },
   { id: "student-label", title: "[학생프론트]", type: "label" },
   { id: "student-home", title: "홈", href: "/student", icon: "House" }

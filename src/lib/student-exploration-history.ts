@@ -1,4 +1,5 @@
 import { STUDENT_MOCK_STORAGE_KEYS } from "@/lib/student-mock-state"
+import { latestDailyReadingRecords } from "@/lib/reading-record-summary"
 
 export interface TransientReadingExplorationRecord {
   id: string
@@ -13,6 +14,9 @@ export interface TransientReadingExplorationRecord {
   attempt: "첫 탐험" | "재탐험"
   progress: string
   questions: string
+  occurredAt?: string
+  questionAreas?: Array<"사실" | "추론" | "비판">
+  questionResults?: boolean[]
 }
 
 const transientReadingRecords: TransientReadingExplorationRecord[] = []
@@ -29,6 +33,8 @@ export function addTransientReadingExplorationRecord(input: {
   totalRounds: number
   correctCount: number
   totalQuestions: number
+  questionAreas: Array<"사실" | "추론" | "비판">
+  questionResults: boolean[]
 }) {
   const now = new Date()
   recordSequence += 1
@@ -45,6 +51,9 @@ export function addTransientReadingExplorationRecord(input: {
     attempt: input.attempt,
     progress: `${input.currentRound}/${input.totalRounds}`,
     questions: `${input.correctCount}/${input.totalQuestions}`,
+    occurredAt: now.toISOString(),
+    questionAreas: input.questionAreas,
+    questionResults: input.questionResults,
   }
 
   if (typeof window === "undefined") {
@@ -52,7 +61,8 @@ export function addTransientReadingExplorationRecord(input: {
     return record
   }
 
-  const records = [record, ...getTransientReadingExplorationRecords()]
+  // Retain raw attempts; only the list projection is grouped by day/book/round.
+  const records = [record, ...readTransientReadingExplorationRecords()]
   window.localStorage.setItem(STUDENT_MOCK_STORAGE_KEYS.explorationRecords, JSON.stringify(records))
   window.sessionStorage.removeItem(STUDENT_MOCK_STORAGE_KEYS.explorationRecords)
   window.dispatchEvent(new CustomEvent("dokdo-exploration-record-change"))
@@ -60,6 +70,10 @@ export function addTransientReadingExplorationRecord(input: {
 }
 
 export function getTransientReadingExplorationRecords() {
+  return latestDailyReadingRecords(readTransientReadingExplorationRecords())
+}
+
+function readTransientReadingExplorationRecords() {
   if (typeof window !== "undefined") {
     try {
       const stored = window.localStorage.getItem(STUDENT_MOCK_STORAGE_KEYS.explorationRecords)

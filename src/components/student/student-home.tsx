@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { BookOpen, ClipboardList, PenLine, RotateCcw, Shirt, Telescope } from "lucide-react"
 
 import { StudentHeader } from "@/components/student/student-header"
-import { getCompletedReadingRoundCount, resetStudentMockState, subscribeCompletedReadingRoundCount } from "@/lib/student-mock-state"
+import { getCompletedReadingRoundCount, getMillisecondsUntilNextKoreanDay, resetStudentMockState, subscribeCompletedReadingRoundCount } from "@/lib/student-mock-state"
 
 const shortcuts = [
   { label: "강치 옷장", icon: Shirt },
@@ -66,8 +66,21 @@ export function StudentHome() {
 
   useEffect(() => {
     const syncReadingCount = () => setReadingCount(getCompletedReadingRoundCount())
+    let nextDayTimer = 0
+    const scheduleNextDaySync = () => {
+      window.clearTimeout(nextDayTimer)
+      nextDayTimer = window.setTimeout(() => {
+        syncReadingCount()
+        scheduleNextDaySync()
+      }, getMillisecondsUntilNextKoreanDay() + 100)
+    }
     syncReadingCount()
-    return subscribeCompletedReadingRoundCount(syncReadingCount)
+    scheduleNextDaySync()
+    const unsubscribe = subscribeCompletedReadingRoundCount(syncReadingCount)
+    return () => {
+      window.clearTimeout(nextDayTimer)
+      unsubscribe()
+    }
   }, [])
 
   const resetMockState = async () => {
@@ -111,21 +124,11 @@ export function StudentHome() {
           </button>
         </aside>
 
-        <aside className="absolute right-0 top-5 z-20 flex flex-col items-end sm:top-7">
-          <Image
-            src="/student-assets/event-logo.webp"
-            width={250}
-            height={103}
-            alt="강치 자랑 대회"
-            priority
-            className="h-auto w-40 object-contain sm:w-[220px] lg:w-[250px]"
-          />
-          <div className="mt-1 flex items-center gap-2">
-            <span className="rounded-lg bg-white px-3 py-2 text-center text-xs leading-5 text-[#444] shadow-sm sm:text-sm">
-              4일 11시간<br />남았어요!
-            </span>
-            <Image src="/student-assets/gull-letter.svg" width={120} height={68} alt="영상 편지를 물고 있는 갈매기" className="h-auto w-20 sm:w-[120px]" />
-          </div>
+        <aside className="absolute right-4 top-[88px] z-20 flex items-center gap-2 sm:right-8 sm:top-[92px] lg:right-6 lg:top-5">
+          <span className="rounded-lg bg-white px-3 py-2 text-center text-xs leading-5 text-[#444] shadow-sm sm:text-sm">
+            4일 11시간<br />남았어요!
+          </span>
+          <Image src="/student-assets/gull-letter.svg" width={120} height={68} alt="영상 편지를 물고 있는 갈매기" className="h-auto w-20 sm:w-[120px]" />
         </aside>
 
         <section className="absolute left-1/2 top-[43%] z-10 flex w-full max-w-[1260px] -translate-x-1/2 items-center justify-between px-5 sm:px-12 lg:px-20">

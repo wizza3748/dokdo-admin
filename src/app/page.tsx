@@ -18,6 +18,24 @@ export default function Home() {
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">일감 ID</div>
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center border-l border-slate-100">제목</div>
               </div>
+              <div className="mx-2 mt-2 grid grid-cols-[150px_minmax(0,1fr)] overflow-hidden rounded-lg border border-amber-300 bg-amber-50/80 transition-colors hover:bg-amber-100/80 group">
+                <div className="flex flex-nowrap items-center justify-center gap-1.5 p-4 text-center">
+                  <a
+                    href="https://sloop-dev.atlassian.net/browse/DD-1654"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="whitespace-nowrap text-sm font-bold text-amber-700 underline underline-offset-4 transition-colors hover:text-amber-900"
+                  >
+                    DD-1654
+                  </a>
+                  <span className="shrink-0 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-black leading-none text-white">NEW</span>
+                </div>
+                <div className="border-l border-amber-200 p-4 text-[14px] font-bold text-amber-700 transition-colors group-hover:text-amber-900">
+                  <Link href="/admin/exploration/workbook-templates" className="hover:underline">
+                    독도 온라인 독후감 피드백 기능
+                  </Link>
+                </div>
+              </div>
               <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group">
                 <div className="p-5 text-center">
                   <a
@@ -84,7 +102,7 @@ export default function Home() {
                 </div>
                 <div className="border-l border-amber-200 p-4 text-[14px] font-bold text-amber-700 transition-colors group-hover:text-amber-900">
                   <Link href="/agency/online-workbooks" className="hover:underline">
-                    독도 온라인 워크북 첨삭 기능
+                    독도 온라인 독후감 피드백 기능
                   </Link>
                 </div>
               </div>
@@ -137,7 +155,7 @@ export default function Home() {
                 </div>
                 <div className="border-l border-amber-200 p-4 text-[14px] font-bold text-amber-700 transition-colors group-hover:text-amber-900">
                   <Link href="/student" className="hover:underline">
-                    독도 온라인 워크북 첨삭 기능
+                    독도 온라인 독후감 피드백 기능
                   </Link>
                 </div>
               </div>

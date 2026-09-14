@@ -1,10 +1,16 @@
 import { STUDENT_MOCK_STORAGE_KEYS } from "@/lib/student-mock-state"
 import { getWorkbookById, type WorkbookRuntimeState } from "@/lib/student-workbooks"
 import { getWorkbookRoundSetting, type WorkbookRoundDisplayMode } from "@/lib/workbook-round-settings"
+import { withWorkbookDisplayNumbers } from "@/lib/workbook-display-numbers"
 
 export type FeedbackStatus = "작성전" | "작성완료" | "전송완료"
 
 export interface OnlineWorkbook {
+  displayNumber?: string
+  reviewId?: string
+  writingRound?: 1 | 2
+  reportStatus?: string
+  secondDecision?: "request" | "complete"
   id: string
   sourceWorkbookId?: string
   institution: string
@@ -13,6 +19,7 @@ export interface OnlineWorkbook {
   bookTitle: string
   templateName: string
   submittedAt: string
+  submittedAtTime?: string
   feedbackAt: string | null
   status: FeedbackStatus
   aiUsed: number
@@ -333,14 +340,22 @@ export async function getMergedStudentSubmittedAgencyWorkbooks() {
   return [...new Map(records.map((record) => [record.id, record])).values()]
 }
 
-export async function getAgencyWorkbookListAsync() {
+export async function getAgencyWorkbookListAsync(role: "agency" | "class" | "admin" = "agency") {
+  const { readReviews } = await import("@/lib/review-client")
+  const { reviewListRows } = await import("@/lib/review-list-adapter")
+  const db = await readReviews(role)
+  const newRecords = reviewListRows(db)
   const overrides = await getMergedStudentSubmittedAgencyWorkbooks()
   const overrideById = new Map(overrides.map((record) => [record.id, record]))
   const seedIds = new Set(AGENCY_ONLINE_WORKBOOKS.map((record) => record.id))
   const submittedRecords = overrides.filter((record) => !seedIds.has(record.id))
-  const seededRecords = AGENCY_ONLINE_WORKBOOKS.map((record) => overrideById.get(record.id) ?? record)
+  const seededRecords = AGENCY_ONLINE_WORKBOOKS.flatMap(record => {
+    const override = overrideById.get(record.id)
+    if (override) return [override]
+    return db.reviews.some(c => c.legacyRecordId === record.id) ? [] : [record]
+  })
 
-  return [...submittedRecords, ...seededRecords].filter((record) => !record.rejected)
+  return withWorkbookDisplayNumbers([...newRecords, ...submittedRecords, ...seededRecords].filter((record) => !record.rejected), AGENCY_ONLINE_WORKBOOKS.map(record => record.id))
 }
 
 export async function syncStudentSubmittedAgencyWorkbooks() {

@@ -145,8 +145,54 @@
   will-change: transform;
 }
 
+@keyframes review-card-glow-feedback {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(255 85 153 / 0%);
+  }
+
+  35%,
+  70% {
+    box-shadow: 0 0 0 6px rgb(255 85 153 / 22%), 0 0 26px rgb(255 85 153 / 42%);
+  }
+}
+
+@keyframes review-card-glow-writing {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(35 156 222 / 0%);
+  }
+
+  35%,
+  70% {
+    box-shadow: 0 0 0 6px rgb(35 156 222 / 22%), 0 0 26px rgb(35 156 222 / 42%);
+  }
+}
+
+.review-card-glow-feedback {
+  z-index: 20;
+  border-color: #ff6fa8;
+  animation: review-card-glow-feedback 1.25s ease-in-out 4;
+}
+
+.review-card-glow-writing {
+  z-index: 20;
+  border-color: #239cde;
+  animation: review-card-glow-writing 1.25s ease-in-out 4;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reading-kangchi-bob {
     animation: none;
+  }
+
+  .review-card-glow-feedback {
+    animation: none;
+    box-shadow: 0 0 0 5px rgb(255 85 153 / 24%);
+  }
+
+  .review-card-glow-writing {
+    animation: none;
+    box-shadow: 0 0 0 5px rgb(35 156 222 / 24%);
   }
 }

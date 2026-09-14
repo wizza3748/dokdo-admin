@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { getConfiguredTemplates, saveConfiguredTemplate, subscribeTemplateSettings } from "@/lib/workbook-template-settings"
 import {
   Check,
   ChevronDown,
@@ -34,16 +35,19 @@ const primaryButton = "inline-flex h-10 cursor-pointer items-center justify-cent
 const secondaryButton = "inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
 const inputClass = "h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition placeholder:text-slate-300 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
 
-function StatusSwitch({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+function StatusSwitch({ checked, onChange, label, onLabel = "검수완료", offLabel = "미검수" }: { checked: boolean; onChange: (checked: boolean) => void; label?: string; onLabel?: string; offLabel?: string }) {
   return (
     <button
       type="button"
-      aria-pressed={checked}
+      role={label ? "switch" : undefined}
+      aria-label={label}
+      aria-checked={label ? checked : undefined}
+      aria-pressed={label ? undefined : checked}
       onClick={() => onChange(!checked)}
       className={`relative h-7 w-[88px] cursor-pointer rounded-full border text-xs font-bold transition ${checked ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-slate-100 text-slate-500"}`}
     >
       <span className={`absolute top-1 h-[18px] w-[18px] rounded-full bg-white shadow transition ${checked ? "right-1" : "left-1"}`} />
-      <span className={checked ? "mr-5" : "ml-5"}>{checked ? "검수완료" : "미검수"}</span>
+      <span className={checked ? "mr-5" : "ml-5"}>{checked ? onLabel : offLabel}</span>
     </button>
   )
 }
@@ -74,20 +78,23 @@ function Toast({ message }: { message: string }) {
 }
 
 export function WorkbookTemplateList() {
+  const [templates, setTemplates] = React.useState(WORKBOOK_TEMPLATES)
+  const [report, setReport] = React.useState("")
+  React.useEffect(() => { const refresh = () => setTemplates(getConfiguredTemplates()); refresh(); return subscribeTemplateSettings(refresh) }, [])
   const [keyword, setKeyword] = React.useState("")
   const [level, setLevel] = React.useState("")
   const [filtersOpen, setFiltersOpen] = React.useState(true)
   const [page, setPage] = React.useState(1)
 
-  const filtered = React.useMemo(() => WORKBOOK_TEMPLATES.filter((template) => {
+  const filtered = React.useMemo(() => templates.filter((template) => {
     const matchesKeyword = template.name.toLowerCase().includes(keyword.trim().toLowerCase())
     const matchesLevel = !level || template.levels.includes(Number(level))
-    return matchesKeyword && matchesLevel
-  }), [keyword, level])
+    return matchesKeyword && matchesLevel && (!report || (report === "yes") === !!template.reportEnabled)
+  }), [keyword, level, report, templates])
   const pageCount = Math.max(1, Math.ceil(filtered.length / 20))
   const rows = filtered.slice((page - 1) * 20, page * 20)
 
-  const reset = () => { setKeyword(""); setLevel(""); setPage(1) }
+  const reset = () => { setKeyword(""); setLevel(""); setReport(""); setPage(1) }
 
   return (
     <div className="space-y-3 text-slate-700">
@@ -96,6 +103,7 @@ export function WorkbookTemplateList() {
           <label className="text-center text-sm font-bold">템플릿명</label>
           <input className={inputClass} value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="템플릿명 검색" onKeyDown={(event) => event.key === "Enter" && setPage(1)} />
           {filtersOpen && <><label className="text-center text-sm font-bold">대상 레벨</label><select className={`${inputClass} cursor-pointer`} value={level} onChange={(event) => { setLevel(event.target.value); setPage(1) }}><option value="">레벨 선택</option>{[1,2,3,4,5,6].map((item) => <option key={item} value={item}>{item}레벨</option>)}</select></>}
+          <label className="text-center text-sm font-bold">평가 보고서</label><select aria-label="평가 보고서 검색" className={inputClass} value={report} onChange={e => { setReport(e.target.value); setPage(1) }}><option value="">전체</option><option value="yes">사용</option><option value="no">미사용</option></select>
           <div className="col-start-5 row-start-1 flex gap-2">
             <button type="button" onClick={reset} className={secondaryButton}>초기화</button>
             <button type="button" onClick={() => setPage(1)} className={primaryButton}><Search className="h-4 w-4" />검색</button>
@@ -106,7 +114,7 @@ export function WorkbookTemplateList() {
 
       <section className="rounded-xl bg-white p-4 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-lg font-extrabold text-slate-800">워크북 템플릿 목록</h1>
+          <h1 className="text-lg font-extrabold text-slate-800">독후감 템플릿 목록</h1>
           <div className="flex items-center gap-2">
             <Link href="/admin/exploration/workbook-templates/create" className={primaryButton}><Plus className="h-4 w-4" />신규 등록</Link>
             {[Search, RefreshCw, Maximize2, ListFilter].map((Icon, index) => <button key={index} type="button" className="grid h-9 w-9 cursor-pointer place-items-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50"><Icon className="h-4 w-4" /></button>)}
@@ -114,8 +122,8 @@ export function WorkbookTemplateList() {
         </div>
         <div className="overflow-hidden rounded-lg border border-slate-200">
           <table className="w-full table-fixed text-center text-[13px]">
-            <thead className="h-12 bg-slate-50 font-bold text-slate-600"><tr><th className="w-16">번호</th><th className="w-[28%]">템플릿명</th><th>대상 레벨</th><th>항목 수</th><th>책 읽기 연결 회차 수</th><th>검수 상태</th><th>최근 수정일</th><th className="w-20">관리</th></tr></thead>
-            <tbody>{rows.map((template) => <tr key={template.id} className="h-12 border-t border-slate-200 hover:bg-blue-50/40"><td>{template.id}</td><td className="truncate px-3 text-left"><Link className="cursor-pointer font-semibold text-blue-600 hover:underline" href={`/admin/exploration/workbook-templates/${template.id}`}>{template.name}</Link></td><td>{template.levels.map((item) => `${item}레벨`).join(", ")}</td><td>{template.questions.length}</td><td>{template.connections}</td><td><span className={`font-semibold ${template.reviewed ? "text-blue-600" : "text-slate-400"}`}>{template.reviewed ? "검수완료" : "미검수"}</span></td><td>{template.updatedAt}</td><td><Link href={`/admin/exploration/workbook-templates/${template.id}`} className="inline-grid h-8 w-8 cursor-pointer place-items-center rounded-full text-blue-600 hover:bg-blue-100" aria-label="수정"><FilePenLine className="h-4 w-4" /></Link></td></tr>)}</tbody>
+            <thead className="h-12 bg-slate-50 font-bold text-slate-600"><tr><th className="w-16">번호</th><th className="w-[28%]">템플릿명</th><th>대상 레벨</th><th>항목 수</th><th>책 읽기 연결 회차 수</th><th>검수 상태</th><th>평가 보고서</th><th>최근 수정일</th><th className="w-20">관리</th></tr></thead>
+            <tbody>{rows.map((template) => <tr key={template.id} className="h-12 border-t border-slate-200 hover:bg-blue-50/40"><td>{template.id}</td><td className="truncate px-3 text-left"><Link className="cursor-pointer font-semibold text-blue-600 hover:underline" href={`/admin/exploration/workbook-templates/${template.id}`}>{template.name}</Link></td><td>{template.levels.map((item) => `${item}레벨`).join(", ")}</td><td>{template.questions.length}</td><td>{template.connections}</td><td><span className={`font-semibold ${template.reviewed ? "text-blue-600" : "text-slate-400"}`}>{template.reviewed ? "검수완료" : "미검수"}</span></td><td>{template.reportEnabled ? "사용" : "미사용"}</td><td>{template.updatedAt}</td><td><Link href={`/admin/exploration/workbook-templates/${template.id}`} className="inline-grid h-8 w-8 cursor-pointer place-items-center rounded-full text-blue-600 hover:bg-blue-100" aria-label="수정"><FilePenLine className="h-4 w-4" /></Link></td></tr>)}</tbody>
           </table>
           {rows.length === 0 && <div className="py-20 text-center text-sm text-slate-400">검색 결과가 없습니다.</div>}
         </div>
@@ -135,13 +143,19 @@ function QuestionDialog({ question, onClose, onConfirm, onDelete }: { question?:
 }
 
 function TemplatePreview({ template, onClose }: { template: WorkbookTemplateRecord; onClose: () => void }) {
-  return <Dialog title="워크북 템플릿 미리보기" onClose={onClose} width="max-w-[920px]" footer={<button type="button" onClick={onClose} className={primaryButton}>확인</button>}>
+  return <Dialog title="독후감 템플릿 미리보기" onClose={onClose} width="max-w-[920px]" footer={<button type="button" onClick={onClose} className={primaryButton}>확인</button>}>
     <div className="rounded-xl bg-[#f4f7f9] p-7"><div className="mb-5 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-full bg-blue-600 text-sm font-extrabold text-white">1</span><div><p className="text-xs text-slate-400">학생용 워크북 미리보기</p><h3 className="text-xl font-extrabold text-slate-800">{template.studentTitle || "학생용 제목"}</h3></div></div><div className="rounded-xl border border-slate-200 bg-white p-7">{template.questions.length ? template.questions.map((question, index) => <div key={question.id} className="mb-7 last:mb-0"><h4 className="font-extrabold">{index + 1}. {question.title}</h4><p className="mt-1 text-sm text-slate-600">{question.description}</p>{question.example && <div className="mt-3 rounded-lg bg-[#f5f2e9] p-3 text-sm"><b>예시</b> {question.example}</div>}<div className="mt-3 h-24 rounded-md border border-slate-200 bg-white p-3 text-sm italic text-slate-300">여기에 답변을 작성해 주세요.</div></div>) : <div className="py-16 text-center text-slate-400">등록된 질문 항목이 없습니다.</div>}</div></div>
   </Dialog>
 }
 
 export function WorkbookTemplateForm({ templateId }: { templateId?: number }) {
-  const source = WORKBOOK_TEMPLATES.find((item) => item.id === templateId)
+  const [ready, setReady] = React.useState(false)
+  React.useEffect(() => setReady(true), [])
+  return ready ? <ConfiguredTemplateForm templateId={templateId} /> : <p>템플릿 불러오는 중…</p>
+}
+function ConfiguredTemplateForm({ templateId }: { templateId?: number }) {
+  const source = getConfiguredTemplates().find((item) => item.id === templateId)
+  const [reportEnabled, setReportEnabled] = React.useState(source?.reportEnabled ?? false)
   const connectedBooks = templateId ? getWorkbookTemplateLiveDetail(templateId)?.connectedBooks ?? [] : []
   const isEdit = Boolean(source)
   const [name, setName] = React.useState(source?.name ?? "")
@@ -170,11 +184,11 @@ export function WorkbookTemplateForm({ templateId }: { templateId?: number }) {
     setQuestions((current) => { const next = [...current]; const [moved] = next.splice(dragIndex.current!, 1); next.splice(toIndex, 0, moved); return next })
     dragIndex.current = null
   }
-  const previewTemplate: WorkbookTemplateRecord = { id: source?.id ?? 0, name, studentTitle, levels, questions, connections: source?.connections ?? 0, reviewed, updatedAt: "2026-09-01", description, rewriteMode, guides }
+  const previewTemplate: WorkbookTemplateRecord = { reportEnabled, id: source?.id ?? Math.max(...getConfiguredTemplates().map(t => t.id)) + 1, name, studentTitle, levels, questions, connections: source?.connections ?? 0, reviewed, updatedAt: "2026-09-01", description, rewriteMode, guides }
 
   return <div className="space-y-4 pb-20 text-slate-700">
     <section className="rounded-xl bg-white p-6 shadow-sm">
-      <h1 className="mb-4 text-lg font-extrabold">{isEdit ? `${name} 상세 정보` : "워크북 템플릿 등록"}</h1>
+      <h1 className="mb-4 text-lg font-extrabold">{isEdit ? `${name} 상세 정보` : "독후감 템플릿 등록"}</h1>
       {isEdit && <div className="mb-6 overflow-hidden rounded-lg border border-slate-200"><button type="button" onClick={() => setConnectionsOpen((open) => !open)} className="flex w-full cursor-pointer items-center gap-3 bg-white px-4 py-4 text-left font-bold hover:bg-slate-50"><ChevronRight className={`h-4 w-4 transition ${connectionsOpen ? "rotate-90" : ""}`} /><span>도서 연결 현황 ({source?.connections}개 회차 연결됨)</span></button>{connectionsOpen && <div className="border-t border-slate-200 p-5"><div className="max-h-[520px] overflow-auto rounded-lg border border-slate-200"><table className="w-full text-center text-sm"><thead className="sticky top-0 h-11 bg-slate-50"><tr><th>고유번호</th><th>도서 제목</th><th>도서 레벨</th><th>학습 회차</th><th>검수 상태</th><th>바로가기</th></tr></thead><tbody>{connectedBooks.map(([id,title,level,round], index) => <tr key={`${id}-${round}-${index}`} className="h-12 border-t border-slate-200"><td>{id}</td><td className="font-semibold">{title}</td><td>{level}레벨</td><td>{round}회차</td><td className="text-blue-600">검수완료</td><td><Link href={`/admin/exploration/reading/${id}/workbook/${getOnlineWorkbookSettingId(id)}`} className="cursor-pointer font-bold text-blue-600 hover:underline">열기</Link></td></tr>)}</tbody></table>{connectedBooks.length === 0 && <div className="py-14 text-center text-sm text-slate-400">연결된 도서 회차가 없습니다.</div>}</div></div>}</div>}
       <h2 className="mb-5 border-b border-slate-200 pb-4 text-base font-extrabold">기본 정보</h2>
       <div className="grid grid-cols-[150px_1fr_150px_1fr] items-center gap-x-4 gap-y-4 text-sm">
@@ -182,10 +196,11 @@ export function WorkbookTemplateForm({ templateId }: { templateId?: number }) {
       <label className="text-right font-bold">템플릿명 <span className="text-rose-500">*</span></label><input className={inputClass} value={name} onChange={(event) => setName(event.target.value)} placeholder="관리용 템플릿명을 입력해 주세요." />
       <label className="text-right font-bold">대상 레벨 <span className="text-rose-500">*</span></label><div className="flex flex-wrap gap-2">{[1,2,3,4,5,6].map((level) => <button type="button" key={level} onClick={() => setLevels((current) => current.includes(level) ? current.filter((item) => item !== level) : [...current, level].sort())} className={`h-9 cursor-pointer rounded-md border px-3 text-xs font-bold ${levels.includes(level) ? "border-blue-600 bg-blue-50 text-blue-600" : "border-slate-200 bg-white text-slate-500"}`}>{levels.includes(level) && <Check className="mr-1 inline h-3 w-3" />}{level}레벨</button>)}</div>
       <label className="text-right font-bold">학생용 제목 <span className="text-rose-500">*</span></label><input className={inputClass} value={studentTitle} onChange={(event) => setStudentTitle(event.target.value)} placeholder="학생 화면에 표시할 제목" />
-      <label className="text-right font-bold">설명</label><textarea className="min-h-20 rounded-md border border-slate-200 p-3 outline-none focus:border-blue-400" value={description} onChange={(event) => setDescription(event.target.value)} />
+      <label className="text-right font-bold">템플릿 설명</label><textarea className="min-h-20 rounded-md border border-slate-200 p-3 outline-none focus:border-blue-400" value={description} onChange={(event) => setDescription(event.target.value)} />
       <label className="text-right font-bold">고쳐쓰기 모드</label><div className="flex gap-6">{([['items','항목별 보기'],['continuous','이어보기']] as const).map(([value,label]) => <label key={value} className="flex cursor-pointer items-center gap-2"><input type="radio" checked={rewriteMode === value} onChange={() => setRewriteMode(value)} className="h-4 w-4 accent-blue-600" />{label}</label>)}</div>
       </div>
 
+      <div className="mt-4 flex items-center gap-5"><strong>평가 보고서</strong><StatusSwitch checked={reportEnabled} onChange={setReportEnabled} label="평가 보고서 사용" onLabel="사용" offLabel="미사용" /><span className="text-xs">저장 후 새로 생성되는 온라인 독후감부터 적용됩니다.</span></div>
       <div className="mt-8 border-t border-slate-200 pt-6"><h2 className="mb-5 text-base font-extrabold">공통안내</h2><div className="grid grid-cols-[150px_1fr] gap-x-4 gap-y-4 text-sm">{([['writing','차례대로 쓰기'],['rewrite','고쳐쓰기'],['complete','나의 글 완성']] as const).map(([key,label]) => <React.Fragment key={key}><label className="pt-3 text-right font-bold">{label}</label><textarea value={guides[key]} onChange={(event) => setGuides((current) => ({ ...current, [key]: event.target.value }))} className="min-h-20 rounded-md border border-slate-200 p-3 outline-none focus:border-blue-400" /></React.Fragment>)}</div></div>
 
       <div className="mt-8 border-t border-slate-200 pt-6"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-lg font-extrabold">질문 항목</h2><p className="mt-1 text-xs text-slate-400">드래그하여 학생에게 보일 질문 순서를 변경할 수 있습니다.</p></div><button type="button" onClick={() => setQuestionModal({})} className={primaryButton}><CirclePlus className="h-4 w-4" />질문 항목 추가</button></div>
@@ -193,7 +208,7 @@ export function WorkbookTemplateForm({ templateId }: { templateId?: number }) {
       </div>
     </section>
 
-    <div className="fixed bottom-0 left-[var(--admin-fixed-left)] right-0 z-30 flex h-20 items-center justify-between border-t border-slate-200 bg-white px-8 shadow-[0_-4px_18px_rgba(15,23,42,.06)] transition-[left] duration-200"><Link href="/admin/exploration/workbook-templates" className={secondaryButton}>목록</Link><div className="flex items-center gap-3"><span className="text-sm font-bold">검수 상태:</span><StatusSwitch checked={reviewed} onChange={setReviewed} /><span className="mx-2 h-7 w-px bg-slate-200" />{isEdit && <button type="button" onClick={() => showToast("프로토타입에서는 삭제 결과만 표시합니다.")} className={`${secondaryButton} text-rose-500`}>삭제</button>}{isEdit ? <Link href={`/online-workbook/preview/${source!.id}`} target="_blank" rel="noopener noreferrer" className={secondaryButton}><Eye className="h-4 w-4" />미리보기</Link> : <button type="button" onClick={() => setPreviewOpen(true)} className={secondaryButton}><Eye className="h-4 w-4" />미리보기</button>}<button type="button" onClick={() => showToast("워크북 템플릿이 저장되었습니다.")} className={primaryButton}>저장</button></div></div>
+    <div className="fixed bottom-0 left-[var(--admin-fixed-left)] right-0 z-30 flex h-20 items-center justify-between border-t border-slate-200 bg-white px-8 shadow-[0_-4px_18px_rgba(15,23,42,.06)] transition-[left] duration-200"><Link href="/admin/exploration/workbook-templates" className={secondaryButton}>목록</Link><div className="flex items-center gap-3"><span className="text-sm font-bold">검수 상태:</span><StatusSwitch checked={reviewed} onChange={setReviewed} /><span className="mx-2 h-7 w-px bg-slate-200" />{isEdit && <button type="button" onClick={() => showToast("프로토타입에서는 삭제 결과만 표시합니다.")} className={`${secondaryButton} text-rose-500`}>삭제</button>}{isEdit ? <Link href={`/online-workbook/preview/${source!.id}`} target="_blank" rel="noopener noreferrer" className={secondaryButton}><Eye className="h-4 w-4" />미리보기</Link> : <button type="button" onClick={() => setPreviewOpen(true)} className={secondaryButton}><Eye className="h-4 w-4" />미리보기</button>}<button type="button" onClick={() => { if (!name.trim() || !studentTitle.trim() || !levels.length || !questions.length) { showToast("필수 정보와 질문 항목을 입력해 주세요."); return } saveConfiguredTemplate({ ...previewTemplate, updatedAt: new Date().toISOString().slice(0, 10) }); showToast("독후감 템플릿이 저장되었습니다.") }} className={primaryButton}>저장</button></div></div>
     {questionModal && <QuestionDialog question={questionModal.index !== undefined ? questions[questionModal.index] : undefined} onClose={() => setQuestionModal(null)} onConfirm={updateQuestion} onDelete={questionModal.index !== undefined ? () => deleteQuestion(questionModal.index!) : undefined} />}
     {previewOpen && <TemplatePreview template={previewTemplate} onClose={() => setPreviewOpen(false)} />}
     {toast && <Toast message={toast} />}
@@ -231,8 +246,8 @@ function TemplateSelectionDialog({ selectedIds, onClose, onConfirm }: { selected
   const [keyword, setKeyword] = React.useState("")
   const [level, setLevel] = React.useState("")
   const candidates = WORKBOOK_TEMPLATES.filter((template) => template.reviewed && template.name.includes(keyword) && (!level || template.levels.includes(Number(level))))
-  return <Dialog title="워크북 템플릿 선택" onClose={onClose} width="max-w-[980px]" footer={<><span className="mr-auto text-sm font-bold text-blue-600">{checked.length}개 선택</span><button type="button" onClick={onClose} className={secondaryButton}>취소</button><button type="button" onClick={() => onConfirm(WORKBOOK_TEMPLATES.filter((template) => checked.includes(template.id)))} className={primaryButton}>확인</button></>}>
-    <p className="mb-4 text-sm text-slate-500">검수 완료된 워크북 템플릿만 선택할 수 있습니다. 현재 선택된 템플릿은 {selectedIds.length}개입니다.</p><div className="mb-4 grid grid-cols-[100px_1fr_100px_220px_auto] items-center gap-2 rounded-lg bg-slate-50 p-4"><label className="text-center text-sm font-bold">템플릿명</label><input className={inputClass} value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="템플릿명 검색" /><label className="text-center text-sm font-bold">대상 레벨</label><select className={`${inputClass} cursor-pointer`} value={level} onChange={(event) => setLevel(event.target.value)}><option value="">레벨 선택</option>{[1,2,3,4,5,6].map((item) => <option key={item} value={item}>{item}레벨</option>)}</select><button type="button" onClick={() => {setKeyword("");setLevel("")}} className={secondaryButton}>초기화</button></div>
+  return <Dialog title="독후감 템플릿 선택" onClose={onClose} width="max-w-[980px]" footer={<><span className="mr-auto text-sm font-bold text-blue-600">{checked.length}개 선택</span><button type="button" onClick={onClose} className={secondaryButton}>취소</button><button type="button" onClick={() => onConfirm(WORKBOOK_TEMPLATES.filter((template) => checked.includes(template.id)))} className={primaryButton}>확인</button></>}>
+    <p className="mb-4 text-sm text-slate-500">검수 완료된 독후감 템플릿만 선택할 수 있습니다. 현재 선택된 템플릿은 {selectedIds.length}개입니다.</p><div className="mb-4 grid grid-cols-[100px_1fr_100px_220px_auto] items-center gap-2 rounded-lg bg-slate-50 p-4"><label className="text-center text-sm font-bold">템플릿명</label><input className={inputClass} value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="템플릿명 검색" /><label className="text-center text-sm font-bold">대상 레벨</label><select className={`${inputClass} cursor-pointer`} value={level} onChange={(event) => setLevel(event.target.value)}><option value="">레벨 선택</option>{[1,2,3,4,5,6].map((item) => <option key={item} value={item}>{item}레벨</option>)}</select><button type="button" onClick={() => {setKeyword("");setLevel("")}} className={secondaryButton}>초기화</button></div>
     <div className="max-h-[430px] overflow-auto rounded-lg border border-slate-200"><table className="w-full text-center text-sm"><thead className="sticky top-0 h-11 bg-slate-50"><tr><th className="w-12"></th><th className="w-16">번호</th><th className="text-left">템플릿명</th><th className="text-left">학생용 제목</th><th>대상 레벨</th><th>항목 수</th></tr></thead><tbody>{candidates.map((template) => <tr key={template.id} onClick={() => setChecked((current) => current.includes(template.id) ? current.filter((id) => id !== template.id) : [...current, template.id])} className="h-12 cursor-pointer border-t border-slate-200 hover:bg-blue-50/50"><td><input type="checkbox" readOnly checked={checked.includes(template.id)} className="h-4 w-4 accent-blue-600" /></td><td>{template.id}</td><td className="text-left font-semibold text-blue-600">{template.name}</td><td className="text-left">{template.studentTitle}</td><td>{template.levels.join(", ")}</td><td>{template.questions.length}</td></tr>)}</tbody></table></div>
   </Dialog>
 }
@@ -314,7 +329,7 @@ export function WorkbookRoundSettings({ bookId = 231 }: { bookId?: number }) {
   const saveRoundSetting = () => {
     const nextPriorityId = templates.some((template) => template.id === priorityId) ? priorityId : templates[0]?.id
     if (!nextPriorityId) {
-      showToast("1순위로 사용할 워크북 템플릿을 선택해 주세요.")
+      showToast("1순위로 사용할 독후감 템플릿을 선택해 주세요.")
       return
     }
     setPriorityId(nextPriorityId)
@@ -329,14 +344,14 @@ export function WorkbookRoundSettings({ bookId = 231 }: { bookId?: number }) {
         questions: template.questions.filter((question) => template.enabledQuestionIds.includes(question.id)),
       })),
     })
-    showToast("온라인 워크북 설정이 저장되었습니다.")
+    showToast("온라인 독후감 설정이 저장되었습니다.")
   }
   const previewHref = `/online-workbook/preview/${roundSetting.previewId}?templateId=${savedPriorityId}`
 
   return <div className="space-y-5 pb-24 text-slate-700">
-    <section className="rounded-xl bg-gradient-to-r from-[#647ce8] to-[#7648aa] px-8 py-7 text-white shadow-sm"><h1 className="text-2xl font-extrabold">온라인 워크북</h1><p className="mt-2 text-sm text-blue-100">회차별 온라인 워크북을 설정하고 관리할 수 있습니다.</p></section>
+    <section className="rounded-xl bg-gradient-to-r from-[#647ce8] to-[#7648aa] px-8 py-7 text-white shadow-sm"><h1 className="text-2xl font-extrabold">온라인 독후감</h1><p className="mt-2 text-sm text-blue-100">회차별 온라인 독후감을 설정하고 관리할 수 있습니다.</p></section>
     <section className="rounded-xl bg-white p-7 shadow-sm"><h2 className="mb-5 border-b border-slate-200 pb-4 text-lg font-extrabold">회차 정보</h2><div className="grid grid-cols-3 gap-5">{[["레벨",`${book?.level ?? connectedBook?.level ?? 4}레벨`],["도서 제목",book?.title ?? connectedBook?.title ?? "대한이는 왜 소한이네 집에 갔을까?"],["회차",`${roundSetting.round}회차`]].map(([label,value]) => <div key={label} className="rounded-xl border border-slate-200 py-5 text-center"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-lg font-extrabold text-slate-700">{value}</p></div>)}</div></section>
-    <section className="rounded-xl bg-white p-7 shadow-sm"><div className="mb-6 flex items-center justify-between"><h2 className="text-lg font-extrabold">워크북 템플릿 목록</h2><button type="button" onClick={() => setSelectionOpen(true)} className={primaryButton}><Plus className="h-4 w-4" />워크북 템플릿 선택하기</button></div><div className="space-y-4">{templates.map((template,index) => <div key={template.id} draggable={!template.open} onDragStart={() => {dragIndex.current=index}} onDragOver={(event) => event.preventDefault()} onDrop={() => dropTemplate(index)} className={`overflow-hidden rounded-xl border bg-white ${template.open ? "border-blue-400" : "border-slate-200"}`}><div className="flex h-16 items-center px-4"><GripVertical className="mr-3 h-5 w-5 cursor-grab text-slate-400" /><span className="mr-4 font-bold">{index+1}.</span><span className="min-w-0 flex-1 truncate font-bold text-blue-600">{template.name}</span><select value={template.displayMode} onChange={(event) => setTemplates((current) => current.map((item) => item.id === template.id ? {...item,displayMode:event.target.value as SelectedTemplate['displayMode']} : item))} className="mr-4 h-9 cursor-pointer rounded-md border border-slate-200 px-3 text-sm"><option value="items">항목별보기</option><option value="continuous">이어보기</option></select><label className="mr-8 flex cursor-pointer items-center gap-2 text-sm"><input type="radio" checked={priorityId === template.id} onChange={() => setPriorityId(template.id)} className="h-5 w-5 accent-blue-600" />1순위</label><button type="button" onClick={() => setTemplates((current) => current.map((item) => item.id===template.id?{...item,open:!item.open}:item))} className="mr-5 cursor-pointer p-2" aria-label={`${template.name} 상세`}><ChevronDown className={`h-5 w-5 transition ${template.open?'rotate-180':''}`} /></button><button type="button" onClick={() => setTemplates((current) => current.filter((item) => item.id !== template.id))} className="cursor-pointer p-2 text-rose-500" aria-label={`${template.name} 삭제`}><Trash2 className="h-5 w-5" /></button></div>{template.open && <TemplateSettingsDetails template={template} onChange={(updated) => setTemplates((current) => current.map((item) => item.id === template.id ? updated : item))} />}</div>)}{templates.length===0&&<div className="rounded-xl border border-dashed border-slate-300 py-16 text-center text-sm text-slate-400">워크북 템플릿을 선택해 주세요.</div>}</div></section>
+    <section className="rounded-xl bg-white p-7 shadow-sm"><div className="mb-6 flex items-center justify-between"><h2 className="text-lg font-extrabold">독후감 템플릿 목록</h2><button type="button" onClick={() => setSelectionOpen(true)} className={primaryButton}><Plus className="h-4 w-4" />독후감 템플릿 선택하기</button></div><div className="space-y-4">{templates.map((template,index) => <div key={template.id} draggable={!template.open} onDragStart={() => {dragIndex.current=index}} onDragOver={(event) => event.preventDefault()} onDrop={() => dropTemplate(index)} className={`overflow-hidden rounded-xl border bg-white ${template.open ? "border-blue-400" : "border-slate-200"}`}><div className="flex h-16 items-center px-4"><GripVertical className="mr-3 h-5 w-5 cursor-grab text-slate-400" /><span className="mr-4 font-bold">{index+1}.</span><span className="min-w-0 flex-1 truncate font-bold text-blue-600">{template.name}</span><select value={template.displayMode} onChange={(event) => setTemplates((current) => current.map((item) => item.id === template.id ? {...item,displayMode:event.target.value as SelectedTemplate['displayMode']} : item))} className="mr-4 h-9 cursor-pointer rounded-md border border-slate-200 px-3 text-sm"><option value="items">항목별보기</option><option value="continuous">이어보기</option></select><label className="mr-8 flex cursor-pointer items-center gap-2 text-sm"><input type="radio" checked={priorityId === template.id} onChange={() => setPriorityId(template.id)} className="h-5 w-5 accent-blue-600" />1순위</label><button type="button" onClick={() => setTemplates((current) => current.map((item) => item.id===template.id?{...item,open:!item.open}:item))} className="mr-5 cursor-pointer p-2" aria-label={`${template.name} 상세`}><ChevronDown className={`h-5 w-5 transition ${template.open?'rotate-180':''}`} /></button><button type="button" onClick={() => setTemplates((current) => current.filter((item) => item.id !== template.id))} className="cursor-pointer p-2 text-rose-500" aria-label={`${template.name} 삭제`}><Trash2 className="h-5 w-5" /></button></div>{template.open && <TemplateSettingsDetails template={template} onChange={(updated) => setTemplates((current) => current.map((item) => item.id === template.id ? updated : item))} />}</div>)}{templates.length===0&&<div className="rounded-xl border border-dashed border-slate-300 py-16 text-center text-sm text-slate-400">독후감 템플릿을 선택해 주세요.</div>}</div></section>
     <div className="fixed bottom-0 left-[var(--admin-fixed-left)] right-0 z-30 flex h-20 items-center justify-between border-t border-slate-200 bg-white px-8 shadow-[0_-4px_18px_rgba(15,23,42,.06)] transition-[left] duration-200"><Link href="/admin/exploration/reading" className={secondaryButton}>목록</Link><div className="flex items-center gap-3"><span className="text-sm font-bold">검수 상태:</span><StatusSwitch checked={reviewed} onChange={setReviewed}/><span className="mx-2 h-7 w-px bg-slate-200"/><button type="button" onClick={resetToOriginal} className={secondaryButton}>취소</button><Link href={previewHref} target="_blank" rel="noopener noreferrer" className={secondaryButton}><Eye className="h-4 w-4"/>미리보기</Link><button type="button" onClick={saveRoundSetting} className={primaryButton}>저장</button></div></div>
     {selectionOpen&&<TemplateSelectionDialog selectedIds={templates.map((item)=>item.id)} onClose={()=>setSelectionOpen(false)} onConfirm={(selected)=>{const nextTemplates=selected.map((item)=>templates.find((current)=>current.id===item.id)??createSelectedTemplate(item));setTemplates(nextTemplates);if(!nextTemplates.some((item)=>item.id===priorityId)&&nextTemplates[0])setPriorityId(nextTemplates[0].id);setSelectionOpen(false)}}/>}
     {toast&&<Toast message={toast}/>} 

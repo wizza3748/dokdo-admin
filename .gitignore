@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+/.local-state/
 
 # next.js
 /.next/
