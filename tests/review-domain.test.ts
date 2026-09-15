@@ -67,7 +67,7 @@ test("기본 목 데이터는 1차 별도 레코드이며 보고서 가능·불�
   assert.equal(seeded.records.length, 3)
   assert.ok(seeded.records.every(r => r.round === 1))
   assert.ok(seeded.records[0].report)
-  assert.equal(seeded.records[0].report!.score, (seeded.records[0].report!.ai + seeded.records[0].report!.teacher) / 2)
+  assert.equal(seeded.records[0].report!.score, (seeded.records[0].report!.ai + seeded.records[0].report!.teacher * 2) / 3)
   assert.equal(seeded.records[1].report, undefined)
   assert.equal(seeded.records[2].report, undefined)
   assert.equal(seeded.records[0].aiUsed, 1)
@@ -455,7 +455,7 @@ test("보고서 생성 가능 스냅샷과 1차 보고서 불변·2차 가중 �
   assert.deepEqual(f.db.records[0].report, firstReport)
   const second = f.db.records[1]
   assert.equal(second.report!.weightedAi, (firstReport!.ai + second.report!.ai * 2) / 3)
-  assert.equal(second.report!.finalScore, (second.report!.weightedAi! + second.report!.weightedTeacher!) / 2)
+  assert.equal(second.report!.finalScore, (second.report!.weightedAi! + second.report!.weightedTeacher! * 2) / 3)
   assert.equal(f.db.records[0].flowers, 15); assert.equal(second.flowers, 0)
   assert.equal(second.parentSentAt, undefined)
   f.run({ type: "send", recordId: second.id }, teacher); f.run({ type: "seen", recordId: second.id })

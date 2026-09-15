@@ -27,15 +27,15 @@ test("모든 레벨의 보고서가 기관관리자와 동일한 5개 영역·9�
     assert.equal(areas.length, 5)
     assert.equal(areas.flatMap(a => a.details).length, 9)
     assert.deepEqual(areas.map(a => a.max), [30, 20, 20, 20, 10])
-    assert.equal(areas.reduce((sum, a) => sum + a.current, 0), 70)
-    for (const area of areas) assert.ok(Math.abs(area.current / area.max - .7) < 1e-10)
+    assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.current, 0) - 220 / 3) < 1e-10)
+    for (const area of areas) assert.ok(Math.abs(area.current / area.max - 2.2 / 3) < 1e-10)
   }
 })
 
 test("영역별 최종 합계는 1차·2차 가중 총점과 같고 원본은 변경하지 않는다", () => {
   const f = fixture(5), before = structuredClone(f)
   const areas = reportAreaScores(f.common, f.second, f.first)!
-  assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.final, 0) - (70 + 90 * 2) / 3) < 1e-10)
+  assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.final, 0) - ((60 + 80 * 2) / 3 + (80 + 100 * 2) / 3 * 2) / 3) < 1e-10)
   assert.deepEqual(f, before)
 })
 
@@ -53,8 +53,8 @@ test("점수 감소·실제 0점도 그대로 계산한다", () => {
   const zero = Object.fromEntries(assessmentCriteria(common.level).map(c => [c.id, 0]))
   const aiZero = Object.fromEntries(assessmentAreas(common.level).map(a => [a.id, 0]))
   const areas = reportAreaScores(common, { ...second, aiScores: aiZero, teacherScores: zero }, first)!
-  assert.equal(areas.reduce((sum, a) => sum + a.current - a.first, 0), -70)
-  assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.final, 0) - 70 / 3) < 1e-10)
+  assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.current - a.first, 0) + 220 / 3) < 1e-10)
+  assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.final, 0) - 220 / 9) < 1e-10)
 })
 
 test("표지와 제출일은 한국 시간 기준이며 잘못된 날짜를 만들지 않는다", () => {

@@ -1,10 +1,12 @@
 "use client"
 import Image from "next/image"
 import { Fragment, type ReactNode } from "react"
-import { ArrowRight, BookOpen, MessageCircle, Printer } from "lucide-react"
+import { ArrowRight, BookOpen, MessageCircle, Printer, TrendingUp } from "lucide-react"
 import { useReviews, type ReviewRole } from "@/lib/review-client"
 import { assessmentCriteria, reviewFeedbackItems, plainReviewText, scoreLabel, type ReviewCommon, type ReviewRecord } from "@/lib/review-domain"
 import { reportAreaScores, reportDate, type ReportArea } from "@/lib/review-report-model"
+import { reviewCriterionLabel } from "@/lib/review-assessment-config"
+import { reviewImprovementMessage, reviewScoreExplanation } from "@/lib/review-score-policy"
 import { ReviewText } from "./review-ui"
 import styles from "./review-report.module.css"
 
@@ -34,19 +36,41 @@ function ReportSheet({ common, rounds, label, children }: { common: ReviewCommon
 }
 function Radar({ areas, second }: { areas: ReportArea[]; second: boolean }) {
   const series = second ? ["first", "current", "final"] as const : ["current"] as const
-  const point = (i: number, ratio: number, radius = 142) => {
+  const point = (i: number, ratio: number, radius = 162) => {
     const angle = -Math.PI / 2 + i * Math.PI * 2 / areas.length
-    return { x: 300 + Math.cos(angle) * radius * ratio, y: 190 + Math.sin(angle) * radius * ratio }
+    return { x: 220 + Math.cos(angle) * radius * ratio, y: 220 + Math.sin(angle) * radius * ratio }
   }
   const polygon = (ratio: number) => areas.map((_, i) => { const p = point(i, ratio); return p.x + "," + p.y }).join(" ")
-  return <figure className={styles.radar}><figcaption>평가 영역별 성취도</figcaption>
-    <div className={styles.legend}>{series.map(key => <span key={key}><SeriesMark series={!second ? "first" : key} />{key === "first" ? "1차" : key === "final" ? "최종" : second ? "2차" : "1차"}</span>)}</div>
-    <svg viewBox="0 0 600 380" role="img" aria-label="영역별 성취도 방사형 그래프. 정확한 점수와 성취도는 아래 표에서 확인할 수 있습니다.">
-      {[1, .8, .6, .4, .2].map(r => <polygon key={r} points={polygon(r)} fill={r === 1 ? "#f7f9fc" : "none"} stroke="#d9e2eb" strokeDasharray={r === 1 ? undefined : "3 4"} />)}
-      {areas.map((a, i) => { const p = point(i, 1), label = point(i, 1, 178); return <g key={a.area}><line x1="300" y1="190" x2={p.x} y2={p.y} stroke="#d9e2eb" /><text x={label.x} y={label.y} textAnchor={i === 0 ? "middle" : i <= 2 ? "start" : "end"} className={styles.axis}>{a.area}<tspan x={label.x} dy="17" className={styles.axisMax}>{a.max}점</tspan></text></g> })}
-      {[.2, .4, .6, .8, 1].map(r => <text key={r} x="307" y={190 - 142 * r + 4} className={styles.tick}>{r * 100}%</text>)}
-      {series.map(key => { const styleKey = second ? key : "first"; return <g key={key}><polygon points={areas.map((a, i) => { const p = point(i, a[key] / a.max); return p.x + "," + p.y }).join(" ")} fill={colors[styleKey]} fillOpacity={key === "final" || !second ? ".09" : "0"} stroke={colors[styleKey]} strokeWidth={key === "final" ? 3.5 : 2.5} strokeLinejoin="round" strokeDasharray={styleKey === "first" ? "6 4" : undefined} />{areas.map((a, i) => { const p = point(i, a[key] / a.max); return styleKey === "final" ? <rect key={a.area} x={p.x - 4} y={p.y - 4} width="8" height="8" fill={colors.final} /> : styleKey === "current" ? <path key={a.area} d={`M${p.x} ${p.y - 5} L${p.x + 5} ${p.y + 4} L${p.x - 5} ${p.y + 4} Z`} fill={colors.current} /> : <circle key={a.area} cx={p.x} cy={p.y} r="4" fill="white" stroke={colors.first} strokeWidth="2.5" /> })}</g> })}
-    </svg><p>바깥쪽에 가까울수록 성취도가 높아요.</p>
+  return <figure className={styles.integratedRadar} data-round={second ? 2 : 1} aria-label="영역별 성취도와 점수">
+    <figcaption className={styles.srOnly}>평가 영역별 성취도와 득점/배점</figcaption>
+    <div className={styles.radarCanvas}>
+      <svg className={styles.radarPlot} viewBox="0 0 440 440" role="img" aria-label={second ? "5개 평가 영역의 1차·2차·최종 성취도 비교. 성취도와 득점/배점은 각 영역 설명에 표시됩니다." : "5개 평가 영역의 1차 성취도. 성취도와 득점/배점은 각 영역 설명에 표시됩니다."}>
+        {[1, .8, .6, .4, .2].map(r => <polygon key={r} points={polygon(r)} fill={r === 1 ? "#f5f8fd" : "none"} stroke="#d9e2eb" />)}
+        {areas.map((a, i) => { const p = point(i, 1), label = point(i, 1, 196); return <g key={a.area}>
+          <line x1="220" y1="220" x2={p.x} y2={p.y} stroke="#d9e2eb" />
+          <text className={styles.mobileAxis} x={label.x} y={label.y - (i === 1 || i === 4 ? 12 : 0)} textAnchor="middle">{a.area}</text>
+        </g> })}
+        {[.2, .4, .6, .8, 1].map(r => <text key={r} x="227" y={220 - 162 * r + 4} className={styles.tick}>{r * 100}%</text>)}
+        {series.map(key => { const styleKey = second ? key : "first"; return <g key={key}>
+          <polygon points={areas.map((a, i) => { const p = point(i, a[key] / a.max); return p.x + "," + p.y }).join(" ")} fill={colors[styleKey]} fillOpacity={key === "final" || !second ? ".1" : "0"} stroke={colors[styleKey]} strokeWidth={key === "final" ? 3.5 : 2.5} strokeLinejoin="round" strokeDasharray={styleKey === "first" ? "6 4" : undefined} />
+          {areas.map((a, i) => { const p = point(i, a[key] / a.max); return styleKey === "final"
+            ? <rect key={a.area} x={p.x - 4} y={p.y - 4} width="8" height="8" fill={colors.final} />
+            : styleKey === "current" ? <path key={a.area} d={`M${p.x} ${p.y - 5} L${p.x + 5} ${p.y + 4} L${p.x - 5} ${p.y + 4} Z`} fill={colors.current} />
+            : <circle key={a.area} cx={p.x} cy={p.y} r="4" fill="white" stroke={colors.first} strokeWidth="2.5" /> })}
+        </g> })}
+      </svg>
+      {areas.map((area, index) => <section key={area.area} className={styles.radarArea} data-axis={index} aria-label={area.area}>
+        <h4>{area.area}</h4>
+        <dl>{series.map(key => {
+          const styleKey = second ? key : "first"
+          return <div key={key} data-series={styleKey}>
+            <dt className={second ? undefined : styles.srOnly}>{second ? styleKey === "first" ? "1차" : styleKey === "current" ? "2차" : "최종" : "성취도와 점수"}</dt>
+            <dd><strong className={styles.achievement}>{n(area[key] / area.max * 100)}<span>%</span></strong><small className={styles.areaPoints}>({n(area[key])}/{area.max})</small></dd>
+          </div>
+        })}</dl>
+      </section>)}
+    </div>
+    <p className={styles.radarHint}>바깥쪽에 가까울수록 성취도가 높아요.</p>
   </figure>
 }
 function RoundWriting({ common, record, rounds }: { common: ReviewCommon; record: ReviewRecord; rounds: ReviewRecord[] }) {
@@ -69,7 +93,7 @@ export function ReviewReportView({ id, role }: { id: string; role: ReviewRole })
   if (!areas || (second && !first?.report)) return <p role="alert" className={styles.empty}>보고서 평가 데이터를 확인할 수 없습니다. {error}</p>
   const report = record.report, rounds = first ? [first, record] : [record]
   const criteria = assessmentCriteria(common.level, record)
-  const change = report.improvement ?? 0
+  const improvement = reviewImprovementMessage(report.improvement ?? 0)
   return <div className={styles.document}>
     <nav className={styles.toolbar} aria-label="평가 보고서 도구"><span><BookOpen size={17} />온라인 독후감 평가 보고서</span><div>{first && <a href={"/online-review/report/" + first.id + "?role=" + role} target="_blank" rel="noopener noreferrer">1차 보고서 ↗</a>}<button type="button" onClick={() => window.print()}><Printer size={16} />인쇄 / 파일 저장</button></div></nav>
     <div className={styles.pages}>
@@ -89,14 +113,24 @@ export function ReviewReportView({ id, role }: { id: string; role: ReviewRole })
       </section>
       <ReportSheet common={common} rounds={rounds} label="평가 결과와 총평">
         <Heading index="01" title={second ? "글을 다시 쓰며 달라진 점" : "내 글을 함께 살펴봐요"} />
+        <div className={styles.scoreOverview} data-round={record.round}>
         <div className={styles.scoreHero} data-round={record.round}>
           <div className={styles.mainScore}><span>{second ? "최종 점수" : "1차 점수"}</span><p><strong>{n(second ? report.finalScore : report.score)}</strong><span>/ 100점</span></p></div>
-          {second ? <div className={styles.comparison}><div className={styles.roundScores}><div data-series="first"><span>1차 점수</span><strong>{n(report.firstScore)}<small>점</small></strong></div><ArrowRight aria-hidden="true" className={styles.scoreArrow} /><div data-series="current"><span>2차 점수</span><strong>{n(report.score)}<small>점</small></strong></div></div><p className={styles.change} data-change={change > 0 ? "up" : change < 0 ? "down" : "same"}>{change > 0 ? `1차보다 ${n(change)}점 높아졌어요` : change < 0 ? `1차보다 ${n(Math.abs(change))}점 낮아졌어요` : "1차와 점수가 같아요"}</p></div> : <div className={styles.breakdown}><div><span>AI 1차 점수</span><strong>{n(report.ai)}<small>점</small></strong></div><div><span>선생님 1차 점수</span><strong>{n(report.teacher)}<small>점</small></strong></div></div>}
+          {second ? <div className={styles.comparison}><h3>작성 차수별 점수</h3><div className={styles.roundScores}><div data-series="first"><span>1차 점수</span><strong>{n(report.firstScore)}<small>점</small></strong></div><ArrowRight aria-hidden="true" className={styles.scoreArrow} /><div data-series="current"><span>2차 점수</span><strong>{n(report.score)}<small>점</small></strong></div></div>{improvement && <p className={styles.change} data-change="up"><TrendingUp size={18} strokeWidth={2.5} aria-hidden="true" /><span>{improvement}</span></p>}</div> : <div className={styles.evaluatorSummary}><h3>평가 주체별 점수</h3><div className={styles.breakdown}><div><span>AI 1차 점수</span><strong>{n(report.ai)}<small>점</small></strong></div><div><span>선생님 1차 점수</span><strong>{n(report.teacher)}<small>점</small></strong></div></div></div>}
         </div>
-        <div className={styles.visualSummary}>
+        {second && <section className={styles.subjectScores} aria-label="평가 주체별 점수"><h3>평가 주체별 점수</h3><dl>
+          <div><dt>AI 평가 총점</dt><dd>{n(report.weightedAi)}<small>점</small></dd></div>
+          <div><dt>선생님 평가 총점</dt><dd>{n(report.weightedTeacher)}<small>점</small></dd></div>
+          <div><dt>최종 점수</dt><dd>{n(report.finalScore)}<small>점</small></dd></div>
+        </dl></section>}
+        <section className={styles.scoreExplanation} aria-label="평가 점수 산출 방법"><h3>평가 점수 산출 방법</h3><p>{reviewScoreExplanation(record.round)}</p></section>
+        </div>
+        <section className={styles.areaSection} aria-label="영역별 평가 결과">
+        <header className={styles.areaHeader}><div><h3>영역별 평가 결과</h3><p>성취도(%) · 괄호 안은 득점/배점</p></div>
+          {second && <div className={styles.legend} aria-label="그래프 범례">{(["first", "current", "final"] as const).map(key => <span key={key}><SeriesMark series={key} />{key === "first" ? "1차" : key === "current" ? "2차" : "최종"}</span>)}</div>}
+        </header>
         <Radar areas={areas} second={second} />
-        <div className={styles.tableWrap}><table className={styles.table + " " + styles.scoreTable}><caption>영역별 점수와 성취도<small>점수 아래 %는 배점 대비 성취도예요.</small></caption><thead><tr><th scope="col">평가 영역</th><th scope="col">배점</th><th scope="col" data-series="first">1차</th>{second && <><th scope="col" data-series="current">2차</th><th scope="col" data-series="final">최종</th></>}</tr></thead><tbody>{areas.map(a => <tr key={a.area}><th scope="row">{a.area}</th><td>{a.max}점</td>{(second ? [a.first, a.current, a.final] : [a.current]).map((score, i) => <td key={i} data-series={["first", "current", "final"][i]}><b>{n(score)}</b><small>{n(score / a.max * 100)}%</small></td>)}</tr>)}</tbody></table></div>
-        </div>
+        </section>
         <section className={styles.commentSection} aria-label="평가보고서용 총평">
           <h3>{record.round}차 총평</h3>
           <div className={styles.reportComment}><div className={styles.richText}><ReviewText value={record.reportFeedback || "저장된 보고서용 총평이 없습니다."} /></div></div>
@@ -110,7 +144,7 @@ export function ReviewReportView({ id, role }: { id: string; role: ReviewRole })
           <thead><tr><th scope="col">평가 영역</th><th scope="col">세부 기준</th><th scope="col">평가 기준 설명</th><th scope="col">배점</th></tr></thead>
           <tbody>{areas.map(area => <Fragment key={area.area}>{area.details.map((c, i) => <tr key={c.id}>
             {i === 0 && <th scope="rowgroup" rowSpan={area.details.length}>{area.area}</th>}
-            <th scope="row">{c.name}</th><td className={styles.criterionDescription}><CriterionDescription value={c.description} /></td><td>{c.max}</td>
+            <th scope="row">{reviewCriterionLabel(c)}</th><td className={styles.criterionDescription}><CriterionDescription value={c.description} /></td><td>{c.max}</td>
           </tr>)}</Fragment>)}</tbody>
           <tfoot><tr><th scope="row" colSpan={3}>총점</th><td>{criteria.reduce((s, c) => s + c.max, 0)}</td></tr></tfoot>
         </table></div>

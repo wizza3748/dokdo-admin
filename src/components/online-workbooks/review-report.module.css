@@ -37,14 +37,14 @@
 .heading { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 30px; break-after: avoid; }
 .heading > span { display: grid; place-items: center; flex: 0 0 36px; height: 36px; border-radius: 12px; background: #e8f4fc; color: #2874a8; font-size: 14px; font-weight: 700; }
 .heading h2 { font-size: 23px; font-weight: 750; letter-spacing: -.04em; line-height: 1.4; }.heading p { color: #768795; font-size: 13px; margin-top: 8px; line-height: 1.6; }
-.scoreHero { display: flex; justify-content: space-between; align-items: center; gap: 28px; background: #f7f4ff; border: 1px solid #e4dcf5; padding: 24px 30px; border-radius: 20px; }
+.scoreHero { display: flex; justify-content: space-between; align-items: center; gap: 28px; padding: 6px 0 24px; }
 .mainScore > span { display: block; font-size: 15px; font-weight: 700; color: #64518c; }
 .mainScore p { display: flex; align-items: baseline; gap: 10px; margin: 4px 0 0; }
 .mainScore p strong { font-size: 72px; font-weight: 800; letter-spacing: -.05em; line-height: 1.1; color: #7046b6; font-variant-numeric: tabular-nums; }
 .mainScore p > span { color: #6c7285; font-size: 15px; white-space: nowrap; }
-.scoreHero[data-round="1"] { background: #f0f8ff; border-color: #d7e7f5; }
+.scoreHero[data-round="1"] { background: none; }
 .scoreHero[data-round="1"] .mainScore > span, .scoreHero[data-round="1"] .mainScore strong { color: #3974cc; }
-.comparison { min-width: 260px; padding: 16px 20px; border: 1px solid #e8e4f0; background: white; border-radius: 16px; }
+.comparison { min-width: 260px; padding-left: 32px; border-left: 1px solid #e5ebef; }
 .roundScores { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
 .roundScores > div, .breakdown > div { display: flex; flex-direction: column; gap: 4px; }
 .roundScores span, .breakdown span { font-size: 12px; color: #617486; font-weight: 600; }
@@ -54,26 +54,38 @@
 .scoreArrow { color: #9ba7b5; width: 21px; }
 .change { margin: 12px 0 0; padding: 8px 12px; border-radius: 9px; background: #f0f3f7; color: #576779; font-size: 13px; font-weight: 650; text-align: center; }
 .change[data-change="up"] { background: #e9f7f0; color: #187658; }
-.breakdown { display: flex; gap: 32px; align-items: center; padding: 16px 22px; background: white; border: 1px solid #dce8f1; border-radius: 16px; }
+.subjectScores { display: flex; align-items: center; gap: 24px; padding: 16px 0 0; border-top: 1px solid #e5ebef; break-inside: avoid; }
+.subjectScores h3, .scoreExplanation h3 { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.subjectScores dl { flex: 1; display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: flex-end; }
+.subjectScores dl > div { display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+.subjectScores dl > div + div { border: 0; }
+.subjectScores dt { font-size: 12px; color: #617486; }
+.subjectScores dd { margin: 0; font-size: 19px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.subjectScores dd small { font-size: 11px; font-weight: 400; margin-left: 3px; }
+.subjectScores dl > div:last-child dd { color: #23384d; }
+.scoreExplanation { margin-top: 24px; padding: 16px 0 0; border-top: 1px solid #e5ebef; font-size: 12px; color: #617486; line-height: 1.8; break-inside: avoid; }
+.scoreExplanation p { white-space: pre-line; }
+.scoreMax { font-size: 10px; font-weight: 400; }
+.breakdown { display: flex; gap: 32px; align-items: center; padding: 0; }
 .weighted { display: flex; flex-wrap: wrap; gap: 20px; justify-content: flex-end; font-size: 11px; color: #6e8190; margin-top: 14px; }.weighted b { color: #344c5b; margin-left: 6px; }
 .radar { margin: 28px auto 20px; max-width: 690px; }.radar figcaption { font-size: 16px; font-weight: 700; text-align: center; }
-.legend { display: flex; gap: 16px; justify-content: center; font-size: 12px; color: #526779; margin-top: 12px; }.legend span { display: flex; align-items: center; gap: 5px; }.legend svg { flex-shrink: 0; }
+.legend { display: flex; gap: 16px; justify-content: center; font-size: 12px; color: #526779; margin: 0; }.legend span { display: flex; align-items: center; gap: 5px; }.legend svg { flex-shrink: 0; }
 .radar > svg { width: 100%; max-height: 380px; overflow: visible; }.radar > p { text-align: center; font-size: 12px; line-height: 1.6; color: #617486; }
 .axis { font-size: 16px; font-weight: 650; fill: #334e63; }.axisMax { font-size: 12px; font-weight: 400; fill: #657e90; }.tick { font-size: 10px; fill: #687f90; }
 .tableWrap { width: 100%; overflow-x: auto; }.table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
 .table caption { text-align: left; font-size: 12px; color: #6b7e8d; padding-bottom: 12px; }.table th, .table td { padding: 11px 13px; border-bottom: 1px solid #e5ebef; line-height: 1.7; }
 .table thead { background: #edf5fb; color: #375e78; }.table thead th { font-weight: 600; }.table tbody th { font-weight: 600; color: #3c566a; }
 .table small { font-size: 10px; color: #82939e; margin-left: 8px; }.table tfoot { background: #f0f7f5; color: #207f71; font-weight: 700; }
-.visualSummary { display: grid; grid-template-columns: 1.1fr 1fr; gap: 24px; align-items: center; margin-top: 28px; }
+.visualSummary { display: grid; grid-template-columns: 1fr 1.15fr; gap: 24px; align-items: start; margin-top: 18px; }
 .visualSummary > * { min-width: 0; }.visualSummary .radar { margin: 0; }
 .visualSummary .table th, .visualSummary .table td { padding: 10px 8px; }
 .visualSummary .table tbody th { word-break: keep-all; }.visualSummary .table td { white-space: nowrap; }
 .visualSummary .table small { display: block; margin-left: 0; }
 .scoreTable caption { font-size: 15px; font-weight: 700; color: #334e63; }.scoreTable caption small { margin-top: 4px; font-size: 11px; font-weight: 400; color: #617486; }
 .scoreTable td:not(:first-child), .scoreTable thead th:not(:first-child) { text-align: center; }.scoreTable td b { font-size: 17px; font-variant-numeric: tabular-nums; }
-.scoreTable [data-series="first"] { color: #3974cc; }.scoreTable [data-series="current"] { color: #008778; }.scoreTable [data-series="final"] { color: #7046b6; background: #f5f0fd; }
+.scoreTable [data-series="first"] { color: #3974cc; }.scoreTable [data-series="current"] { color: #008778; }.scoreTable [data-series="final"] { color: #7046b6; background: #faf8fe; }
 .scoreTable td small { color: #637587; font-size: 11px; }.scoreTable tbody tr:last-child > * { border-bottom: 0; }
-.commentSection { border-top: 1px solid #e5ebef; margin-top: 24px; padding-top: 22px; }
+.commentSection { margin-top: 24px; padding-top: 22px; }
 .commentSection h3 { font-size: 18px; font-weight: 700; margin-bottom: 14px; break-after: avoid; }
 .assessmentTable { table-layout: fixed; min-width: 700px; }
 .assessmentTable th, .assessmentTable td { padding: 10px 8px; overflow-wrap: anywhere; vertical-align: middle; }
@@ -107,6 +119,7 @@
   .visualSummary .table th, .visualSummary .table td { padding: 9px 5px; }
 }
 @media print {
+  .subjectScores { margin-top: 12px; }.subjectScores h3, .scoreExplanation h3 { font-size: 11px; margin-bottom: 4px; }.subjectScores dl > div { padding: 7px; }.subjectScores dd { font-size: 23px; }.subjectScores dt, .scoreExplanation { font-size: 10px; }.scoreExplanation { margin-top: 10px; }.scoreMax { font-size: 8px; }
   .coverDetails { margin-top: 24px; max-width: 120mm; padding-top: 12px; }.coverDetails > div { padding: 6px 0; }.coverDetails dd { font-size: 13px; }.coverDetails strong { font-size: 16px; }
   .sheetFrame > thead { display: table-header-group; break-inside: avoid; }.sheetFrame > tbody > tr, .sheetFrame > tbody > tr > td { break-inside: auto; }
   .pageHeader { font-size: 10px; padding-bottom: 8px; margin-bottom: 14px; break-inside: avoid; }.pageDates { font-size: 9px; }
@@ -126,4 +139,217 @@
   .toolbar { display: none; }.pages { display: block; max-width: none; padding: 0; }.sheet { border: 0; border-radius: 0; box-shadow: none; padding: 0; margin: 0; break-before: page; }.sheet:first-child { break-before: auto; }
   .cover { min-height: 262mm; padding: 12mm 9mm 7mm; }.coverContent { margin-top: 30mm; }.cover h1 { font-size: 46px; }.coverFooter { padding-top: 15mm; }.coverArt { opacity: 1; }
   .heading { margin-bottom: 20px; }.heading h2 { font-size: 21px; }.scoreHero { flex-direction: row; align-items: center; padding: 20px 24px; break-inside: avoid; }.scoreHero p strong { font-size: 48px; }.breakdown { width: auto; gap: 22px; }.weighted { justify-content: flex-end; }.radar { max-width: 540px; margin: 16px auto; break-inside: avoid; }.radar svg { max-height: 310px; }.tableWrap { overflow: visible; }.table { font-size: 10px; }.table th, .table td { padding: 7px 9px; }.table small { display: inline; margin-left: 6px; }.table thead { display: table-header-group; }.table tfoot { display: table-row-group; }.table tr { break-inside: avoid; }.criteriaTable { min-width: 0; }.criteriaIntro { font-size: 11px; }.writingGrid { display: block; }.writingGrid article { margin-bottom: 30px; }.writingGrid article > header { break-after: avoid; }.richText :global(div) { font-size: 11px; line-height: 1.85; orphans: 3; widows: 3; }.richText :global(img) { max-height: 220mm; object-fit: contain; break-inside: avoid; }.items h4, .detailRound h3 { break-after: avoid; }.endnote { break-inside: avoid; }.note { font-size: 10px; }
+}
+/* Score hierarchy shared by both report rounds. */
+.scoreOverview { padding: 24px 28px; border: 1px solid #dce7f3; border-radius: 20px; background: #f7faff; }
+.scoreOverview .scoreHero { display: grid; grid-template-columns: 1fr 2fr; align-items: center; gap: 24px; padding: 0; }
+.scoreOverview[data-round="2"] { display: block; padding: 24px 28px; background: #f7faff; border-color: #dce7f3; border-radius: 20px; }
+.scoreOverview[data-round="2"] .scoreHero { grid-template-columns: minmax(180px, .8fr) minmax(0, 2fr); gap: 36px; align-items: start; }
+.scoreOverview .mainScore { padding: 16px; border-radius: 12px; background: #f7f4fc; }
+.scoreOverview[data-round="1"] .mainScore { padding: 0; background: none; border-radius: 0; }
+.scoreOverview[data-round="1"] .scoreHero { grid-template-columns: minmax(180px, .8fr) minmax(0, 2fr); gap: 36px; align-items: start; }
+.scoreOverview[data-round="1"] .evaluatorSummary { padding: 0; border: 0; }
+.scoreOverview[data-round="1"] .mainScore > span,
+.scoreOverview[data-round="1"] .evaluatorSummary h3 { font-size: 13px; font-weight: 600; line-height: 20px; margin: 0 0 10px; }
+.scoreOverview[data-round="1"] .mainScore p { align-items: baseline; margin: 0; }
+.scoreOverview[data-round="1"] .breakdown { display: flex; justify-content: flex-start; gap: 48px; }
+.scoreOverview[data-round="1"] .breakdown strong { font-size: 30px; }
+.scoreOverview .mainScore p strong { font-size: 56px; }
+.scoreOverview .mainScore p > span { font-size: 12px; }
+.comparison h3, .evaluatorSummary h3, .subjectScores h3 { font-size: 12px; font-weight: 600; color: #617486; margin: 0 0 12px; }
+.scoreOverview .comparison { min-width: 0; padding: 0; border: 0; }
+.scoreOverview .roundScores { gap: 12px; }
+.scoreOverview .roundScores strong { font-size: 27px; }
+.scoreOverview .change { margin-top: 10px; padding: 6px 8px; font-size: 12px; }
+.evaluatorSummary { min-width: 0; padding-left: 24px; border-left: 1px solid #e5ebef; }
+.scoreOverview .breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 0; width: 100%; }
+.scoreOverview .breakdown strong { font-size: 32px; }
+.scoreOverview .subjectScores { display: block; padding: 0 0 0 24px; margin: 0; border-top: 0; border-left: 1px solid #e5ebef; }
+.subjectScores h3 { white-space: nowrap; }
+.subjectScores dl { display: grid; gap: 6px; }
+.subjectScores dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 0; }
+.subjectScores dd { font-size: 19px; }
+/* One result summary: headline scores above, supporting evaluator scores below. */
+.scoreOverview[data-round="2"] .mainScore { padding: 0; background: none; border-radius: 0; }
+.scoreOverview[data-round="2"] .comparison { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 24px; align-items: center; }
+.scoreOverview[data-round="2"] .comparison h3 { grid-column: 1 / -1; }
+.scoreOverview[data-round="2"] .mainScore > span,
+.scoreOverview[data-round="2"] .comparison h3 { font-size: 13px; font-weight: 600; line-height: 20px; text-align: left; margin: 0 0 10px; }
+.scoreOverview[data-round="2"] .mainScore p { align-items: baseline; margin: 0; }
+.scoreOverview[data-round="2"] .roundScores { justify-content: flex-start; gap: 24px; }
+.scoreOverview[data-round="2"] .roundScores strong { font-size: 30px; }
+.scoreOverview[data-round="2"] .change { display: inline-flex; align-items: center; gap: 7px; justify-self: start; margin: 0; padding: 9px 13px; border: 1px solid #cdebdc; border-radius: 999px; background: #e8f7ee; color: #18734f; font-size: 13px; line-height: 20px; white-space: nowrap; }
+.change > svg { flex-shrink: 0; }
+.scoreOverview[data-round="2"] .subjectScores { display: flex; align-items: baseline; gap: 28px; padding: 16px 0 0; margin: 20px 0 0; border: 0; border-top: 1px solid #dfe5ed; }
+.scoreOverview[data-round="2"] .subjectScores h3 { margin: 0; font-size: 12px; font-weight: 600; text-align: left; }
+.scoreOverview[data-round="2"] .subjectScores dl { display: flex; flex: none; flex-wrap: wrap; justify-content: flex-start; gap: 12px 28px; margin: 0; }
+.scoreOverview[data-round="2"] .subjectScores dl > div { align-items: baseline; justify-content: flex-start; gap: 8px; }
+.scoreOverview[data-round="2"] .subjectScores dl > div + div { padding-left: 28px; border-left: 1px solid #dfe5ed; }
+.scoreOverview .mainScore > span,
+.scoreOverview .comparison h3,
+.scoreOverview .evaluatorSummary h3,
+.scoreOverview .subjectScores h3 { display: flex; align-items: center; gap: 8px; }
+.scoreOverview .mainScore > span::before,
+.scoreOverview .comparison h3::before,
+.scoreOverview .evaluatorSummary h3::before,
+.scoreOverview .subjectScores h3::before { content: ""; flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%; background: #7d9cbb; }
+.scoreOverview .mainScore > span::before { background: currentColor; }
+.scoreOverview .comparison, .scoreOverview .evaluatorSummary { position: relative; align-self: stretch; }
+.scoreOverview .comparison::before, .scoreOverview .evaluatorSummary::before { content: ""; position: absolute; left: -19px; top: 0; bottom: 0; border-left: 2px dotted #c6d5e5; pointer-events: none; }
+.scoreOverview .scoreExplanation { margin-top: 20px; padding-top: 16px; border-top: 1px solid #dce7f3; }
+.scoreOverview .scoreExplanation h3 { color: #405c73; font-size: 12px; margin-bottom: 6px; }
+.scoreOverview .scoreExplanation p { margin: 0; }
+.areaSection { margin-top: 28px; padding: 24px; border: 1px solid #dce7f3; border-radius: 20px; background: #fff; }
+.areaHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid #e7edf3; }
+.areaHeader h3 { font-size: 17px; font-weight: 700; }
+.areaHeader p { font-size: 11px; color: #617486; margin-top: 4px; }
+.integratedRadar { margin: 18px 0 0; break-inside: avoid; }
+.radarCanvas { position: relative; aspect-ratio: 900 / 640; width: 100%; }
+.radarPlot { position: absolute; left: 24%; top: 14%; width: 52%; height: auto; overflow: visible; }
+.integratedRadar[data-round="1"] .radarCanvas { aspect-ratio: 900 / 560; }
+.integratedRadar[data-round="1"] .radarPlot { top: 5%; }
+.mobileAxis { display: none; }
+.radarArea { position: absolute; width: 26%; text-align: center; }
+.radarArea[data-axis="0"] { left: 50%; top: 0; transform: translateX(-50%); }
+.radarArea[data-axis="1"] { right: 0; top: 35%; }
+.radarArea[data-axis="4"] { left: 0; top: 35%; }
+.radarArea[data-axis="2"] { left: 76%; top: 77%; transform: translateX(-50%); }
+.radarArea[data-axis="3"] { left: 24%; top: 77%; transform: translateX(-50%); }
+.radarArea h4 { font-size: 15px; font-weight: 700; color: #334e63; line-height: 1.5; margin: 0 0 8px; word-break: keep-all; }
+.radarArea dl { display: grid; gap: 3px; margin: 0; }
+.radarArea dl > div { display: flex; align-items: baseline; justify-content: center; gap: 9px; }
+.radarArea dt { flex: 0 0 27px; font-size: 12px; font-weight: 600; text-align: left; }
+.radarArea dd { display: flex; align-items: baseline; gap: 8px; margin: 0; }
+.achievement { display: inline-block; min-width: 68px; font-size: 21px; font-weight: 750; line-height: 1.3; text-align: right; font-variant-numeric: tabular-nums; }
+.achievement > span { font-size: 14px; margin-left: 1px; }
+.areaPoints { min-width: 57px; font-size: 11px; font-weight: 400; color: #617486; text-align: left; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.radarArea [data-series="first"] { color: #3974cc; }
+.radarArea [data-series="current"] { color: #008778; }
+.radarArea [data-series="final"] { color: #7b51c7; }
+.radarHint { margin-top: 10px; text-align: center; font-size: 12px; color: #617486; }
+@media screen and (max-width: 700px) {
+  .radarCanvas { aspect-ratio: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .areaSection { padding: 16px; margin-top: 20px; }
+  .integratedRadar[data-round="1"] .radarCanvas { aspect-ratio: auto; }
+  .radarPlot { position: static; width: 100%; grid-column: 1 / -1; }
+  .mobileAxis { display: block; font-size: 12px; font-weight: 600; fill: #334e63; }
+  .radarArea { position: static; width: auto; padding: 12px 0; border-bottom: 1px solid #e5ebef; }
+  .radarArea[data-axis] { transform: none; }
+  .radarArea h4 { font-size: 14px; }
+  .achievement { font-size: 20px; }
+}
+@media screen and (max-width: 480px) {
+  .radarCanvas { grid-template-columns: 1fr; gap: 8px; }
+  .radarArea { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; }
+  .radarArea h4 { max-width: 90px; margin: 0; }
+  .radarArea dl { flex-shrink: 0; }
+  .radarArea dl > div { gap: 5px; }
+  .radarArea dd { gap: 5px; }
+  .achievement { min-width: 61px; }
+  .areaPoints { min-width: 50px; font-size: 10px; }
+}
+@media print {
+  .integratedRadar { margin-top: 12px; }
+  .radarArea h4 { font-size: 12px; margin-bottom: 5px; }
+  .radarArea dl { gap: 2px; }
+  .radarArea dl > div, .radarArea dd { gap: 5px; }
+  .radarArea dt { font-size: 9px; flex-basis: 22px; }
+  .achievement { min-width: 54px; font-size: 17px; }
+  .achievement > span { font-size: 11px; }
+  .areaPoints { min-width: 44px; font-size: 9px; }
+  .radarHint { font-size: 9px; }
+}
+/* Both columns share one measured-height row; the SVG fills the available chart panel. */
+.visualSummary { grid-template-columns: 1.08fr 1fr; gap: 20px; align-items: stretch; }
+.visualSummary .radar { display: flex; flex-direction: column; justify-content: center; padding: 12px 8px; margin: 0; background: #f8fbff; border: 1px solid #e5edf5; border-radius: 14px; }
+.visualSummary .radar > svg { display: block; flex: 1; min-height: 0; width: 100%; height: 356px; max-height: none; }
+.visualSummary .radar > p { flex: none; margin-top: 8px; font-size: 11px; }
+.visualSummary .tableWrap { display: flex; }
+.visualSummary .scoreTable { table-layout: fixed; font-size: 13px; height: 100%; }
+.visualSummary .scoreTable th, .visualSummary .scoreTable td { padding: 8px 6px; }
+.scoreTable thead { background: #f6f8fa; height: 40px; }
+.scoreTable thead th:first-child { width: 34%; }
+.scoreTable td b { font-size: 16px; }
+.scoreTable tbody [data-series="first"], .scoreTable tbody [data-series="current"] { color: #334e63; }
+.scoreTable td small { color: #617486; margin-top: 2px; }
+.scoreMax { color: #617486; font-size: 11px; }
+.scoreTable tbody th { font-size: 12px; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0 !important; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media screen and (min-width: 701px) and (max-width: 900px) {
+  .scoreOverview[data-round="2"] .comparison { grid-template-columns: 1fr; row-gap: 10px; }
+  .scoreOverview[data-round="2"] .subjectScores { align-items: flex-start; }
+  .scoreOverview[data-round="2"] .subjectScores dl { gap: 10px 16px; }
+  .scoreOverview[data-round="2"] .subjectScores dl > div + div { padding-left: 0; border: 0; }
+}
+@media screen and (max-width: 700px) {
+  .scoreOverview, .scoreOverview[data-round="2"] { display: block; padding: 16px; }
+  .scoreOverview .scoreHero { grid-template-columns: 1fr; gap: 16px; }
+  .scoreOverview .mainScore { padding: 12px 16px; }
+  .scoreOverview .mainScore p strong { font-size: 48px; }
+  .scoreOverview .comparison, .evaluatorSummary { width: 100%; padding: 16px 0 0; border: 0; }
+  .scoreOverview .subjectScores { padding: 16px 0 0; margin-top: 16px; border-left: 0; border-top: 1px solid #e5ebef; }
+  .scoreOverview[data-round="2"] .scoreHero { grid-template-columns: 1fr; gap: 20px; }
+  .scoreOverview[data-round="1"] .scoreHero { grid-template-columns: 1fr; gap: 20px; }
+  .scoreOverview[data-round="1"] .breakdown { gap: 32px; }
+  .scoreOverview .comparison::before, .scoreOverview .evaluatorSummary::before { left: 0; right: 0; top: -11px; bottom: auto; border-left: 0; border-top: 2px dotted #c6d5e5; }
+  .scoreOverview[data-round="2"] .comparison { grid-template-columns: 1fr; gap: 10px; padding: 0; }
+  .scoreOverview[data-round="2"] .comparison h3 { margin: 0; }
+  .scoreOverview[data-round="2"] .roundScores { justify-content: flex-start; }
+  .scoreOverview[data-round="2"] .change { justify-self: start; }
+  .scoreOverview[data-round="2"] .subjectScores { flex-direction: column; gap: 12px; }
+  .scoreOverview[data-round="2"] .subjectScores dl { display: grid; width: 100%; gap: 8px; }
+  .scoreOverview[data-round="2"] .subjectScores dl > div { justify-content: space-between; }
+  .scoreOverview[data-round="2"] .subjectScores dl > div + div { padding-left: 0; border: 0; }
+  .subjectScores dl { width: 100%; }
+  .subjectScores dl > div { flex-direction: row; align-items: baseline; }
+  .areaHeader { flex-wrap: wrap; gap: 12px; }
+  .areaHeader .legend { gap: 12px; }
+  .visualSummary { grid-template-columns: 1fr; gap: 18px; }
+  .visualSummary .radar > svg { flex: none; height: auto; aspect-ratio: 500 / 430; }
+  .visualSummary .scoreTable { height: auto; }
+}
+@media print {
+  .scoreOverview { padding: 16px 20px; break-inside: avoid; }
+  .scoreOverview[data-round="2"] { padding: 16px 20px; }
+  .scoreOverview[data-round="2"] .scoreHero { grid-template-columns: minmax(150px, .8fr) minmax(0, 2fr); gap: 24px; }
+  .scoreOverview[data-round="1"] .scoreHero { grid-template-columns: minmax(150px, .8fr) minmax(0, 2fr); gap: 24px; }
+  .scoreOverview[data-round="1"] .mainScore > span,
+  .scoreOverview[data-round="1"] .evaluatorSummary h3 { font-size: 10px; line-height: 16px; margin-bottom: 8px; }
+  .scoreOverview[data-round="1"] .breakdown { gap: 32px; }
+  .scoreOverview[data-round="1"] .breakdown strong { font-size: 23px; }
+  .scoreOverview .comparison::before, .scoreOverview .evaluatorSummary::before { left: -13px; }
+  .scoreOverview .scoreHero { gap: 16px; }
+  .scoreOverview .mainScore { padding: 10px; }
+  .scoreOverview .mainScore p strong { font-size: 40px; }
+  .scoreOverview .mainScore > span { font-size: 12px; }
+  .scoreOverview .mainScore p > span { font-size: 10px; }
+  .scoreOverview .comparison { min-width: 0; padding: 0; }
+  .evaluatorSummary, .scoreOverview .subjectScores { padding-left: 16px; }
+  .scoreOverview .roundScores strong, .scoreOverview .breakdown strong { font-size: 23px; }
+  .comparison h3, .evaluatorSummary h3, .subjectScores h3, .subjectScores dt { font-size: 9px; }
+  .subjectScores dd { font-size: 15px; }
+  .scoreOverview .change { font-size: 10px; }
+  .scoreOverview[data-round="2"] .change { font-size: 10px; padding: 6px 8px; gap: 5px; }
+  .change > svg { width: 15px; height: 15px; }
+  .scoreOverview[data-round="2"] .comparison { grid-template-columns: max-content minmax(0, 1fr); column-gap: 16px; }
+  .scoreOverview[data-round="2"] .roundScores { gap: 16px; }
+  .scoreOverview[data-round="2"] .roundScores strong { font-size: 23px; }
+  .scoreOverview[data-round="2"] .subjectScores { gap: 16px; margin-top: 14px; padding-top: 12px; }
+  .scoreOverview[data-round="2"] .subjectScores dl { gap: 12px; }
+  .scoreOverview[data-round="2"] .subjectScores dl > div + div { padding-left: 12px; }
+  .scoreOverview[data-round="2"] .mainScore > span,
+  .scoreOverview[data-round="2"] .comparison h3,
+  .scoreOverview[data-round="2"] .subjectScores h3 { font-size: 10px; line-height: 16px; margin-bottom: 8px; }
+  .areaSection { margin-top: 20px; padding: 14px; break-inside: avoid; }
+  .areaHeader { padding-bottom: 10px; }
+  .scoreOverview .scoreExplanation { margin-top: 12px; padding-top: 10px; }
+  .scoreOverview .scoreExplanation h3 { font-size: 10px; }
+  .areaHeader h3 { font-size: 14px; }.areaHeader p { font-size: 9px; }
+  .visualSummary { grid-template-columns: 1.08fr 1fr; margin-top: 10px; gap: 14px; }
+  .visualSummary .radar > svg { height: 280px; max-height: none; }
+  .visualSummary .radar > p { font-size: 9px; }
+  .visualSummary .scoreTable { font-size: 10px; }
+  .visualSummary .scoreTable th, .visualSummary .scoreTable td { padding: 5px; }
+  .scoreTable tbody th { font-size: 10px; }.scoreTable td b { font-size: 13px; }.scoreMax { font-size: 9px; }
+  .scoreExplanation { margin-top: 16px; padding-top: 10px; }
 }

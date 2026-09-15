@@ -1,5 +1,9 @@
 // @ts-expect-error Node tests load TypeScript sources directly.
 import { assessmentCriteria, validAiScores, validScores, type ReviewCommon, type ReviewRecord } from "./review-domain.ts"
+// @ts-expect-error Node tests load TypeScript sources directly.
+import { weightedReviewScore } from "./review-score-policy.ts"
+// @ts-expect-error Node tests load TypeScript sources directly.
+import { reviewAreaLabel } from "./review-assessment-config.ts"
 
 export function reportAreaScores(common: ReviewCommon, record: ReviewRecord, first?: ReviewRecord) {
   if (!validAiScores(common.level, record.aiScores, record) || !validScores(common.level, record.teacherScores, record)) return null
@@ -11,9 +15,9 @@ export function reportAreaScores(common: ReviewCommon, record: ReviewRecord, fir
     const details = criteria.filter(c => c.area === area)
     const sum = (r: ReviewRecord, kind: "aiScores" | "teacherScores") => kind === "aiScores" ? r.aiScores![area] : details.reduce((total, c) => total + r.teacherScores![c.id], 0)
     const ai = sum(record, "aiScores"), teacher = sum(record, "teacherScores")
-    const current = (ai + teacher) / 2
-    const firstScore = first ? (sum(first, "aiScores") + sum(first, "teacherScores")) / 2 : current
-    return { area, details, max: details.reduce((total, c) => total + c.max, 0), ai, teacher, current, first: firstScore, final: record.round === 2 ? (firstScore + 2 * current) / 3 : current }
+    const current = weightedReviewScore(ai, teacher)
+    const firstScore = first ? weightedReviewScore(sum(first, "aiScores"), sum(first, "teacherScores")) : current
+    return { area: reviewAreaLabel(area), details, max: details.reduce((total, c) => total + c.max, 0), ai, teacher, current, first: firstScore, final: record.round === 2 ? weightedReviewScore(firstScore, current) : current }
   })
 }
 export type ReportArea = NonNullable<ReturnType<typeof reportAreaScores>>[number]

@@ -2,9 +2,11 @@
 
 import * as React from "react"
 import { Info } from "lucide-react"
-import { snapshotReviewAssessment, type ReviewAssessmentSnapshot } from "@/lib/review-assessment-config"
+import { snapshotReviewAssessment, reviewAreaLabel, reviewCriterionLabel, type ReviewAssessmentSnapshot } from "@/lib/review-assessment-config"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { assessmentCriteria, scoreLabel, scoreTotal, validAiScores, validScores, type ReviewCommon, type ReviewRecord, type ReviewReport, type ReviewScores } from "@/lib/review-domain"
+
+import { weightedReviewScore } from "@/lib/review-score-policy"
 
 type AssessmentProps = {
   common: ReviewCommon
@@ -23,8 +25,8 @@ export function ReviewAssessment({ common, record, scores, onChange, readOnly = 
   const teacherComplete = validScores(common.level, scores, record)
   const aiTotal = aiComplete ? scoreTotal(record.aiScores!) : undefined
   const teacherTotal = teacherComplete ? scoreTotal(scores) : undefined
-  const previewScore = aiTotal !== undefined && teacherTotal !== undefined ? (aiTotal + teacherTotal) / 2 : undefined
-  const roundScore = record.report?.score ?? previewScore
+  const previewScore = aiTotal !== undefined && teacherTotal !== undefined ? weightedReviewScore(aiTotal, teacherTotal) : undefined
+  const roundScore = readOnly ? record.report?.score : previewScore
   const confirmed = Boolean(record.report)
   const assessmentState = confirmed ? "확정" : teacherComplete ? "입력 완료" : "입력 중"
   const subtotal = (values: ReviewScores | undefined, ids: string[]) => ids.every(id => Number.isFinite(values?.[id])) ? scoreLabel(ids.reduce((sum, id) => sum + values![id], 0)) : "-"
@@ -47,17 +49,18 @@ export function ReviewAssessment({ common, record, scores, onChange, readOnly = 
           const group = criteria.filter(criterion => criterion.area === area)
           const areaMax = group.reduce((sum, criterion) => sum + criterion.max, 0)
           return <tr key={area} className="border-b border-[#edf0f2] bg-white last:border-b-0">
-            <th scope="row" className="px-3 py-4 text-left font-semibold text-[#263747]">{area}</th>
+            <th scope="row" className="px-3 py-4 text-left font-semibold text-[#263747]">{reviewAreaLabel(area)}</th>
             <td className="px-2 py-4 text-center text-[#596773]">{areaMax}점</td>
             <td className="px-2 py-4 text-center font-semibold text-[#42515e]">{record.aiScores?.[area] === undefined ? "-" : scoreLabel(record.aiScores[area])}</td>
             <td className="px-2 py-3"><div className="flex flex-wrap items-end gap-x-2 gap-y-2">
               {group.map(criterion => {
                 const value = scores[criterion.id]
+                const criterionName = reviewCriterionLabel(criterion)
                 const invalid = value !== undefined && (!Number.isFinite(value) || value < 0 || value > criterion.max)
                 return <div key={criterion.id} className="flex flex-col gap-1">
-                  <div className="flex items-center gap-1 text-xs text-[#596773]"><span>{criterion.name}</span><CriterionHelp name={criterion.name} description={criterion.description} /></div>
+                  <div className="flex items-center gap-1 text-xs text-[#596773]"><span>{criterionName}</span><CriterionHelp name={criterionName} description={criterion.description} /></div>
                   <div className="flex items-center gap-1.5">
-                  {readOnly ? <span className="flex h-9 min-w-20 items-center justify-center rounded-md bg-[#f7f9fb] px-2 font-semibold text-[#42515e]">{value === undefined ? "-" : scoreLabel(value)}<span className="ml-1 text-xs font-normal text-[#89949d]">/ {criterion.max}</span></span> : <label className={`inline-flex h-9 items-center overflow-hidden rounded-md border bg-white ${invalid ? "border-[#ff4d4f]" : "border-[#bfc8cf] focus-within:border-[#1890ff] focus-within:ring-2 focus-within:ring-[#1890ff]/15"}`}><input aria-label={`${criterion.name} 선생님 점수`} type="number" min={0} max={criterion.max} step="any" value={value ?? ""} aria-invalid={invalid} onChange={event => { const next = { ...scores }; if (event.target.value === "") delete next[criterion.id]; else next[criterion.id] = Number(event.target.value); onChange?.(next) }} className="h-full w-12 border-0 bg-transparent px-1 text-right font-semibold outline-none" /><span className="border-l border-[#e2e6e9] bg-[#f7f9fb] px-1.5 text-xs text-[#697681]">/ {criterion.max}</span></label>}</div>
+                  {readOnly ? <span className="flex h-9 min-w-20 items-center justify-center rounded-md bg-[#f7f9fb] px-2 font-semibold text-[#42515e]">{value === undefined ? "-" : scoreLabel(value)}<span className="ml-1 text-xs font-normal text-[#89949d]">/ {criterion.max}</span></span> : <label className={`inline-flex h-9 items-center overflow-hidden rounded-md border bg-white ${invalid ? "border-[#ff4d4f]" : "border-[#bfc8cf] focus-within:border-[#1890ff] focus-within:ring-2 focus-within:ring-[#1890ff]/15"}`}><input aria-label={`${criterionName} 선생님 점수`} type="number" min={0} max={criterion.max} step="any" value={value ?? ""} aria-invalid={invalid} onChange={event => { const next = { ...scores }; if (event.target.value === "") delete next[criterion.id]; else next[criterion.id] = Number(event.target.value); onChange?.(next) }} className="h-full w-12 border-0 bg-transparent px-1 text-right font-semibold outline-none" /><span className="border-l border-[#e2e6e9] bg-[#f7f9fb] px-1.5 text-xs text-[#697681]">/ {criterion.max}</span></label>}</div>
                   {invalid && <span role="alert" className="text-xs text-[#d4380d]">0~{criterion.max}점</span>}
                 </div>
               })}
@@ -77,7 +80,7 @@ function CriterionHelp({ name, description }: { name: string; description: strin
 }
 
 function ScoreHelp({ group }: { group: ReviewAssessmentSnapshot }) {
-  return <Popover><PopoverTrigger asChild><button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-[#0877b9] hover:underline"><Info className="size-3.5" />점수 계산 기준</button></PopoverTrigger><PopoverContent align="end" className="w-80 space-y-2 text-sm leading-6 text-[#596773]"><p><strong className="text-[#263747]">차수 점수</strong><br />(AI 점수 + 선생님 점수) ÷ 2</p><p><strong className="text-[#263747]">최종 평가</strong><br />1차 1/3·2차 2/3 비중 적용 후 AI·선생님 환산 점수의 평균</p><p className="border-t pt-2">{group.label}({group.minLevel}~{group.maxLevel}레벨)의 평가 기준 및 배점을 적용합니다.</p></PopoverContent></Popover>
+  return <Popover><PopoverTrigger asChild><button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-[#0877b9] hover:underline"><Info className="size-3.5" />점수 계산 기준</button></PopoverTrigger><PopoverContent align="end" className="w-80 space-y-2 text-sm leading-6 text-[#596773]"><p><strong className="text-[#263747]">차수 점수</strong><br />(AI 점수 + 선생님 점수 × 2) ÷ 3</p><p><strong className="text-[#263747]">최종 평가</strong><br />(1차 점수 + 2차 점수 × 2) ÷ 3</p><p>중간 값은 반올림하지 않으며, 표시할 때만 소수점 첫째 자리로 반올림합니다. 소수점이 0이면 정수로 표시합니다.</p><p className="border-t pt-2">{group.label}({group.minLevel}~{group.maxLevel}레벨)의 평가 기준 및 배점을 적용합니다.</p></PopoverContent></Popover>
 }
 
 function ScoreSummary({ label, value, primary = false }: { label: string; value?: number; primary?: boolean }) {
@@ -85,7 +88,7 @@ function ScoreSummary({ label, value, primary = false }: { label: string; value?
 }
 
 function SecondRoundResult({ report }: { report: ReviewReport }) {
-  return <section aria-label="2차 평가 결과" className="rounded-xl border border-[#bae0ff] bg-[#f5fbff] p-4"><div className="mb-3 flex items-center justify-between"><h4 className="font-bold text-[#123b5a]">평가 결과</h4><span className="rounded-full bg-[#d9f0ff] px-2.5 py-1 text-xs font-semibold text-[#0877b9]">확정</span></div><div className="grid gap-3 sm:grid-cols-2"><ResultGroup title="성장 비교"><ResultValue label="1차 점수" value={report.firstScore} /><ResultValue label="2차 점수" value={report.score} /><ResultValue label="향상 수치" value={report.improvement} signed primary /></ResultGroup><ResultGroup title="최종 평가"><ResultValue label="AI 환산 점수" value={report.weightedAi} /><ResultValue label="선생님 환산 점수" value={report.weightedTeacher} /><ResultValue label="최종 점수" value={report.finalScore} primary /></ResultGroup></div></section>
+  return <section aria-label="2차 평가 결과" className="rounded-xl border border-[#bae0ff] bg-[#f5fbff] p-4"><div className="mb-3 flex items-center justify-between"><h4 className="font-bold text-[#123b5a]">평가 결과</h4><span className="rounded-full bg-[#d9f0ff] px-2.5 py-1 text-xs font-semibold text-[#0877b9]">확정</span></div><div className="grid gap-3 sm:grid-cols-2"><ResultGroup title="성장 비교"><ResultValue label="1차 점수" value={report.firstScore} /><ResultValue label="2차 점수" value={report.score} />{(report.improvement ?? 0) > 0 && <ResultValue label="향상 수치" value={report.improvement} signed primary />}</ResultGroup><ResultGroup title="최종 평가"><ResultValue label="AI 평가 총점" value={report.weightedAi} /><ResultValue label="선생님 평가 총점" value={report.weightedTeacher} /><ResultValue label="최종 점수" value={report.finalScore} primary /></ResultGroup></div></section>
 }
 
 function ResultGroup({ title, children }: { title: string; children: React.ReactNode }) {

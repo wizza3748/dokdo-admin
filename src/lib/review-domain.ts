@@ -1,7 +1,9 @@
 // @ts-expect-error Node domain tests load TypeScript sources directly.
-import { legacyAssessmentCriteria, snapshotReviewAssessment, type ReviewAssessmentSnapshot } from "./review-assessment-config.ts"
+import { legacyAssessmentCriteria, snapshotReviewAssessment, reviewAreaLabel, type ReviewAssessmentSnapshot } from "./review-assessment-config.ts"
 // @ts-expect-error Node domain tests load TypeScript sources directly.
 import { REVIEW_FEEDBACK_SAMPLES } from "./review-feedback-samples.ts"
+// @ts-expect-error Node domain tests load TypeScript sources directly.
+import { calculateReviewScores, reviewScoreLabel } from "./review-score-policy.ts"
 
 export type ReviewActor = { role: "student" | "agency" | "class" | "admin" | "external"; studentId?: string; institutionId?: string; classId?: string; name: string }
 export type ReviewItem = { id: string; title: string; description: string; example?: string }
@@ -54,7 +56,7 @@ export function reviewActivityDate(review: Pick<ReviewCommon, "createdAt" | "mon
   const [year, month] = review.month.split("-").map(Number)
   return { year, month, day: 1, monthKey: review.month }
 }
-export type ReviewReport = { version: 1; generatedAt: string; ai: number; teacher: number; score: number; firstScore?: number; improvement?: number; weightedAi?: number; weightedTeacher?: number; finalScore?: number }
+export type ReviewReport = { version: 1; calculationVersion?: string; generatedAt: string; ai: number; teacher: number; score: number; firstScore?: number; improvement?: number; weightedAi?: number; weightedTeacher?: number; finalScore?: number }
 export type ReviewRecord = {
   assessment?: ReviewAssessmentSnapshot;
   legacyAiScores?: ReviewScores;
@@ -266,7 +268,25 @@ export function mergeReviewSeeds(existing: ReviewDatabase, seeds: ReviewDatabase
   return { ...existing, seedVersion: seeds.seedVersion, reviews: [...existing.reviews.map(c => { const repair = repairs.find(seed => seed.id === c.id); return repair ? { ...repair, progress: resetSeenDefaults ? repair.progress : c.progress } : c }), ...additions], records: [...existing.records.filter(r => !repairs.some(c => c.id === r.reviewId)), ...seeds.records.filter(r => [...additions, ...repairs].some(c => c.id === r.reviewId)).map(r => { const old = existing.records.find(o => o.id === r.id); return old ? { ...r, seenAt: resetSeenDefaults ? r.seenAt : old.seenAt, history: [...r.history, ...old.history.filter(h => !h.requestId.startsWith(`seed:${r.reviewId}:`) && !(resetSeenDefaults && h.action === "seen"))] } : r })] }
 }
 export const plainReviewText = (html: string) => html.replace(/<br\s*\/?\s*>|<\/(p|div)>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").trim()
-export const scoreLabel = (score: number) => Number(score.toFixed(1)).toString()
+export const scoreLabel = reviewScoreLabel
+
+/** Recalculate only derived values of existing reports, including sent reports.
+ * Saved evaluator totals, individual marks, rubric snapshots and all history remain untouched.
+ */
+export function normalizeReviewReportScores(db: ReviewDatabase): ReviewDatabase {
+  const valid = (report?: ReviewReport): report is ReviewReport => !!report && [report.ai, report.teacher].every(value => Number.isFinite(value) && value >= 0 && value <= 100)
+  let changed = false
+  const records = db.records.map(record => {
+    if (!valid(record.report)) return record
+    const first = record.round === 2 ? db.records.find(r => r.id === record.linkedRecordId && r.reviewId === record.reviewId && r.round === 1) : undefined
+    if (record.round === 2 && !valid(first?.report)) return record
+    const values = calculateReviewScores(record.report.ai, record.report.teacher, first?.report)
+    if (Object.entries(values).every(([key, value]) => record.report![key as keyof ReviewReport] === value)) return record
+    changed = true
+    return { ...record, report: { ...record.report, ...values } }
+  })
+  return changed ? { ...db, records } : db
+}
 
 export function assessmentCriteria(level: number, record?: Pick<ReviewRecord, "assessment">) {
   return (record?.assessment ?? snapshotReviewAssessment(level)).criteria
@@ -404,7 +424,7 @@ export function validItemFeedback(items: ItemFeedback[]) {
 
 /** Pure command boundary shared by the API and regression tests. Never mutate previous records. */
 export function applyReviewCommand(database: ReviewDatabase, command: ReviewCommand, actor: ReviewActor, requestId: string, at: string): ReviewDatabase {
-  const db = normalizeReviewFeedbackScope(structuredClone(database))
+  const db = normalizeReviewReportScores(normalizeReviewFeedbackScope(structuredClone(database)))
   requireCondition(["create", "switch-template", "start-second", "save-writing", "enter-rewrite", "submit", "seen", "reject", "send", "parent", "ai-start", "ai-result", "flower", "save-feedback"].includes(command.type), "지원하지 않는 작업입니다.")
   if (db.records.some(r => r.history.some(h => h.requestId === requestId))) return db
   if (command.type === "create") {
@@ -514,12 +534,8 @@ export function applyReviewCommand(database: ReviewDatabase, command: ReviewComm
       requireCondition(validAiScores(review.level, record.aiScores, record) && validScores(review.level, command.scores, record), "AI 생성 성공 및 선생님 평가 완료가 필요합니다.")
       record.teacherScores = command.scores
       const ai = scoreTotal(record.aiScores); const teacher = scoreTotal(command.scores)
-      record.report = { version: 1, generatedAt: at, ai, teacher, score: (ai + teacher) / 2 }
-      if (record.round === 2) {
-        requireCondition(first.report, "1차 평가 보고서가 필요합니다.")
-        const weightedAi = (first.report.ai + ai * 2) / 3; const weightedTeacher = (first.report.teacher + teacher * 2) / 3
-        Object.assign(record.report, { firstScore: first.report.score, improvement: record.report.score - first.report.score, weightedAi, weightedTeacher, finalScore: (weightedAi + weightedTeacher) / 2 })
-      }
+      if (record.round === 2) requireCondition(first.report, "1차 평가 보고서가 필요합니다.")
+      record.report = { version: 1, generatedAt: at, ai, teacher, ...calculateReviewScores(ai, teacher, record.round === 2 ? first.report : undefined) }
     }
     if (record.round === 1) { review.secondDecision = command.decision; review.decidedBy = actor.name; review.decidedAt = at }
     if (review.reportEnabled) {
@@ -556,7 +572,7 @@ export function sampleReviewAi(review: ReviewCommon, record: ReviewRecord) {
       const score = scores[area] ?? 0
       const ratio = score / max
       const text = ratio >= .9 ? "해당 영역의 요구를 충족하며 내용을 명확하고 구체적으로 표현하였습니다." : ratio < .6 ? "해당 영역에서 필요한 내용을 구체적으로 작성하는 연습이 필요합니다. 핵심 내용을 정리하고 이유를 덧붙여 설명해 보아야 합니다." : REVIEW_FEEDBACK_SAMPLES.areas[area]
-      return `${area}(${scoreLabel(score)}/${max}점): ${text ?? "해당 영역의 내용을 구체적으로 설명하는 연습이 필요합니다."}`
+      return `${reviewAreaLabel(area)}(${scoreLabel(score)}/${max}점): ${text ?? "해당 영역의 내용을 구체적으로 설명하는 연습이 필요합니다."}`
     }),
     ...(record.round === 2 ? [`\n[성장 요약] ${REVIEW_FEEDBACK_SAMPLES.second.growth}`] : []),
   ].join("\n") : undefined

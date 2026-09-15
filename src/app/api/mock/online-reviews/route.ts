@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises"
 import path from "node:path"
-import { applyReviewCommand, canAccessReview, expandLegacyReviewScores, upgradeUnscoredMockAssessments, hydrateLegacyReviewFeedback, mergeReviewSeeds, normalizeReviewFeedbackScope, type ReviewActor, type ReviewCommand, type ReviewDatabase } from "@/lib/review-domain"
+import { applyReviewCommand, canAccessReview, expandLegacyReviewScores, upgradeUnscoredMockAssessments, hydrateLegacyReviewFeedback, mergeReviewSeeds, normalizeReviewFeedbackScope, normalizeReviewReportScores, type ReviewActor, type ReviewCommand, type ReviewDatabase } from "@/lib/review-domain"
 import { getDefaultReviewDatabase } from "@/lib/review-seeds"
 
 export const runtime = "nodejs"
@@ -10,10 +10,10 @@ const shared = globalThis as typeof globalThis & { reviewQueue?: Promise<unknown
 async function readState(): Promise<ReviewDatabase> {
   try {
     const db = JSON.parse(await readFile(statePath, "utf8")) as ReviewDatabase
-    const scoped = normalizeReviewFeedbackScope(db)
-    // Persist only the approved item-feedback cleanup, not unrelated hydration changes.
+    const scoped = normalizeReviewReportScores(normalizeReviewFeedbackScope(db))
+    // Persist approved report recalculation and item cleanup, not unrelated hydration changes.
     if (scoped !== db) await writeState(scoped)
-    return normalizeReviewFeedbackScope(hydrateLegacyReviewFeedback(upgradeUnscoredMockAssessments(expandLegacyReviewScores(mergeReviewSeeds(scoped, getDefaultReviewDatabase())))))
+    return normalizeReviewReportScores(normalizeReviewFeedbackScope(hydrateLegacyReviewFeedback(upgradeUnscoredMockAssessments(expandLegacyReviewScores(mergeReviewSeeds(scoped, getDefaultReviewDatabase()))))))
   }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return getDefaultReviewDatabase(); throw error }
 }

@@ -1,5 +1,9 @@
 export type ReviewAssessmentCriterion = { id: string; area: string; name: string; max: number; description: string }
 
+// Area strings are also persisted score keys. Rename labels without moving or losing marks.
+export const reviewAreaLabel = (area: string) => area === "구성 및 조직력" ? "구성과 조직력" : area
+export const reviewCriterionLabel = (criterion: ReviewAssessmentCriterion) => criterion.area === "감상과 깨달음" && criterion.name === "구체성" ? "감상의 구체성" : criterion.name
+
 export const legacyAssessmentCriteria: ReviewAssessmentCriterion[] = [
     { id: "accuracy", area: "내용 요약", name: "정확성", max: 10, description: "책의 주요 내용을 빠뜨리지 않고 오류 없이 정확하게 서술했는가?" },
     { id: "logic", area: "내용 요약", name: "논리적 서술", max: 10, description: "이야기책은 사건의 원인과 결과·시간적 순서·논리적 흐름에 맞게 서술하고, 정보책은 핵심 개념·용어와 정보 사이의 관계를 올바르게 서술했는가?" },
