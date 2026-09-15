@@ -194,20 +194,20 @@ function FilterMenu({ label, value, onValueChange, options }: {
   )
 }
 
-function SummaryCards({ records }: { records: OnlineWorkbook[] }) {
+function SummaryCards({ records, status, onStatusChange }: { records: OnlineWorkbook[]; status: string; onStatusChange: (status: FeedbackStatus) => void }) {
   return (
     <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
       {summary.map((item) => (
-        <div key={item.status} className="flex h-[104px] items-center justify-between rounded-[10px] border border-slate-200 bg-white px-7 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-700">{item.title}</h2>
-            <p className={cn("mt-1 text-sm", item.color)}>{item.description}</p>
-          </div>
-          <p className="shrink-0 text-[32px] font-bold leading-none text-slate-700">
+        <button key={item.status} type="button" aria-label={`${item.title} 목록 보기`} aria-pressed={status === item.status} aria-controls="agency-review-table" onClick={() => onStatusChange(item.status)} className="flex h-[104px] cursor-pointer items-center justify-between rounded-[10px] border border-slate-200 bg-white px-7 text-left shadow-[0_1px_2px_rgba(15,23,42,0.03)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+          <span>
+            <span className="block text-lg font-semibold text-slate-700">{item.title}</span>
+            <span className={cn("mt-1 block text-sm", item.color)}>{item.description}</span>
+          </span>
+          <span className="shrink-0 text-[32px] font-bold leading-none text-slate-700">
             {records.filter((record) => record.status === item.status).length}
             <span className="ml-1 text-sm font-normal">건</span>
-          </p>
-        </div>
+          </span>
+        </button>
       ))}
     </section>
   )
@@ -367,7 +367,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
 
   return (
     <div className="w-full space-y-4 pb-2 text-slate-700">
-      <SummaryCards records={records} />
+      <SummaryCards records={records} status={status} onStatusChange={setStatus} />
 
       <section className="border border-blue-100 bg-[#edf7ff] text-sm leading-7 text-blue-600">
         <button type="button" aria-expanded={guideOpen} aria-controls="agency-workbook-guide" onClick={() => setGuideOpen(open => !open)} className="flex w-full cursor-pointer items-center justify-between px-6 py-3 text-left font-semibold focus-visible:outline-2 focus-visible:outline-blue-600">
