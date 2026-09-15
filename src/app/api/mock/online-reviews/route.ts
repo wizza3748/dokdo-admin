@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises"
 import path from "node:path"
-import { applyReviewCommand, canAccessReview, expandLegacyReviewScores, upgradeUnscoredMockAssessments, hydrateLegacyReviewFeedback, mergeReviewSeeds, type ReviewActor, type ReviewCommand, type ReviewDatabase } from "@/lib/review-domain"
+import { applyReviewCommand, canAccessReview, expandLegacyReviewScores, upgradeUnscoredMockAssessments, hydrateLegacyReviewFeedback, mergeReviewSeeds, normalizeReviewFeedbackScope, type ReviewActor, type ReviewCommand, type ReviewDatabase } from "@/lib/review-domain"
 import { getDefaultReviewDatabase } from "@/lib/review-seeds"
 
 export const runtime = "nodejs"
@@ -10,7 +10,10 @@ const shared = globalThis as typeof globalThis & { reviewQueue?: Promise<unknown
 async function readState(): Promise<ReviewDatabase> {
   try {
     const db = JSON.parse(await readFile(statePath, "utf8")) as ReviewDatabase
-    return hydrateLegacyReviewFeedback(upgradeUnscoredMockAssessments(expandLegacyReviewScores(mergeReviewSeeds(db, getDefaultReviewDatabase()))))
+    const scoped = normalizeReviewFeedbackScope(db)
+    // Persist only the approved item-feedback cleanup, not unrelated hydration changes.
+    if (scoped !== db) await writeState(scoped)
+    return normalizeReviewFeedbackScope(hydrateLegacyReviewFeedback(upgradeUnscoredMockAssessments(expandLegacyReviewScores(mergeReviewSeeds(scoped, getDefaultReviewDatabase())))))
   }
   catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return getDefaultReviewDatabase(); throw error }
 }
@@ -41,8 +44,10 @@ function visibleState(db: ReviewDatabase, actor: ReviewActor, sharedRecordId?: s
   return { version: 1, reviews, records }
 }
 export async function GET(request: Request) {
-  await shared.reviewQueue
-  return NextResponse.json(visibleState(await readState(), actorFor(request), new URL(request.url).searchParams.get("recordId")), { headers: { "Cache-Control": "no-store" } })
+  // Reads may perform the one-time prototype migration; serialize them with writes.
+  const job = (shared.reviewQueue ?? Promise.resolve()).catch(() => undefined).then(async () => visibleState(await readState(), actorFor(request), new URL(request.url).searchParams.get("recordId")))
+  shared.reviewQueue = job.catch(() => undefined)
+  return NextResponse.json(await job, { headers: { "Cache-Control": "no-store" } })
 }
 export async function POST(request: Request) {
   const actor = actorFor(request)

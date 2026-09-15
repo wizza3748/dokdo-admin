@@ -3,6 +3,7 @@
 import * as React from "react"
 import { useReviews } from "@/lib/review-client"
 import { StudentReviewRecordCard } from "./student-review-records"
+import { SecondReviewStartModal } from "./second-review-start-modal"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, FileText, Home, Smartphone } from "lucide-react"
@@ -60,6 +61,7 @@ const basicRecords: BasicRecord[] = [
 export function ExplorationRecord() {
   const reviewHook = useReviews()
   const router = useRouter()
+  const [secondStart, setSecondStart] = React.useState<{ recordId: string; sourceWorkbookId: string } | null>(null)
   const currentDate = new Date()
   const currentYear = currentDate.getFullYear()
   const currentMonth = currentDate.getMonth() + 1
@@ -134,14 +136,12 @@ export function ExplorationRecord() {
     setMonth(nextMonth)
   }
 
-  const startSecondReview = async (recordId: string, sourceWorkbookId: string) => {
-    const next = await reviewHook.run({ type: "start-second", recordId })
-    if (next) router.push(`/student/online-workbook/${sourceWorkbookId}?round=2`)
-  }
+  const startSecondReview = (recordId: string, sourceWorkbookId: string) => setSecondStart({ recordId, sourceWorkbookId })
 
   return (
     <div className="min-h-screen bg-[#f5f7f9] text-[#3f4549] [&_button:not(:disabled)]:cursor-pointer">
       <StudentHeader />
+      {secondStart && <SecondReviewStartModal {...secondStart} run={reviewHook.run} onClose={() => setSecondStart(null)} />}
       <section className="border-b border-[#e5e9ec] bg-white px-4 pb-8 pt-8">
         <div className="mx-auto flex max-w-[920px] items-center justify-center gap-2">
           <button aria-label="이전 월" onClick={() => moveMonth(-1)} className="grid size-8 place-items-center rounded-full bg-[#2ca4e6] text-white transition hover:bg-[#168fd1]"><ChevronLeft className="size-5" /></button>

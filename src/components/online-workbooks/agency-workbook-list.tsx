@@ -497,7 +497,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
       {actionDialog?.kind === "single-send" && <AlertDialog title="학생 전송" message={<p>{actionDialog.record.studentName} 학생에게 피드백을 전송할까요? 전송 후에는 수정할 수 없습니다.</p>} onClose={() => setActionDialog(null)} onConfirm={() => void sendSingleFeedback(actionDialog.record)} />}
       {actionDialog?.kind === "parent" && <AlertDialog title="학부모 발송" message={<p>{actionDialog.record.studentName} 학부모에게 발송하시겠습니까?</p>} onClose={() => setActionDialog(null)} onConfirm={confirmSingleParentSend} />}
 
-      {actionDialog?.kind === "bulk" && actionDialog.action === "ai" && <AlertDialog title="AI 피드백 생성 실행" message={<><p>선택한 <strong>{selectedIds.length}</strong>개의 독후감에 AI 피드백 생성을 실행하시겠어요?</p><p>각 독후감의 AI 피드백 생성 가능 횟수에서 성공한 경우에만 1회씩 차감됩니다.</p><p>생성된 내용은 상세 화면에서 확인 후 수정해 주세요.</p></>} onClose={() => setActionDialog(null)} onConfirm={confirmBulkAction} />}
+      {actionDialog?.kind === "bulk" && actionDialog.action === "ai" && <AlertDialog title="AI 피드백 생성 실행" message={<><p>선택한 <strong>{selectedIds.length}</strong>개의 독후감에 AI 피드백 생성을 실행하시겠어요?</p><p>각 독후감의 AI 피드백 생성 가능 횟수에서 성공한 경우에만 1회씩 차감됩니다.</p><p>항목별보기는 총평과 항목별 피드백을, 이어보기는 총평만 생성합니다. 평가 보고서 제공 독후감은 평가 점수와 보고서용 총평도 생성합니다.</p><p>생성된 내용은 상세 화면에서 확인·수정한 후 저장해 주세요.</p></>} onClose={() => setActionDialog(null)} onConfirm={confirmBulkAction} />}
 
       {actionDialog?.kind === "bulk" && actionDialog.action === "send" && <AlertDialog title="일괄 학생 전송" message={<p>선택한 {selectedIds.length}개의 피드백을 학생에게 전송하시겠습니까?</p>} onClose={() => setActionDialog(null)} onConfirm={confirmBulkAction} />}
 

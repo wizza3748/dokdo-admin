@@ -1,5 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
+// @ts-expect-error Node's type stripping uses explicit .ts paths.
+import { normalizeReviewFeedbackScope, reviewFeedbackItems, reviewIncludesItemFeedback } from "../src/lib/review-domain.ts"
 // Node 24 runs these pure domain tests without a browser, mock server or state-file changes.
 // @ts-expect-error Node's type stripping uses explicit .ts paths.
 import { applyReviewCommand, assessmentCriteria, canAccessReview, canAwardReview, canRejectReview, canSendReview, createSeededReviewDatabase, expandLegacyReviewScores, hydrateLegacyReviewFeedback, mergeReviewSeeds, emptyReviewDatabase, plainReviewText, reviewProgressLabels, reviewRecordStatus, sampleReviewAi, scoreLabel, sortStudentReviewRecords, studentReviewListAction, studentReviewNotices, studentReviewProgressLabel, studentReviewRecordStatus, validAiScores, validScores, type ReviewActor, type ReviewCommand, type ReviewDatabase, type ReviewSeed } from "../src/lib/review-domain.ts"
@@ -194,10 +196,112 @@ function fixture(reportEnabled = false, rewriteMode: "items" | "continuous" = "c
   }
   const save = (id = "qa-r1", decision: "request" | "complete" = "request") => {
     const record = db.records.find(r => r.id === id)!
-    run({ type: "save-feedback", recordId: id, feedback: "인물의 마음을 근거와 함께 잘 표현했어요.", items: record.itemFeedback, scores: Object.fromEntries(assessmentCriteria(4).map(c => [c.id, c.max])), decision }, teacher)
+    run({ type: "save-feedback", recordId: id, feedback: "인물의 마음을 근거와 함께 잘 표현했어요.", items: record.itemFeedback.map(item => ({ ...item, text: item.text || "학생이 쓴 내용에 이유를 더해 보세요." })), scores: Object.fromEntries(assessmentCriteria(4).map(c => [c.id, c.max])), decision }, teacher)
   }
   return { get db() { return db }, run, write, generate, save }
 }
+
+for (const mode of ["items", "continuous"] as const) for (const report of [false, true]) {
+  test(`${mode}·보고서 ${report}: 1차·2차 생성/저장/전송은 템플릿의 피드백 범위를 적용한다`, () => {
+    const f = fixture(report, mode)
+    for (const round of [1, 2]) {
+      const id = `qa-r${round}`
+      f.write(id)
+      f.generate(id)
+      const draft = f.db.records.find(r => r.id === id)!.aiDraft!
+      assert.equal(draft.items.length, mode === "items" ? 2 : 0)
+      assert.equal(Boolean(draft.reportFeedback), report)
+      f.save(id)
+      const saved = f.db.records.find(r => r.id === id)!
+      assert.equal(saved.itemFeedback.length, mode === "items" ? 2 : 0)
+      assert.equal(Boolean(saved.report), report)
+      assert.ok(canSendReview(f.db.reviews[0], saved))
+      f.run({ type: "send", recordId: id }, teacher)
+      f.run({ type: "seen", recordId: id })
+      if (round === 1) f.run({ type: "start-second", recordId: id })
+    }
+  })
+}
+
+test("이어보기의 오래된 입력은 AI 응답과 저장 요청에서도 제거하고 점수·총평은 유지한다", () => {
+  const f = fixture(true); f.write()
+  const staleItems = [{ itemId: "item-a", visible: true, text: "짧음" }]
+  f.run({ type: "ai-start", recordId: "qa-r1" }, teacher, "scope-ai")
+  const result = { ...sampleReviewAi(f.db.reviews[0], f.db.records[0]), items: staleItems }
+  f.run({ type: "ai-result", recordId: "qa-r1", runId: "scope-ai", result }, teacher)
+  assert.deepEqual(f.db.records[0].aiDraft?.items, [])
+  f.run({ type: "save-feedback", recordId: "qa-r1", feedback: result.feedback, reportFeedback: result.reportFeedback, items: staleItems, scores: Object.fromEntries(assessmentCriteria(4).map(c => [c.id, c.max])), decision: "complete" }, teacher)
+  assert.deepEqual(f.db.records[0].itemFeedback, [])
+  assert.equal(f.db.records[0].feedback, result.feedback)
+  assert.equal(f.db.records[0].reportFeedback, result.reportFeedback)
+})
+
+test("기존 이어보기의 저장·전송 피드백과 AI 초안은 항목별 내용만 정리한다", () => {
+  const f = fixture(true); f.write(); f.generate(); f.save()
+  f.run({ type: "send", recordId: "qa-r1" }, teacher)
+  const before = structuredClone(f.db)
+  const items = [{ itemId: "item-a", visible: true, text: "기존에 전달한 항목별 피드백입니다." }]
+  before.records[0].itemFeedback = items
+  before.records[0].aiDraft = { feedback: "유지할 총평 초안", reportFeedback: "유지할 보고서 초안", items }
+  const expected = structuredClone(before)
+  expected.records[0].itemFeedback = []
+  expected.records[0].aiDraft!.items = []
+  const after = normalizeReviewFeedbackScope(before)
+  assert.deepEqual(after, expected)
+  assert.deepEqual(before.records[0].itemFeedback, items)
+  assert.equal(normalizeReviewFeedbackScope(after), after)
+  before.reviews[0].template.rewriteMode = "items"
+  assert.equal(normalizeReviewFeedbackScope(before), before)
+})
+
+test("피드백 범위는 고쳐쓰기 편집 여부가 아닌 템플릿 기준이며 개별 OFF는 보존한다", () => {
+  const f = fixture(false, "items"); f.write()
+  const record = f.db.records[0]
+  record.rewriteEdited = true
+  record.itemFeedback[0] = { itemId: "item-a", visible: false, text: "유지할 비공개 피드백" }
+  const result = sampleReviewAi(f.db.reviews[0], record)
+  assert.deepEqual(result.items[0], record.itemFeedback[0])
+  assert.ok(result.items[1].visible && result.items[1].text.length >= 10)
+  const template = { ...f.db.reviews[0].template, rewriteMode: undefined, rewriteGuide: "하나의 글로 완성해요" }
+  assert.equal(reviewIncludesItemFeedback(template), false)
+  assert.deepEqual(reviewFeedbackItems(template, result.items), [])
+})
+
+test("학생 표시 항목은 각각 10자 이상이어야 하며 실패하면 저장 상태를 바꾸지 않는다", () => {
+  const f = fixture(false, "items"); f.write()
+  const before = structuredClone(f.db)
+  for (const text of ["", "123456789", "<b>123456789</b>", "<p>   </p>"]) {
+    const items = f.db.records[0].itemFeedback.map((item, index) => ({ ...item, visible: true, text: index === 0 ? text : "충분한 길이의 항목별 피드백입니다." }))
+    assert.throws(() => f.run({ type: "save-feedback", recordId: "qa-r1", feedback: "충분한 길이의 총평입니다.", items, decision: "complete" }, teacher), /항목별 피드백을 각각 10자/)
+    assert.deepEqual(f.db, before)
+  }
+  const items = f.db.records[0].itemFeedback.map(item => ({ ...item, visible: true, text: "<b>1234567890</b>" }))
+  f.run({ type: "save-feedback", recordId: "qa-r1", feedback: "충분한 길이의 총평입니다.", items, decision: "complete" }, teacher)
+  assert.equal(f.db.records[0].feedbackStatus, "작성완료")
+})
+
+test("항목별보기의 학생 표시 OFF 항목은 10자 검사에서 제외한다", () => {
+  for (const summaryOnly of [false, true]) {
+    const f = fixture(false, "items"); f.write()
+    const items = f.db.records[0].itemFeedback.map((item, index) => ({ ...item, visible: !summaryOnly && index === 0, text: !summaryOnly && index === 0 ? "1234567890" : "" }))
+    f.run({ type: "save-feedback", recordId: "qa-r1", feedback: "충분한 길이의 총평입니다.", items, decision: "complete" }, teacher)
+    assert.equal(f.db.records[0].feedbackStatus, "작성완료")
+    assert.deepEqual(f.db.records[0].itemFeedback, items)
+  }
+})
+
+test("피드백 확인과 2차 시작의 반복 요청은 최초 확인일과 기존 작성글을 유지한다", () => {
+  const f = fixture(); f.write(); f.save()
+  f.run({ type: "send", recordId: "qa-r1" }, teacher)
+  f.run({ type: "seen", recordId: "qa-r1" })
+  const seenAt = f.db.records[0].seenAt
+  f.run({ type: "seen", recordId: "qa-r1" }, student, "seen-again", "2026-09-14T00:00:00Z")
+  assert.equal(f.db.records[0].seenAt, seenAt)
+  f.run({ type: "start-second", recordId: "qa-r1" })
+  const records = structuredClone(f.db.records)
+  f.run({ type: "start-second", recordId: "qa-r1" })
+  assert.deepEqual(f.db.records, records)
+})
 
 test("워크북 교체는 1차 고쳐쓰기 전만 허용하고 재선택 상태와 보고서 정책을 저장한다", () => {
   const f = fixture()
@@ -282,7 +386,7 @@ for (const edited of [false, true]) test(`2차 최초 진입 분기: 1차 편집
 })
 
 test("AI 실패·누락은 차감/입력 변경 없이 반려만 잠금", () => {
-  const f = fixture(true); f.write()
+  const f = fixture(true, "items"); f.write()
   f.generate("qa-r1", "failure"); f.generate("qa-r1", "missing")
   assert.equal(f.db.records[0].aiUsed, 0); assert.equal(f.db.records[0].aiDraft, undefined)
   assert.equal(canRejectReview(f.db.records[0]), false)
@@ -311,11 +415,11 @@ test("채점 불가는 AI 실패로 기록하고 횟수·점수·피드백 처�
   assert.equal(f.db.records[0].feedbackStatus, "전송완료")
 })
 
-test("항목별 피드백을 사용하지 않아도 총평과 AI 점수 생성·저장이 가능하다", () => {
+test("이어보기는 항목별 피드백 없이 총평과 AI 점수 생성·저장이 가능하다", () => {
   const f = fixture(true); f.write()
   f.run({ type: "ai-start", recordId: "qa-r1" }, teacher, "ai-total-only")
   const result = sampleReviewAi(f.db.reviews[0], f.db.records[0])
-  result.items = result.items.map(item => ({ ...item, text: "", visible: false }))
+  assert.deepEqual(result.items, [])
   f.run({ type: "ai-result", recordId: "qa-r1", runId: "ai-total-only", result }, teacher)
   const generated = f.db.records[0]
   assert.equal(generated.aiUsed, 1)

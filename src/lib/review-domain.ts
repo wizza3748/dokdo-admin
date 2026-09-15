@@ -19,6 +19,13 @@ export function reviewWritingMode(template: ReviewTemplate, fallback: "items" | 
 export function composeReviewBody(template: ReviewTemplate, answers: Record<string, string>) {
   return template.items.map(item => answers[item.id] ?? "").join("\n\n")
 }
+/** Feedback follows the saved template, never a viewing tab or rewrite edit flag. */
+export function reviewIncludesItemFeedback(template: ReviewTemplate) {
+  return reviewWritingMode(template) === "items"
+}
+export function reviewFeedbackItems(template: ReviewTemplate, items: ItemFeedback[]) {
+  return reviewIncludesItemFeedback(template) ? items : []
+}
 export type ReviewCommon = {
   seeded?: boolean; legacyRecordId?: string; bookAuthor?: string; bookCoverSrc?: string;
   sourceBookId?: number; sourceReadingRecordId?: string; sourceReadingWorkbookId?: string; sourceReadingRound?: number;
@@ -138,6 +145,18 @@ export function sortStudentReviewRecords<T extends Pick<ReviewRecord, "reviewId"
   return [...records].sort((a, b) => (reviewOrder.get(a.reviewId)! - reviewOrder.get(b.reviewId)!) || b.round - a.round)
 }
 export const emptyReviewDatabase = (): ReviewDatabase => ({ version: 1, reviews: [], records: [] })
+
+/** Prototype migration: remove only continuous-template item feedback, including AI drafts. */
+export function normalizeReviewFeedbackScope(db: ReviewDatabase): ReviewDatabase {
+  const continuousIds = new Set(db.reviews.filter(review => !reviewIncludesItemFeedback(review.template)).map(review => review.id))
+  let changed = false
+  const records = db.records.map(record => {
+    if (!continuousIds.has(record.reviewId) || (!record.itemFeedback.length && !record.aiDraft?.items.length)) return record
+    changed = true
+    return { ...record, itemFeedback: [], ...(record.aiDraft ? { aiDraft: { ...record.aiDraft, items: [] } } : {}) }
+  })
+  return changed ? { ...db, records } : db
+}
 
 export type ReviewSeed = {
   common: Omit<ReviewCommon, "createdAt" | "progress" | "reportEnabled">;
@@ -370,18 +389,22 @@ function makeRecord(review: ReviewCommon, round: 1 | 2, first?: ReviewRecord): R
     writingStatus: "writing", feedbackStatus: "작성전", answers: first && (!direct || itemRewrite) ? structuredClone(first.answers) : {},
     initialBody: direct ? first!.finalBody : "", body: direct ? first!.finalBody : "", finalBody: "", rewriteEdited: false,
     initialStage: direct ? "rewrite" : "items", stage: direct ? "rewrite" : "items", itemIndex: 0,
-    feedback: "", itemFeedback: review.template.items.map(i => ({ itemId: i.id, text: "", visible: true })),
+    feedback: "", itemFeedback: reviewFeedbackItems(review.template, review.template.items.map(i => ({ itemId: i.id, text: "", visible: true }))),
     aiHistory: [], aiUsed: 0, parentContact: first?.parentContact ?? true, flowers: 0, history: [],
   }
 }
 function validateItems(review: ReviewCommon, items: ItemFeedback[]) {
-  const expected = review.template.items.map(i => i.id)
+  const expected = reviewIncludesItemFeedback(review.template) ? review.template.items.map(i => i.id) : []
   return Array.isArray(items) && items.every(i => i && typeof i.itemId === "string") && items.length === expected.length && new Set(items.map(i => i.itemId)).size === expected.length && items.every(i => expected.includes(i.itemId) && typeof i.text === "string" && typeof i.visible === "boolean")
+}
+
+export function validItemFeedback(items: ItemFeedback[]) {
+  return items.every(item => !item.visible || plainReviewText(item.text).length >= 10)
 }
 
 /** Pure command boundary shared by the API and regression tests. Never mutate previous records. */
 export function applyReviewCommand(database: ReviewDatabase, command: ReviewCommand, actor: ReviewActor, requestId: string, at: string): ReviewDatabase {
-  const db = structuredClone(database)
+  const db = normalizeReviewFeedbackScope(structuredClone(database))
   requireCondition(["create", "switch-template", "start-second", "save-writing", "enter-rewrite", "submit", "seen", "reject", "send", "parent", "ai-start", "ai-result", "flower", "save-feedback"].includes(command.type), "지원하지 않는 작업입니다.")
   if (db.records.some(r => r.history.some(h => h.requestId === requestId))) return db
   if (command.type === "create") {
@@ -461,7 +484,7 @@ export function applyReviewCommand(database: ReviewDatabase, command: ReviewComm
   } else if (command.type === "reject") {
     requireCondition(canRejectReview(record), "AI 실행 이력이 없고 피드백 작성전인 경우만 반려할 수 있습니다.")
     record.writingStatus = "writing"; record.rejectedAt = at; record.feedback = ""; record.teacherScores = undefined; record.aiDraft = undefined
-    record.itemFeedback = review.template.items.map(i => ({ itemId: i.id, text: "", visible: true })); review.progress = `${prefix}-writing`
+    record.itemFeedback = reviewFeedbackItems(review.template, review.template.items.map(i => ({ itemId: i.id, text: "", visible: true }))); review.progress = `${prefix}-writing`
   } else if (command.type === "ai-start") {
     // A browser closed between start/result must not permanently lock this record.
     record.aiHistory.forEach(h => { if (h.status === "running" && Date.parse(at) - Date.parse(h.at) >= 120_000) { h.status = "failure"; h.reason = "응답 대기 시간이 초과되었습니다." } })
@@ -471,7 +494,7 @@ export function applyReviewCommand(database: ReviewDatabase, command: ReviewComm
     requireCondition(record.writingStatus === "submitted" && record.feedbackStatus !== "전송완료", "이미 처리된 피드백입니다.")
     const run = record.aiHistory.find(h => h.requestId === command.runId && h.status === "running")
     requireCondition(run, "진행 중인 AI 실행을 찾을 수 없습니다.")
-    const result = command.result
+    const result = command.result && { ...command.result, items: reviewFeedbackItems(review.template, command.result.items) }
     const unscorableReason = !command.error ? result?.unscorableReason?.trim() : undefined
     const valid = result && typeof result.feedback === "string" && plainReviewText(result.feedback).length >= 10 && validateItems(review, result.items) && result.items.every(i => !i.visible || plainReviewText(i.text)) && (!review.reportEnabled || (typeof result.reportFeedback === "string" && plainReviewText(result.reportFeedback).length >= 10 && (validAiScores(review.level, record.aiScores, record) || validAiScores(review.level, result.scores, record))))
     run.status = !unscorableReason && valid && !command.error ? "success" : "failure"
@@ -482,7 +505,10 @@ export function applyReviewCommand(database: ReviewDatabase, command: ReviewComm
   } else if (command.type === "save-feedback") {
     requireCondition(record.writingStatus === "submitted" && record.feedbackStatus !== "전송완료", "피드백을 수정할 수 없습니다.")
     requireCondition(!record.aiHistory.some(h => h.status === "running"), "AI 생성이 끝난 뒤 저장해 주세요.")
-    requireCondition(plainReviewText(command.feedback).length >= 10 && validateItems(review, command.items), "총평 10자와 템플릿 항목을 확인해 주세요.")
+    const items = reviewFeedbackItems(review.template, command.items)
+    requireCondition(plainReviewText(command.feedback).length >= 10, "[학생용] 총평을 10자 이상 작성해 주세요.")
+    requireCondition(validateItems(review, items), "템플릿의 질문 항목과 항목별 피드백이 일치하는지 확인해 주세요.")
+    requireCondition(validItemFeedback(items), "학생에게 표시할 항목별 피드백을 각각 10자 이상 작성해 주세요.")
     requireCondition(record.round !== 1 || command.decision === "request" || command.decision === "complete", "2차 작성 여부를 선택해 주세요.")
     if (review.reportEnabled) {
       requireCondition(validAiScores(review.level, record.aiScores, record) && validScores(review.level, command.scores, record), "AI 생성 성공 및 선생님 평가 완료가 필요합니다.")
@@ -500,7 +526,7 @@ export function applyReviewCommand(database: ReviewDatabase, command: ReviewComm
       if (command.reportFeedback !== undefined) requireCondition(typeof command.reportFeedback === "string" && plainReviewText(command.reportFeedback).length >= 10, "보고서용 총평을 10자 이상 입력해 주세요.")
       record.reportFeedback = command.reportFeedback ?? record.aiDraft?.reportFeedback ?? record.reportFeedback
     }
-    record.feedback = command.feedback; record.itemFeedback = command.items; record.savedAt = at; record.feedbackStatus = "작성완료"; record.aiDraft = undefined; review.progress = `${prefix}-saved`
+    record.feedback = command.feedback; record.itemFeedback = items; record.savedAt = at; record.feedbackStatus = "작성완료"; record.aiDraft = undefined; review.progress = `${prefix}-saved`
   } else if (command.type === "send") {
     requireCondition(canSendReview(review, record), "저장 및 평가 완료 후 전송할 수 있습니다.")
     record.feedbackStatus = "전송완료"; record.sentAt = at; review.progress = `${prefix}-sent`
@@ -537,7 +563,9 @@ export function sampleReviewAi(review: ReviewCommon, record: ReviewRecord) {
   return {
     feedback: `${lowerFeedback ? copy.lower : copy.upper}\n\n${copy.mission}`,
     reportFeedback,
-    items: review.template.items.map(item => {
+    items: (reviewIncludesItemFeedback(review.template) ? review.template.items : []).map(item => {
+      const existing = (record.aiDraft?.items ?? record.itemFeedback).find(feedback => feedback.itemId === item.id)
+      if (existing && !existing.visible) return { ...existing }
       const sample = REVIEW_FEEDBACK_SAMPLES.items.find(sample => new RegExp(sample.match).test(item.title))
       const present = Boolean(plainReviewText(record.answers[item.id] ?? ""))
       const text = !present && !record.rewriteEdited ? "이 항목은 아직 쓰지 않았어요." : record.round === 1 ? sample?.first ?? "질문에 맞추어 자신의 생각을 적었어요. 그렇게 생각한 이유를 덧붙여 보세요." : sample?.second ?? "질문에 대한 생각은 적었지만 이유가 아직 짧아요. 책 내용과 연결하여 설명해 보세요."

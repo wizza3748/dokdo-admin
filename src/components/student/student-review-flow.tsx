@@ -2,6 +2,7 @@
 import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { SecondReviewStartModal } from "./second-review-start-modal"
 import { ArrowLeft, ArrowRight, ArrowUpRight, Check, ClipboardCheck, Copy, ExternalLink, FileCheck2, FileText, GitCompareArrows, LockKeyhole, MessageCircle, PanelRightOpen, RefreshCw, Save, Search, Smartphone, X } from "lucide-react"
 import { BookPanel, StartConfirmModal, ConfirmModal, OutlineModal, PreviewModal, SelectionScreen, SelectionTitle, WorkbookTopBars } from "./student-workbook-ui"
 import { getWorkbookForReview, type WorkbookTemplate } from "@/lib/student-workbooks"
@@ -10,7 +11,7 @@ import { useReviews } from "@/lib/review-client"
 import { getConfiguredTemplates, subscribeTemplateSettings } from "@/lib/workbook-template-settings"
 import { cn } from "@/lib/utils"
 import { DEFAULT_GUIDES } from "@/lib/workbook-templates"
-import { canChangeReviewTemplate, plainReviewText, reviewActivityDate, studentReviewProgressLabel, reviewWritingMode, type ReviewCommon, type ReviewRecord, type ReviewTemplate } from "@/lib/review-domain"
+import { canChangeReviewTemplate, reviewFeedbackItems, plainReviewText, reviewActivityDate, studentReviewProgressLabel, reviewWritingMode, type ReviewCommon, type ReviewRecord, type ReviewTemplate } from "@/lib/review-domain"
 import type { StudentWorkbook } from "@/lib/student-workbooks"
 import { ItemReference, ReviewEditor, ReviewText } from "@/components/online-workbooks/review-ui"
 
@@ -360,21 +361,22 @@ function ReviewWriting({ common, record, first, hook, writingGuide }: { common: 
 }
 
 function ResultFeedbackRail({ common, record, maxHeight, onClose }: { common: ReviewCommon; record: ReviewRecord; maxHeight: number | null; onClose: () => void }) {
-  const showStudentAnswers = reviewWritingMode(common.template) === "continuous"
-  const visibleFeedback = record.itemFeedback.filter(item => item.visible)
-  return <RewriteReferenceShell title={`${record.round}차 피드백`} description="선생님의 총평과 질문 항목별 피드백을 확인해 보세요." icon={<MessageCircle className="size-4.5" />} closeLabel={`${record.round}차 피드백 닫기`} onClose={onClose} contentClassName="px-4 pb-4" maxHeight={maxHeight} tone="pink">
+  const visibleFeedback = reviewFeedbackItems(common.template, record.itemFeedback).filter(item => item.visible && plainReviewText(item.text))
+  return <RewriteReferenceShell title={`${record.round}차 피드백`} description={visibleFeedback.length ? "선생님의 총평과 질문 항목별 피드백을 확인해 보세요." : "선생님의 총평을 확인해 보세요."} icon={<MessageCircle className="size-4.5" />} closeLabel={`${record.round}차 피드백 닫기`} onClose={onClose} contentClassName="px-4 pb-4" maxHeight={maxHeight} tone="pink">
     {record.flowers > 0 && <div className="flex items-center gap-2 border-b border-[#eadce1] py-3 text-[12px] font-semibold leading-5 text-[#6f5360]"><Image src="/student-assets/flower-reward.svg" alt="" width={26} height={26} /><span>선생님이 섬초롱꽃 <strong className="font-black text-[#d93670]">{record.flowers}개</strong>를 보내주셨어요.</span></div>}
     <section className="py-4"><div className="flex items-center justify-between gap-3"><h3 className="text-[14px] font-black text-[#2d3035]">총평</h3><time className="text-[11px] text-[#8a747c]">{record.savedAt?.slice(0, 10)}</time></div><div className="mt-2 text-[#3f4146] [&>div]:text-[13px] [&>div]:leading-6"><ReviewText value={record.feedback} /></div></section>
-    <section className="border-t border-[#eadce1] pt-4"><h3 className="pb-2 text-[14px] font-black text-[#2d3035]">질문 항목별 피드백</h3><div className="divide-y divide-[#eadfe3]">{visibleFeedback.map((feedback, index) => {
+    {visibleFeedback.length > 0 && <section className="border-t border-[#eadce1] pt-4"><h3 className="pb-2 text-[14px] font-black text-[#2d3035]">질문 항목별 피드백</h3><div className="divide-y divide-[#eadfe3]">{visibleFeedback.map((feedback, index) => {
       const item = common.template.items.find(candidate => candidate.id === feedback.itemId)
-      const studentAnswer = record.answers[feedback.itemId]
-      return <details key={feedback.itemId} className="group py-1"><summary className="flex cursor-pointer list-none items-center gap-2 py-2.5 text-[13px] font-black text-[#34373b] marker:content-none"><span className="grid size-6 shrink-0 place-items-center rounded-md bg-[#fff0f5] text-[11px] text-[#d93670]">{index + 1}</span><span className="min-w-0 flex-1">{item?.title}</span><span aria-hidden className="text-[#c54a73] before:content-['＋'] group-open:before:content-['－']" /></summary><div className="pb-3 pl-8 pr-1">{showStudentAnswers && studentAnswer && <div className="mb-3 rounded-lg bg-[#f7f8f9] px-3 py-2.5"><p className="mb-1 text-[11px] font-black text-[#7b858c]">질문 항목별 작성 내용</p><div className="text-[#4a4f53] [&>div]:text-[12px] [&>div]:leading-5"><ReviewText value={studentAnswer} /></div></div>}{showStudentAnswers && studentAnswer && <p className="mb-1 text-[11px] font-black text-[#d13b6e]">선생님 피드백</p>}<div className="text-[#3f4146] [&>div]:text-[13px] [&>div]:leading-6"><ReviewText value={feedback.text} /></div></div></details>
-    })}{visibleFeedback.length === 0 && <p className="py-4 text-[12px] text-[#8a747c]">표시할 질문 항목별 피드백이 없습니다.</p>}</div></section>
+      return <details key={feedback.itemId} className="group py-1"><summary className="flex cursor-pointer list-none items-center gap-2 py-2.5 text-[13px] font-black text-[#34373b] marker:content-none"><span className="grid size-6 shrink-0 place-items-center rounded-md bg-[#fff0f5] text-[11px] text-[#d93670]">{index + 1}</span><span className="min-w-0 flex-1">{item?.title}</span><span aria-hidden className="text-[#c54a73] before:content-['＋'] group-open:before:content-['－']" /></summary><div className="pb-3 pl-8 pr-1"><div className="text-[#3f4146] [&>div]:text-[13px] [&>div]:leading-6"><ReviewText value={feedback.text} /></div></div></details>
+    })}</div></section>}
   </RewriteReferenceShell>
 }
 
 export function ReviewResult({ common, record, records, hook, setRound, external = false }: { common: ReviewCommon; record: ReviewRecord; records: ReviewRecord[]; hook: ReviewHook; setRound: (round: number) => void; external?: boolean }) {
-  const [feedbackRound, setFeedbackRound] = React.useState<1 | 2 | null>(null)
+  const [feedbackRound, setFeedbackRound] = React.useState<1 | 2 | null>(() => external && record.feedbackStatus === "전송완료" ? record.round : null)
+  const [secondStart, setSecondStart] = React.useState(false)
+  const feedbackEntry = React.useRef<string | null>(null)
+  const seenRequests = React.useRef(new Set<string>())
   const [compareOpen, setCompareOpen] = React.useState(false)
   const [copyMessage, setCopyMessage] = React.useState("")
   const workspaceRef = React.useRef<HTMLDivElement>(null)
@@ -386,6 +388,7 @@ export function ReviewResult({ common, record, records, hook, setRound, external
   const secondSubmitted = second?.writingStatus === "submitted"
   const firstFeedback = first?.feedbackStatus === "전송완료"
   const secondFeedback = second?.feedbackStatus === "전송완료"
+  const canStartSecond = !external && firstSubmitted && firstFeedback && !!first?.seenAt && common.secondDecision === "request" && !second
   const firstReport = common.reportEnabled && firstFeedback && first?.report
   const secondReport = common.reportEnabled && secondFeedback && second?.report
   const feedbackRecord = records.find(r => r.round === feedbackRound && r.feedbackStatus === "전송완료")
@@ -401,6 +404,24 @@ export function ReviewResult({ common, record, records, hook, setRound, external
   const compareClass = (active = false) => cn(buttonBase, active ? "border-[#5c6470] bg-[#5c6470] text-white shadow-[0_3px_10px_rgba(62,69,79,.15)]" : "border-[#cfd6dc] bg-white text-[#4c5861] hover:bg-[#f5f7f8]")
   const feedbackClass = (active = false) => cn(buttonBase, active ? "border-[#ed4d83] bg-[#ed4d83] text-white shadow-[0_3px_10px_rgba(210,47,104,.20)]" : "border-[#f0b8ca] bg-[#fff6f8] text-[#d93670] hover:border-[#e87199] hover:bg-[#ffedf3]")
   const reportClass = cn(buttonBase, "border-[#cbd4dc] bg-[#f9fafb] text-[#44545f] hover:border-[#9dabb5] hover:bg-white")
+  const openFeedback = React.useCallback((target: ReviewRecord) => {
+    setCompareOpen(false)
+    setRound(target.round)
+    setFeedbackRound(target.round)
+    if (!external && !target.seenAt && !seenRequests.current.has(target.id)) {
+      seenRequests.current.add(target.id)
+      void hook.run({ type: "seen", recordId: target.id }).then(next => {
+        if (!next) seenRequests.current.delete(target.id)
+      })
+    }
+  }, [external, hook, setRound])
+  React.useEffect(() => {
+    if (external || feedbackEntry.current === common.id) return
+    const requested = new URLSearchParams(window.location.search).get("feedback")
+    feedbackEntry.current = common.id
+    const target = records.find(item => String(item.round) === requested && item.feedbackStatus === "전송완료")
+    if (target) openFeedback(target)
+  }, [common.id, external, records, openFeedback])
   React.useEffect(() => { if (new URLSearchParams(window.location.search).get("compare") === "1" && submitted.length === 2) setCompareOpen(true) }, [submitted.length])
   React.useLayoutEffect(() => {
     if (!feedbackRecord) { setWorkspaceMaxHeight(null); return }
@@ -429,10 +450,7 @@ export function ReviewResult({ common, record, records, hook, setRound, external
   const selectWriting = (targetRound: number) => { setCompareOpen(false); setFeedbackRound(null); setRound(targetRound) }
   const toggleFeedback = (target: ReviewRecord) => {
     if (feedbackRound === target.round) { setFeedbackRound(null); return }
-    setCompareOpen(false)
-    setRound(target.round)
-    setFeedbackRound(target.round)
-    if (!external && !target.seenAt) void hook.run({ type: "seen", recordId: target.id })
+    openFeedback(target)
   }
   const toggleCompare = () => { setFeedbackRound(null); setCompareOpen(current => !current) }
   const copyWriting = async () => {
@@ -443,6 +461,7 @@ export function ReviewResult({ common, record, records, hook, setRound, external
     <main className={cn("mx-auto max-w-[1200px] px-4 pt-4", showListNavigation ? "pb-28" : "pb-10")}>
       <header className="flex flex-wrap items-start justify-between gap-3"><h1 className="flex items-center gap-2 text-[22px] font-black"><span className="grid size-7 place-items-center rounded-lg border border-[#f3bfd0] bg-[#fff1f6] text-[#df3f74]"><FileCheck2 className="size-4" /></span>나의 글 완성</h1><div role="group" aria-label="작성글, 피드백 및 보고서" className="flex max-w-[940px] flex-wrap items-center justify-end gap-2">
         <div className="flex gap-1.5">{firstSubmitted && <button type="button" aria-pressed={!compareOpen && record.round === 1} className={writingClass(!compareOpen && record.round === 1)} onClick={() => selectWriting(1)}>1차 작성글</button>}{secondSubmitted && <button type="button" aria-pressed={!compareOpen && record.round === 2} className={writingClass(!compareOpen && record.round === 2)} onClick={() => selectWriting(2)}>2차 작성글</button>}</div>
+        {canStartSecond && <button type="button" className={writingClass()} onClick={() => setSecondStart(true)}>2차 작성하기</button>}
         {secondSubmitted && <button type="button" aria-pressed={compareOpen} className={compareClass(compareOpen)} onClick={toggleCompare}><GitCompareArrows className="size-4" />작성글 비교</button>}
         <div className="flex gap-1.5">{firstFeedback && first && <button type="button" aria-pressed={feedbackRound === 1} className={feedbackClass(feedbackRound === 1)} onClick={() => toggleFeedback(first)}><MessageCircle className="size-4" />1차 피드백 {!first.seenAt && !external && <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[9px] text-[#d93670]">NEW</span>}</button>}{secondFeedback && second && <button type="button" aria-pressed={feedbackRound === 2} className={feedbackClass(feedbackRound === 2)} onClick={() => toggleFeedback(second)}><MessageCircle className="size-4" />2차 피드백 {!second.seenAt && !external && <span className="rounded-full bg-white/90 px-1.5 py-0.5 text-[9px] text-[#d93670]">NEW</span>}</button>}</div>
         <div className="flex gap-1.5">{firstReport && first && <a className={reportClass} target="_blank" rel="noopener noreferrer" href={`/online-review/report/${first.id}?role=${external ? "external" : "student"}`}><FileText className="size-4" />1차 보고서<ArrowUpRight className="size-3.5" /></a>}{secondReport && second && <a className={reportClass} target="_blank" rel="noopener noreferrer" href={`/online-review/report/${second.id}?role=${external ? "external" : "student"}`}><FileText className="size-4" />2차 보고서<ArrowUpRight className="size-3.5" /></a>}</div>
@@ -476,6 +495,7 @@ export function ReviewResult({ common, record, records, hook, setRound, external
         </div>}
       {copyMessage && <p role="status" className={cn("fixed left-1/2 z-[90] -translate-x-1/2 rounded-full bg-[#28333b] px-6 py-3 font-bold text-white shadow-xl", showListNavigation ? "bottom-24" : "bottom-6")}>{copyMessage}</p>}
     </main>
+    {secondStart && !external && first && <SecondReviewStartModal recordId={first.id} sourceWorkbookId={common.sourceWorkbookId} run={hook.run} onClose={() => setSecondStart(false)} onStarted={() => setRound(2)} />}
     {showListNavigation && <footer className="fixed inset-x-0 bottom-0 z-40 min-h-[68px] bg-[#4a5e77]"><div className="mx-auto flex min-h-[68px] max-w-[1200px] items-center px-4 py-2"><Link href={`/student/exploration-record?tab=workbook&month=${reviewActivityDate(common).monthKey}`} className="inline-flex h-11 items-center gap-2 rounded bg-[#34475f] px-5 font-black text-white"><ArrowLeft className="size-4" />온라인 독후감 목록</Link></div></footer>}
   </>
 }

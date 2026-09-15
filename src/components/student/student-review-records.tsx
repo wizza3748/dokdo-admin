@@ -18,10 +18,10 @@ export function StudentReviewRecordCard({ db, record: r, onStartSecond }: { db: 
     const [highlighted, setHighlighted] = useState(false)
     const [startingSecond, setStartingSecond] = useState(false)
     const c = db.reviews.find(c => c.id === r.reviewId)!
-    const href = `/student/online-workbook/${c.sourceWorkbookId}?round=${r.round}`
     const sent = r.feedbackStatus === "전송완료"
     const secondAvailable = r.round === 1 && c.progress === "second-available"
     const unreadFeedback = sent && !r.seenAt
+    const href = `/student/online-workbook/${c.sourceWorkbookId}?round=${r.round}${unreadFeedback ? `&feedback=${r.round}` : ""}`
     const actionLabel = studentReviewListAction(c, r)
     const actionable = r.writingStatus === "writing" || secondAvailable || unreadFeedback
     const actionColor = unreadFeedback ? "text-[#d93670]" : actionable ? "text-[#178ad1]" : sent ? "text-[#2c966f]" : "text-[#6f7b83]"

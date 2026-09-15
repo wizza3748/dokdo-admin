@@ -4,7 +4,7 @@ import { AlignLeft, Bold, ImagePlus, Info, Italic, Strikethrough, Underline, X }
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import type { ReviewCommon, ReviewRecord } from "@/lib/review-domain"
+import { reviewFeedbackItems, type ReviewCommon, type ReviewRecord } from "@/lib/review-domain"
 
 import { safeReviewHtml } from "@/lib/review-html"
 export { safeReviewHtml } from "@/lib/review-html"
@@ -31,7 +31,7 @@ export function ItemReference({ common, record, compactAnswers = false, compact 
   return <div className="space-y-5">{common.template.items.map(item => <section key={item.id} className="rounded-lg border p-4"><h3 className="font-bold">{item.title}</h3>{showAnswers && record.answers[item.id] && <div className={cn("mt-1", compactAnswers && "[&>div]:text-[15px] [&>div]:leading-6 [&_p]:my-0")}><ReviewText value={record.answers[item.id]} /></div>}<p className="mt-3 whitespace-pre-wrap text-sm text-slate-500">안내: {item.description}</p>{item.example && <p className="mt-2 whitespace-pre-wrap text-sm text-slate-500">예시: {item.example}</p>}</section>)}</div>
 }
 export function FeedbackReference({ common, record, accordionItems = false, showItemGuidance = true, showReward = true, showScore = true }: { common: ReviewCommon; record: ReviewRecord; accordionItems?: boolean; showItemGuidance?: boolean; showReward?: boolean; showScore?: boolean }) {
-  return <div className="space-y-5"><h3 className="font-bold">총평 · {record.savedAt?.slice(0, 10)}</h3><ReviewText value={record.feedback} />{record.itemFeedback.filter(i => i.visible).map(feedback => {
+  return <div className="space-y-5"><h3 className="font-bold">총평 · {record.savedAt?.slice(0, 10)}</h3><ReviewText value={record.feedback} />{reviewFeedbackItems(common.template, record.itemFeedback).filter(i => i.visible).map(feedback => {
     const item = common.template.items.find(i => i.id === feedback.itemId)
     const studentAnswer = !record.rewriteEdited && record.answers[feedback.itemId]
     const guidance = showItemGuidance && <details className="mt-3 text-sm text-slate-500"><summary>질문 항목 안내·예시</summary><p>{item?.description}</p><p>{item?.example}</p></details>
