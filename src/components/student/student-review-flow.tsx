@@ -130,7 +130,7 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
   const [pendingMove, setPendingMove] = React.useState<number | "rewrite" | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [message, setMessage] = React.useState("")
-  const [referenceView, setReferenceView] = React.useState<"guide" | "first" | null>(() => record.round === 2 ? "guide" : null)
+  const [referenceView, setReferenceView] = React.useState<"guide" | "first" | null>(() => hasReference ? "guide" : null)
   const [referenceFeedback, setReferenceFeedback] = React.useState(true)
   const [checkedGuideItems, setCheckedGuideItems] = React.useState<Set<number>>(() => new Set(record.rewriteChecklist ?? []))
   const messageTimerRef = React.useRef<number | null>(null)

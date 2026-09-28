@@ -208,15 +208,15 @@ export function ResultScreen({ workbook, template, answers, hasFeedback, feedbac
 }
 
 export function ModalShell({ children, width = "560px", fixedFrame = false }: { children: React.ReactNode; width?: string; fixedFrame?: boolean }) {
-  return <div className="fixed inset-0 z-[100] grid place-items-center bg-black/75 p-4"><section role="dialog" aria-modal="true" style={{ width }} className={cn("max-h-[90dvh] max-w-full rounded-[22px] bg-white shadow-2xl", fixedFrame ? "flex flex-col overflow-hidden" : "overflow-auto")}>{children}</section></div>
+  return <div className="fixed inset-0 z-[100] grid place-items-center bg-black/75 p-4"><section role="dialog" aria-modal="true" style={{ width }} className={cn("max-h-[90dvh] max-w-full rounded-[24px] bg-white text-[#222]", fixedFrame ? "flex flex-col overflow-hidden" : "overflow-auto")}>{children}</section></div>
 }
 
 export function ModalHeader({ title, subtitle, onClose }: { title: string; subtitle?: string; onClose: () => void }) {
-  return <header className="relative shrink-0 border-b-2 border-dashed border-[#dde1e3] px-5 py-3 text-center"><h2 className="text-[24px] font-black">{title}</h2>{subtitle && <p className="mt-0.5 text-[14px] text-[#269bdc]">{subtitle}</p>}<button type="button" onClick={onClose} aria-label="닫기" className="absolute right-4 top-4 text-[#444b50]"><X className="size-7" /></button></header>
+  return <header className="relative shrink-0 border-b-2 border-dashed border-[#e0e0e0] px-12 py-2 text-center"><h2 className="text-[24px] font-semibold leading-9 text-[#505050]">{title}</h2>{subtitle && <p className="mt-0.5 text-[14px] text-[#269bdc]">{subtitle}</p>}<button type="button" onClick={onClose} aria-label="닫기" className="absolute right-4 top-3 text-[#505050]"><X className="size-7" /></button></header>
 }
 
 export function StartConfirmModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: () => void }) {
-  return <ModalShell><ModalHeader title="독후감 선택 확인" onClose={onClose} /><div className="grid min-h-[205px] place-items-center px-7 text-center text-[20px] leading-8"><p>이 독후감으로 시작할까요?<br /><strong className="font-medium">고쳐쓰기 전까지는 다른 독후감으로 바꿀 수 있어요.</strong></p></div><YellowFooter><button type="button" onClick={onClose}>취소</button><button type="button" onClick={onConfirm}>시작하기</button></YellowFooter></ModalShell>
+  return <ModalShell><ModalHeader title="독후감 선택 확인" onClose={onClose} /><div className="grid min-h-[206px] place-items-center p-4 text-center text-[20px] leading-[30px]"><p>이 독후감으로 시작할까요?<br /><strong className="font-medium">고쳐쓰기 전까지는 다른 독후감으로 바꿀 수 있어요.</strong></p></div><YellowFooter><button type="button" onClick={onClose}>취소</button><button type="button" onClick={onConfirm}>시작하기</button></YellowFooter></ModalShell>
 }
 
 export function OutlineModal({ template, onClose, onStart }: { template: WorkbookTemplate; onClose: () => void; onStart: () => void }) {
@@ -230,11 +230,11 @@ export function PreviewModal({ template, onClose }: { template: WorkbookTemplate
 }
 
 export function ConfirmModal({ title, description, cancelLabel = "취소", confirmLabel, single = false, busy = false, onClose, onCancel = onClose, onConfirm }: { title: string; description: React.ReactNode; cancelLabel?: string; confirmLabel: string; single?: boolean; busy?: boolean; onClose: () => void; onCancel?: () => void; onConfirm: () => void }) {
-  return <ModalShell><ModalHeader title={title} onClose={() => { if (!busy) onClose() }} /><div className="grid min-h-[190px] place-items-center px-7 text-center text-[19px] leading-8"><p>{description}</p></div><YellowFooter single={single}>{!single && <button type="button" disabled={busy} onClick={onCancel}>{cancelLabel}</button>}<button type="button" disabled={busy} onClick={onConfirm}>{confirmLabel}</button></YellowFooter></ModalShell>
+  return <ModalShell><ModalHeader title={title} onClose={() => { if (!busy) onClose() }} /><div className="grid min-h-[206px] place-items-center p-4 text-center text-[20px] leading-[30px]"><p>{description}</p></div><YellowFooter single={single}>{!single && <button type="button" disabled={busy} onClick={onCancel}>{cancelLabel}</button>}<button type="button" disabled={busy} onClick={onConfirm}>{confirmLabel}</button></YellowFooter></ModalShell>
 }
 
 export function YellowFooter({ children, single = false }: { children: React.ReactNode; single?: boolean }) {
-  return <footer className={cn("grid h-16 shrink-0 bg-[#ffd924] text-[20px] font-black [&>button+button]:border-l [&>button+button]:border-[#e8be15]", single ? "grid-cols-1" : "grid-cols-2")}>{children}</footer>
+  return <footer className={cn("grid min-h-16 shrink-0 bg-[#ffd720] text-[20px] font-extrabold [&>button]:p-4 [&>button+button]:border-l [&>button+button]:border-black/10 [&>button:disabled]:opacity-50", single ? "grid-cols-1" : "grid-cols-2")}>{children}</footer>
 }
 
 export function NotFound() {

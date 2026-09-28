@@ -8,7 +8,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useReviews, type ReviewRole } from "@/lib/review-client"
 import { reviewAiDialogCopy } from "@/lib/review-ai-dialog"
-import { canAwardReview, canRejectReview, canSendReview, reviewFeedbackItems, reviewIncludesItemFeedback, plainReviewText, reportState, sampleReviewAi, scoreLabel, validAiScores, validItemFeedback, validScores, type ItemFeedback, type ReviewCommon, type ReviewRecord, type ReviewScores } from "@/lib/review-domain"
+import { canAwardReview, canRejectReview, canSendReview, reviewFeedbackItems, reviewIncludesItemFeedback, plainReviewText, reportState, scoreLabel, validAiScores, validItemFeedback, validScores, type ItemFeedback, type ReviewCommon, type ReviewRecord, type ReviewScores } from "@/lib/review-domain"
+import { previewReviewAi } from "@/lib/review-ai-preview"
 import { ReviewAssessment } from "./review-assessment"
 import { TeacherReferencePanel } from "./teacher-reference-panel"
 import { TeacherStudentWriting } from "./teacher-student-writing"
@@ -66,7 +67,7 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
     const requestId = crypto.randomUUID()
     const started = await hook.run({ type: "ai-start", recordId: record.id }, requestId)
     if (started) {
-      const generated = sampleReviewAi(common, { ...record, itemFeedback: items, aiDraft: undefined })
+      const generated = previewReviewAi(common, { ...record, itemFeedback: items, aiDraft: undefined })
       const candidate = { ...generated, items: generated.items.map(item => {
         const current = items.find(existing => existing.itemId === item.itemId)
         const visible = includeItemFeedback && (current?.visible ?? true)
@@ -83,7 +84,7 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
           if (firstItemId) setExpandedItemIds(current => new Set(current).add(firstItemId))
         }
         if (common.reportEnabled) setAssessmentOpen(true)
-        setNotice(`AI가 생성한 ${includeItemFeedback ? "[학생용] 총평·항목별 피드백" : "[학생용] 총평"}${common.reportEnabled ? "과 평가 점수·[보고서용] 총평" : ""}을 확인한 뒤 저장해 주세요.`)
+        setNotice(`새 프롬프트 형식의 프로토타입 샘플입니다. 실제 AI 채점 결과가 아닙니다. ${includeItemFeedback ? "총평·항목별 피드백" : "총평·강점과 보완할 점"}${common.reportEnabled ? "과 평가 점수·보고서용 총평" : ""}을 확인한 뒤 저장해 주세요.`)
       }
       else if (updated?.aiHistory.at(-1)?.reason?.startsWith("채점 불가:")) setNotice(`AI ${updated.aiHistory.at(-1)!.reason} 사용 횟수는 차감되지 않았습니다. 다시 생성해 주세요.`)
       else setNotice("AI 생성 실패: 기존 입력과 점수, 성공 횟수를 유지했습니다.")
