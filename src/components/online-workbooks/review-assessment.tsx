@@ -44,7 +44,7 @@ export function ReviewAssessment({ common, record, scores, onChange, readOnly = 
     </div>
     <div className="overflow-x-auto rounded-lg border border-[#dfe4e8]">
       <table className="w-full min-w-[480px] table-fixed border-collapse text-sm">
-        <thead><tr className="border-b border-[#dfe4e8] bg-[#f7f9fb] text-left text-[#596773]"><th className="w-[18%] px-3 py-3 font-semibold">평가 기준</th><th className="w-[10%] px-2 py-3 text-center font-semibold">배점</th><th className="w-[10%] px-2 py-3 text-center font-semibold">AI 점수</th><th className="w-[62%] px-2 py-3 text-center font-semibold">세부 기준별 선생님 평가</th></tr></thead>
+        <thead><tr className="border-b border-[#dfe4e8] bg-[#f7f9fb] text-left text-[#596773]"><th className="w-[18%] px-3 py-3 font-semibold">평가 영역</th><th className="w-[10%] px-2 py-3 text-center font-semibold">배점</th><th className="w-[10%] px-2 py-3 text-center font-semibold">AI 점수</th><th className="w-[50%] px-2 py-3 text-center font-semibold">세부 기준별 선생님 평가 <CriteriaGuide criteria={criteria} /></th><th className="w-[12%] px-2 py-3 text-center">소계</th></tr></thead>
         <tbody>{areas.map(area => {
           const group = criteria.filter(criterion => criterion.area === area)
           const areaMax = group.reduce((sum, criterion) => sum + criterion.max, 0)
@@ -58,25 +58,40 @@ export function ReviewAssessment({ common, record, scores, onChange, readOnly = 
                 const criterionName = reviewCriterionLabel(criterion)
                 const invalid = value !== undefined && (!Number.isFinite(value) || value < 0 || value > criterion.max)
                 return <div key={criterion.id} className="flex flex-col gap-1">
-                  <div className="flex items-center gap-1 text-xs text-[#596773]"><span>{criterionName}</span><CriterionHelp name={criterionName} description={criterion.description} /></div>
+                  <div className="flex items-center gap-1 text-xs text-[#596773]"><span>{criterionName}</span></div>
                   <div className="flex items-center gap-1.5">
-                  {readOnly ? <span className="flex h-9 min-w-20 items-center justify-center rounded-md bg-[#f7f9fb] px-2 font-semibold text-[#42515e]">{value === undefined ? "-" : scoreLabel(value)}<span className="ml-1 text-xs font-normal text-[#89949d]">/ {criterion.max}</span></span> : <label className={`inline-flex h-9 items-center overflow-hidden rounded-md border bg-white ${invalid ? "border-[#ff4d4f]" : "border-[#bfc8cf] focus-within:border-[#1890ff] focus-within:ring-2 focus-within:ring-[#1890ff]/15"}`}><input aria-label={`${criterionName} 선생님 점수`} type="number" min={0} max={criterion.max} step="any" value={value ?? ""} aria-invalid={invalid} onChange={event => { const next = { ...scores }; if (event.target.value === "") delete next[criterion.id]; else next[criterion.id] = Number(event.target.value); onChange?.(next) }} className="h-full w-12 border-0 bg-transparent px-1 text-right font-semibold outline-none" /><span className="border-l border-[#e2e6e9] bg-[#f7f9fb] px-1.5 text-xs text-[#697681]">/ {criterion.max}</span></label>}</div>
+                  {readOnly ? <span className="flex h-9 min-w-20 items-center justify-center rounded-md bg-[#f7f9fb] px-2 font-semibold text-[#42515e]">{value === undefined ? "-" : scoreLabel(value)}<span className="ml-1 text-xs font-normal text-[#89949d]">/ {criterion.max}</span></span> : <label className={`inline-flex h-9 items-center overflow-hidden rounded-md border bg-white ${invalid ? "border-[#ff4d4f]" : "border-[#bfc8cf] focus-within:border-[#1890ff] focus-within:ring-2 focus-within:ring-[#1890ff]/15"}`}><input aria-label={`${criterionName} 선생님 점수`} type="number" min={0} max={criterion.max} step="any" value={value ?? ""} aria-invalid={invalid} onChange={event => { const next = { ...scores }; if (event.target.value === "") delete next[criterion.id]; else { const value = Number(event.target.value); if (!Number.isFinite(value) || value < 0 || value > criterion.max) return; next[criterion.id] = value; } onChange?.(next) }} className="h-full w-12 border-0 bg-transparent px-1 text-right font-semibold outline-none" /><span className="border-l border-[#e2e6e9] bg-[#f7f9fb] px-1.5 text-xs text-[#697681]">/ {criterion.max}</span></label>}</div>
                   {invalid && <span role="alert" className="text-xs text-[#d4380d]">0~{criterion.max}점</span>}
                 </div>
               })}
-              <span className="mb-2 ml-auto whitespace-nowrap text-xs font-semibold text-[#0877b9]">소계 {subtotal(scores, group.map(criterion => criterion.id))} / {areaMax}</span>
-            </div></td>
+            </div></td><td className="px-2 text-center text-xs text-[#0877b9]">소계 {subtotal(scores, group.map(criterion => criterion.id))} / {areaMax}</td>
           </tr>
         })}</tbody>
-        <tfoot><tr className="bg-[#eaf6ff] font-bold text-[#123b5a]"><td className="px-4 py-3.5">총점</td><td className="px-3 py-3.5 text-center">{criteria.reduce((sum, criterion) => sum + criterion.max, 0)}점</td><td className="px-3 py-3.5 text-center">{aiTotal === undefined ? "-" : scoreLabel(aiTotal)}</td><td className="px-4 py-3.5 text-center">{teacherTotal === undefined ? "-" : scoreLabel(teacherTotal)}</td></tr></tfoot>
+        <tfoot><tr className="bg-[#eaf6ff] font-bold text-[#123b5a]"><td className="px-4 py-3.5">총점</td><td className="px-3 py-3.5 text-center">{criteria.reduce((sum, criterion) => sum + criterion.max, 0)}점</td><td className="px-3 py-3.5 text-center">{aiTotal === undefined ? "-" : scoreLabel(aiTotal)}</td><td></td><td className="px-4 py-3.5 text-center">{teacherTotal === undefined ? "-" : scoreLabel(teacherTotal)}</td></tr></tfoot>
       </table>
     </div>
     {record.round === 2 && record.report && <SecondRoundResult report={record.report} />}
   </section>
 }
 
-function CriterionHelp({ name, description }: { name: string; description: string }) {
-  return <Popover><PopoverTrigger asChild><button type="button" aria-label={`${name} 세부 평가 기준`} className="inline-flex shrink-0 items-center text-[#0877b9] hover:text-[#005a91]"><Info className="size-3.5" /></button></PopoverTrigger><PopoverContent align="start" className="max-w-[min(20rem,calc(100vw-2rem))] whitespace-pre-line text-sm leading-6 text-[#42515e]"><strong className="mb-1 block text-[#263747]">{name}</strong>{description}</PopoverContent></Popover>
+function CriteriaGuide({ criteria }: { criteria: ReviewAssessmentSnapshot["criteria"] }) {
+  const [open, setOpen] = React.useState(false)
+  const dialog = React.useRef<HTMLDialogElement>(null)
+  React.useEffect(() => {
+    if (!open) return
+    const element = dialog.current
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    element?.showModal()
+    return () => { element?.close(); document.body.style.overflow = previousOverflow }
+  }, [open])
+  return <><button type="button" onClick={() => setOpen(true)} className="ml-2 rounded border border-[#1890ff] bg-white px-2 py-1 text-xs font-normal text-[#1890ff]">평가 기준표 보기</button>
+    {open && <dialog ref={dialog} onCancel={() => setOpen(false)} aria-labelledby="review-criteria-title" className="fixed inset-0 m-auto max-h-[85vh] w-[min(960px,calc(100vw-32px))] overflow-hidden rounded-lg border-0 bg-white p-0 text-left text-sm font-normal text-[#44515e] shadow-2xl backdrop:bg-black/45">
+      <header className="flex items-center justify-between border-b px-6 py-4"><h2 id="review-criteria-title" className="text-lg font-semibold">평가 기준 안내</h2><button type="button" onClick={() => setOpen(false)} aria-label="평가 기준 안내 닫기" className="px-2 text-2xl">×</button></header>
+      <div className="max-h-[calc(85vh-140px)] overflow-y-auto p-6"><p className="mb-4 leading-6">독후감은 아래의 기준으로 평가합니다.<br />배점은 각 기준에 부여된 점수이며, 학생이 받은 점수가 아닙니다.</p><table className="w-full border-collapse text-sm"><thead><tr className="bg-[#f5f7f9]">{["평가 영역", "세부 기준", "평가 기준 설명", "배점"].map(label => <th key={label} className="border border-[#ddd] p-3">{label}</th>)}</tr></thead><tbody>{criteria.map(c => <tr key={c.id}><th className="w-28 border border-[#ddd] p-3 font-medium">{reviewAreaLabel(c.area)}</th><th className="w-32 border border-[#ddd] p-3 font-medium">{reviewCriterionLabel(c)}</th><td className="whitespace-pre-line border border-[#ddd] p-3 leading-6">{c.description}</td><td className="border border-[#ddd] p-3 text-center">{c.max}</td></tr>)}</tbody><tfoot><tr><th colSpan={3} className="border border-[#ddd] p-3">총점</th><td className="border border-[#ddd] p-3 text-center">{criteria.reduce((total,c) => total+c.max,0)}</td></tr></tfoot></table></div>
+      <footer className="flex justify-end border-t px-6 py-3"><button type="button" onClick={() => setOpen(false)} className="rounded bg-[#1890ff] px-5 py-2 text-white">닫기</button></footer>
+    </dialog>}
+  </>
 }
 
 function ScoreHelp({ group }: { group: ReviewAssessmentSnapshot }) {

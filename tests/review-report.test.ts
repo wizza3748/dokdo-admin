@@ -20,12 +20,12 @@ function fixture(level: number) {
   return { common, first, second }
 }
 
-test("모든 레벨의 보고서가 기관관리자와 동일한 5개 영역·9개 기준과 배점을 사용한다", () => {
+test("모든 레벨의 보고서가 기관관리자와 동일한 5개 영역·8개 기준과 배점을 사용한다", () => {
   for (let level = 1; level <= 6; level++) {
     const { common, first } = fixture(level)
     const areas = reportAreaScores(common, first)!
     assert.equal(areas.length, 5)
-    assert.equal(areas.flatMap(a => a.details).length, 9)
+    assert.equal(areas.flatMap(a => a.details).length, 8)
     assert.deepEqual(areas.map(a => a.max), [30, 20, 20, 20, 10])
     assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.current, 0) - 220 / 3) < 1e-10)
     for (const area of areas) assert.ok(Math.abs(area.current / area.max - 2.2 / 3) < 1e-10)

@@ -1,12 +1,14 @@
 "use client"
 
 import * as React from "react"
+import ui from "./exploration-test-server.module.css"
 import { useReviews } from "@/lib/review-client"
 import { StudentReviewRecordCard } from "./student-review-records"
 import { SecondReviewStartModal } from "./second-review-start-modal"
+import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ArrowRight, CalendarDays, ChevronLeft, ChevronRight, FileText, Home, Smartphone } from "lucide-react"
+import { CalendarDays, ChevronLeft, ChevronRight, Pencil, FileText, Home, Smartphone } from "lucide-react"
 
 import { StudentHeader } from "@/components/student/student-header"
 import { ModalHeader, ModalShell, YellowFooter } from "@/components/student/student-workbook-ui"
@@ -20,7 +22,7 @@ import { getReadingRoundResultsByBook } from "@/lib/student-mock-state"
 import { cn } from "@/lib/utils"
 import { getWorkbookById, getWorkbookRuntime, studentWorkbooks, type StudentWorkbook } from "@/lib/student-workbooks"
 
-type TabName = "전체" | "책 읽기 탐험" | "글쓰기 탐험" | "영상편지" | "온라인 독후감"
+type TabName = "전체" | "책 읽기 탐험" | "글쓰기 탐험" | "영상편지" | "온라인 독후감" | "바닷속 도서관"
 
 interface BasicRecord {
   id: string
@@ -40,7 +42,7 @@ interface BasicRecord {
   questionResults?: boolean[]
 }
 
-const tabs: TabName[] = ["전체", "책 읽기 탐험", "글쓰기 탐험", "영상편지", "온라인 독후감"]
+const tabs: TabName[] = ["전체", "책 읽기 탐험", "글쓰기 탐험", "영상편지", "온라인 독후감", "바닷속 도서관"]
 
 const basicRecords: BasicRecord[] = [
   { id: "r-0901-1", year: 2026, month: 9, day: 1, weekday: "화요일", type: "책 읽기 탐험", level: 4, title: "민주주의를 어떻게 이룰까요?", attempt: "첫 탐험", progress: "1/1", questions: "0/6" },
@@ -68,6 +70,8 @@ export function ExplorationRecord() {
   const [year, setYear] = React.useState(currentYear)
   const [month, setMonth] = React.useState(currentMonth)
   const [tab, setTab] = React.useState<TabName>("전체")
+  const [readingLevel, setReadingLevel] = React.useState("")
+  const [readingAttempt, setReadingAttempt] = React.useState("")
   const tabListRef = React.useRef<HTMLDivElement>(null)
   React.useEffect(() => {
     const list = tabListRef.current
@@ -105,7 +109,7 @@ export function ExplorationRecord() {
   })
   const transientWorkbookIds = new Set(transientWorkbooks.map((item) => item.id))
   const visibleWorkbooks = [...transientWorkbooks, ...studentWorkbooks.filter((item) => !transientWorkbookIds.has(item.id))].filter((item) => item.year === year && item.month === month && !reviewHook.db.reviews.some(c => c.sourceWorkbookId === item.id))
-  const visibleBasics = [...transientReadingRecords, ...basicRecords].filter((item) => item.year === year && item.month === month && (tab === "전체" || item.type === tab))
+  const visibleBasics = [...transientReadingRecords, ...basicRecords].filter((item) => item.year === year && item.month === month && (tab === "전체" || item.type === tab) && (tab !== "책 읽기 탐험" || ((!readingLevel || String(item.level) === readingLevel) && (!readingAttempt || item.attempt === readingAttempt))))
   const transientActivityByWorkbookId = new Map(transientReadingRecords.map(record => [record.workbookId, readingRecordActivityTimestamp(record)]))
   const transientActivityById = new Map(transientReadingRecords.map(record => [record.id, readingRecordActivityTimestamp(record)]))
   let sourceOrder = 0
@@ -124,6 +128,12 @@ export function ExplorationRecord() {
     result[row.day] = [...(result[row.day] ?? []), row]
     return result
   }, {})
+  const monthBasics = [...transientReadingRecords, ...basicRecords].filter(item => item.year === year && item.month === month)
+  const monthReviews = reviewHook.db.records.filter(record => reviewHook.db.reviews.some(c => c.id === record.reviewId && reviewActivityDate(c).monthKey === `${year}-${String(month).padStart(2,"0")}`))
+  const tabCount = (name: TabName) => name === "온라인 독후감" ? monthReviews.length + visibleWorkbooks.length : name === "전체" ? monthBasics.length + monthReviews.length + visibleWorkbooks.length : monthBasics.filter(r => r.type === name).length
+  const flowers = rows.reduce((sum, row) => sum + (row.kind === "review" ? row.item.flowers : 0), 0)
+  const monthStart = new Date(year, month - 1, 1).getDay()
+  const monthDays = new Date(year, month, 0).getDate()
   const canNext = year < currentYear || (year === currentYear && month < currentMonth)
   const days = Object.keys(grouped).map(Number).sort((a, b) => b - a)
 
@@ -139,36 +149,33 @@ export function ExplorationRecord() {
   const startSecondReview = (recordId: string, sourceWorkbookId: string) => setSecondStart({ recordId, sourceWorkbookId })
 
   return (
-    <div className="min-h-screen bg-[#f5f7f9] text-[#3f4549] [&_button:not(:disabled)]:cursor-pointer">
+    <div className={ui.page}>
       <StudentHeader />
       {secondStart && <SecondReviewStartModal {...secondStart} run={reviewHook.run} onClose={() => setSecondStart(null)} />}
-      <section className="border-b border-[#e5e9ec] bg-white px-4 pb-8 pt-8">
+      <section className={ui.top}>
         <div className="mx-auto flex max-w-[920px] items-center justify-center gap-2">
           <button aria-label="이전 월" onClick={() => moveMonth(-1)} className="grid size-8 place-items-center rounded-full bg-[#2ca4e6] text-white transition hover:bg-[#168fd1]"><ChevronLeft className="size-5" /></button>
           <button type="button" className="flex h-9 items-center gap-2 rounded-full border-2 border-[#36a7e7] bg-white px-5 text-[16px] font-black text-[#1688ca]"><CalendarDays className="size-5" />{year}년 {month}월</button>
           <button aria-label="다음 월" disabled={!canNext} onClick={() => moveMonth(1)} className="grid size-8 place-items-center rounded-full bg-[#2ca4e6] text-white transition hover:bg-[#168fd1] disabled:cursor-not-allowed disabled:opacity-0"><ChevronRight className="size-5" /></button>
         </div>
-        <div ref={tabListRef} role="tablist" aria-label="탐험 유형" className="mx-auto mt-6 flex h-10 max-w-[560px] items-center justify-start overflow-x-auto overflow-y-hidden rounded-full bg-[#fafafa] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:justify-center">
-          {tabs.map((item) => <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)} className={cn("h-8 flex-none whitespace-nowrap rounded-full px-3 text-[15px] font-bold transition sm:flex-1", tab === item ? "bg-[#cdebf8] text-[#1497d9] shadow-sm" : "text-[#8b9297] hover:text-[#1688ca]")}>{item}</button>)}
+        <div ref={tabListRef} role="tablist" aria-label="탐험 유형" className={ui.tabs}>
+          {tabs.map((item) => <button key={item} type="button" role="tab" aria-selected={tab === item} onClick={() => setTab(item)} className={ui.tab}>{item}<span>{tabCount(item)}</span></button>)}
         </div>
       </section>
 
-      <main className="mx-auto max-w-[930px] px-4 py-8">
-        {tab === "온라인 독후감" && (
-          <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-[#cce6f5] bg-[#eef8fd] px-4 py-3 text-[13px] font-bold leading-5 text-[#39718f] sm:items-center sm:px-5 sm:text-sm">
-            <FileText aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-[#1597d5] sm:mt-0" />
-            <p><span className="font-black text-[#f05d94]">분홍색 NEW</span>는 새 피드백, <span className="font-black text-[#168fd1]">파란색 NEW</span>는 2차 작성 요청이에요. 보고서는 제공되는 독후감에만 표시돼요.</p>
-          </div>
-        )}
+      <main className={ui.layout}>
+        <aside className={ui.calendar}><h2>{month}월의 탐험</h2><p className={ui.stats}><strong>{rows.length}</strong> 회 학습 <span><Image className="inline-block" src="/student-assets/flower-reward.svg" alt="섬초롱꽃" width={20} height={20} /> <b>{flowers}</b>개</span></p><div className={ui.days}>{["일","월","화","수","목","금","토"].map((d,i)=><span className={ui.weekday} key={d} data-sunday={i===0}>{d}</span>)}{Array.from({length:monthStart},(_,i)=><span key={`blank-${i}`} />)}{Array.from({length:monthDays},(_,i)=><span key={i} data-active={Boolean(grouped[i+1])} data-today={year===currentYear && month===currentMonth && i+1===currentDate.getDate()}>{i+1}</span>)}</div><footer><p><i />책 + 글　<i />책 또는 글　<i />그 외</p><p>이번 달 <strong>{days.length}일</strong> 탐험했어요</p></footer></aside>
+        <div className={ui.timeline}>{tab === "책 읽기 탐험" && <div className={ui.readingFilters}><label>레벨 <select aria-label="레벨" value={readingLevel} onChange={e=>setReadingLevel(e.target.value)}><option value="">선택</option>{[1,2,3,4,5,6].map(level=><option key={level} value={level}>{level}레벨</option>)}</select></label><label>탐험 구분 <select aria-label="탐험 구분" value={readingAttempt} onChange={e=>setReadingAttempt(e.target.value)}><option value="">선택</option><option>첫 탐험</option><option>재탐험</option></select></label></div>}{tab === "온라인 독후감" && <p className={ui.notice}>보고서는 제공되는 독후감에만 표시돼요.</p>}
         {days.length === 0 ? <div className="grid min-h-[390px] place-items-center rounded-[22px] bg-white text-[#999] shadow-[0_4px_18px_rgba(45,62,72,.08)]"><p>탐험 기록이 없는 달이에요</p></div> : (
           <div className="space-y-8">
             {days.map(day => {
               const dayRows = sortExplorationTimelineItems(grouped[day] ?? [])
-              const weekday = new Intl.DateTimeFormat("ko-KR", { weekday: "long" }).format(new Date(year, month - 1, day))
-              return <section key={day} className="rounded-[22px] bg-white px-4 py-8 sm:px-8 shadow-[0_4px_18px_rgba(45,62,72,.08)]"><h2 className="mb-4 flex items-center gap-2 text-base font-black"><CalendarDays className="size-5 text-[#60baf0]" />{String(month).padStart(2, "0")}월 {String(day).padStart(2, "0")}일 {weekday}</h2><ul className="space-y-2">{dayRows.map((row) => row.kind === "review" ? <StudentReviewRecordCard key={row.item.id} db={reviewHook.db} record={row.item} onStartSecond={(record, sourceWorkbookId) => startSecondReview(record.id, sourceWorkbookId)} /> : row.kind === "workbook" ? <WorkbookRow key={row.item.id} workbook={row.item} mounted={mounted} onClick={() => router.push(`/student/online-workbook/${row.item.id}?from=records`)} /> : <BasicRow key={row.item.id} item={row.item} onClick={row.item.type === "책 읽기 탐험" ? () => setSelectedReadingRecord(row.item) : undefined} />)}</ul></section>
+              const weekday = new Intl.DateTimeFormat("ko-KR", { weekday: "short" }).format(new Date(year, month - 1, day))
+              return <section key={day} className={ui.dayGroup}><h2 className="mb-4 flex items-center gap-2 text-base font-black"><CalendarDays className="size-5 text-[#60baf0]" />{String(month).padStart(2, "0")}월 {String(day).padStart(2, "0")}일 ({weekday})</h2><ul className={ui.cards}>{dayRows.map((row) => row.kind === "review" ? <StudentReviewRecordCard key={row.item.id} db={reviewHook.db} record={row.item} onStartSecond={(record, sourceWorkbookId) => startSecondReview(record.id, sourceWorkbookId)} /> : row.kind === "workbook" ? <WorkbookRow key={row.item.id} workbook={row.item} mounted={mounted} onClick={() => router.push(`/student/online-workbook/${row.item.id}?from=records`)} /> : <BasicRow key={row.item.id} item={row.item} onClick={row.item.type === "책 읽기 탐험" ? () => setSelectedReadingRecord(row.item) : undefined} />)}</ul></section>
             })}
           </div>
         )}
+        </div>
       </main>
 
       {selectedReadingRecord && <ReadingExplorationDetailModal record={selectedReadingRecord} onClose={() => setSelectedReadingRecord(null)} onRead={(mode) => {
@@ -187,17 +194,15 @@ export function ExplorationRecord() {
 function WorkbookRow({ workbook, mounted, onClick }: { workbook: StudentWorkbook; mounted: boolean; onClick: () => void }) {
   const runtime = mounted ? getWorkbookRuntime(workbook) : { status: workbook.status, feedbackSeen: workbook.feedback?.seen ?? true }
   const isNewReview = `${workbook.year}-${String(workbook.month).padStart(2, "0")}` >= "2026-09"
-  const isUnreadFeedback = runtime.status === "feedback" && !runtime.feedbackSeen
-  const action = runtime.status === "before" ? "글 시작하기" : runtime.status === "writing" ? "이어서 쓰기" : runtime.status === "completed" ? "선생님 확인 중" : isUnreadFeedback ? "피드백 확인하기" : "활동 완료"
-  const actionable = runtime.status === "before" || runtime.status === "writing" || isUnreadFeedback
-  const actionColor = runtime.status === "completed" ? "text-[#6f7b83]" : runtime.status === "feedback" && !isUnreadFeedback ? "text-[#2c966f]" : "text-[#178ad1]"
-  return <li><button type="button" onClick={onClick} aria-label={`${workbook.bookTitle} ${action}`} className="flex min-h-[92px] w-full items-stretch overflow-hidden rounded-lg border border-[#e4e8eb] bg-[#f8fafb] text-left transition hover:bg-[#eef3f6]"><div className="min-w-0 flex-1 px-5 py-4"><div className="flex items-center gap-2 text-[12px] font-bold"><span className="rounded-full bg-[#ffe4ee] px-2.5 py-1 text-[#f05d94]">온라인 독후감</span><span className="text-[#f05d94]">{workbook.level}레벨{isNewReview ? " · 1차" : ""}</span></div><p className="mt-2 truncate text-base font-black">{workbook.bookTitle}</p></div><div className={cn("relative flex w-[160px] shrink-0 items-center justify-center gap-1 whitespace-nowrap border-l border-dashed border-[#dce1e4] px-3 py-5 text-center text-xs font-black sm:w-[180px] sm:px-4 sm:text-sm", actionColor)}>{isUnreadFeedback && <span className="absolute right-2 top-2 rounded-full bg-[#ff4c79] px-2 py-0.5 text-[10px] text-white shadow-sm">NEW</span>}<span>{action}</span>{actionable && <ArrowRight aria-hidden="true" className="size-3.5 shrink-0" />}</div></button></li>
+  const unread = runtime.status === "feedback" && !runtime.feedbackSeen
+  const finished = runtime.status === "feedback" && !unread
+  const action = runtime.status === "before" ? "글 시작하기" : runtime.status === "writing" ? "이어서 쓰기" : runtime.status === "completed" ? "선생님 확인 중" : unread ? "피드백 확인하기" : "피드백 다시 보기"
+  return <li><button type="button" onClick={onClick} aria-label={`${workbook.bookTitle} ${action}`} className={ui.recordRow}><div className={ui.rowText}><div className={ui.rowMeta}><span><i data-type="review" />온라인 독후감</span>{isNewReview && <span>1차</span>}<span>{workbook.level}레벨</span>{finished && <b>활동 완료</b>}{runtime.status === "completed" && <span>선생님 확인 중</span>}</div><p>{workbook.bookTitle}</p></div>{runtime.status === "completed" ? <ChevronRight size={16} className="text-[#aaa]" /> : <span className={ui.rowAction} data-tone={unread ? "pink" : finished ? "outline" : "blue"}>{action}{unread && <small>NEW</small>}</span>}</button></li>
 }
 
 function BasicRow({ item, onClick }: { item: BasicRecord | TransientReadingExplorationRecord; onClick?: () => void }) {
-  const typeClass = item.type === "책 읽기 탐험" ? "bg-[#ecebff] text-[#7971ee]" : item.type === "글쓰기 탐험" ? "bg-[#e3f8ef] text-[#2ba97b]" : "bg-[#fff0dc] text-[#e58b2e]"
-  const content = <><div className="min-w-0 flex-1 px-5 py-4"><div className="flex items-center gap-2 text-[12px] font-bold"><span className={cn("rounded-full px-2.5 py-1", typeClass)}>{item.type.replace(" 탐험", "")}</span><span className="text-[#7971ee]">{item.level}레벨 · {item.attempt}</span></div><p className="mt-2 truncate text-base font-black">{item.title} <span className="ml-2 rounded bg-[#e9edef] px-2 py-0.5 text-xs text-[#7a8288]">{item.progress}</span></p></div><div className="grid w-[160px] shrink-0 place-items-center whitespace-nowrap border-l border-dashed border-[#dce1e4] px-3 text-center text-xs font-black sm:w-[180px] sm:px-4 sm:text-base">{item.questions}</div></>
-  return <li>{onClick ? <button type="button" onClick={onClick} className="flex min-h-[92px] w-full items-stretch overflow-hidden rounded-lg border border-[#e4e8eb] bg-[#f8fafb] text-left transition hover:bg-[#eef3f6]">{content}</button> : <div className="flex min-h-[92px] items-stretch overflow-hidden rounded-lg border border-[#e4e8eb] bg-[#f8fafb]">{content}</div>}</li>
+  const content = <><div className={ui.rowText}><div className={ui.rowMeta}><span><i data-type={item.type === "책 읽기 탐험" ? "reading" : "other"} />{item.type}</span><span>{item.level}레벨 · {item.attempt}</span></div><p>{item.title}<small>{item.progress.replace("/", " / ")} 회차</small></p></div><div className={ui.rowScore}><Pencil size={15} fill="#b88bdd" stroke="#ad7fd2" /><strong>{item.questions}</strong><ChevronRight size={16} /></div></>
+  return <li>{onClick ? <button type="button" onClick={onClick} className={ui.recordRow}>{content}</button> : <div className={ui.recordRow}>{content}</div>}</li>
 }
 
 function getReadingRecordIdentity(record: BasicRecord | TransientReadingExplorationRecord) {

@@ -9,6 +9,7 @@ import { reviewCriterionLabel } from "@/lib/review-assessment-config"
 import { reviewImprovementMessage, reviewScoreExplanation } from "@/lib/review-score-policy"
 import { ReviewText } from "./review-ui"
 import styles from "./review-report.module.css"
+import { ReviewReportScreen } from "./review-report-screen"
 
 const colors = { first: "#3974cc", current: "#008778", final: "#7b51c7" }
 const n = (value?: number) => value === undefined ? "—" : scoreLabel(value)
@@ -96,6 +97,8 @@ export function ReviewReportView({ id, role }: { id: string; role: ReviewRole })
   const improvement = reviewImprovementMessage(report.improvement ?? 0)
   return <div className={styles.document}>
     <nav className={styles.toolbar} aria-label="평가 보고서 도구"><span><BookOpen size={17} />온라인 독후감 평가 보고서</span><div>{first && <a href={"/online-review/report/" + first.id + "?role=" + role} target="_blank" rel="noopener noreferrer">1차 보고서 ↗</a>}<button type="button" onClick={() => window.print()}><Printer size={16} />인쇄 / 파일 저장</button></div></nav>
+    <ReviewReportScreen common={common} record={record} first={first} areas={areas} />
+    <div className={styles.printOriginal}>
     <div className={styles.pages}>
       <section className={styles.sheet + " " + styles.cover} aria-label={record.round + "차 평가 보고서 표지"}>
         <header className={styles.coverTop}><Image src="/student-assets/dokdo-logo.svg" width={64} height={55} alt="독도" priority /></header>
@@ -150,6 +153,6 @@ export function ReviewReportView({ id, role }: { id: string; role: ReviewRole })
         </table></div>
         <footer className={styles.endnote}><Image src="/student-assets/dokdo-logo.svg" width={38} height={33} alt="독도" /></footer>
       </ReportSheet>
-    </div>
+    </div></div>
   </div>
 }

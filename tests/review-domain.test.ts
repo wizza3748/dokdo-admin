@@ -494,14 +494,15 @@ test("권한·잘못된 요청·평가 범위·추가 점수 방어", () => {
   assert.equal(plainReviewText("<p>첫 문장</p><p>두 번째 &amp; 생각</p>"), "첫 문장\n두 번째 & 생각")
 })
 
-test("하위·상위 모두 5개 영역과 9개 기준을 사용하고 이전 목 데이터 총점을 보존한다", () => {
+test("하위·상위 모두 5개 영역과 8개 기준을 사용하고 이전 목 데이터 총점을 보존한다", () => {
   const criteria = assessmentCriteria(1)
-  assert.equal(criteria.length, 9)
+  assert.equal(criteria.length, 8)
+  assert.deepEqual(criteria.map(c => c.max), [10, 20, 20, 20, 10, 10, 5, 5])
   assert.equal(new Set(criteria.map(criterion => criterion.area)).size, 5)
   assert.equal(criteria.reduce((total, criterion) => total + criterion.max, 0), 100)
   assert.ok(criteria.every(criterion => criterion.description.length > 0))
   for (const level of [1, 2, 3, 4, 5, 6]) {
-    assert.equal(assessmentCriteria(level).length, 9)
+    assert.equal(assessmentCriteria(level).length, 8)
     assert.equal(assessmentCriteria(level).reduce((total, criterion) => total + criterion.max, 0), 100)
   }
   const db = structuredClone(fixture().db)

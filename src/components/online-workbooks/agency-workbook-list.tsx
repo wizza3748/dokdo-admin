@@ -6,7 +6,6 @@ import Link from "next/link"
 import {
   Bot,
   Check,
-  ChevronDown,
   CircleHelp,
   FileText,
   Flower2,
@@ -15,7 +14,6 @@ import {
   RefreshCw,
   Search,
   Send,
-  SlidersHorizontal,
   X,
 } from "lucide-react"
 
@@ -177,28 +175,26 @@ function FilterMenu({ label, value, onValueChange, options }: {
   options: FilterOption[]
 }) {
   return (
-    <Select value={value} onValueChange={onValueChange}>
+    <div className="flex min-w-0 items-center gap-3"><span className="w-24 shrink-0 text-right text-[13px]">{label}</span><Select value={value} onValueChange={onValueChange}>
       <SelectTrigger
         aria-label={label}
         className={cn(
-          "h-9 w-full min-w-0 gap-2 rounded-full border-slate-200 bg-white px-3.5 text-xs shadow-none transition-colors hover:border-blue-300 focus:ring-2 focus:ring-blue-100 sm:w-auto sm:min-w-[168px]",
+          "h-8 w-full min-w-0 gap-3 rounded border-slate-200 bg-white px-3 text-xs shadow-none hover:border-blue-300",
           value !== "all" && "border-blue-300 bg-blue-50 text-blue-700"
         )}
       >
-        <span className="font-bold">{label}</span>
-        <span className="text-slate-300">·</span>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>{options.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
-    </Select>
+    </Select></div>
   )
 }
 
-function SummaryCards({ records, status, onStatusChange }: { records: OnlineWorkbook[]; status: string; onStatusChange: (status: FeedbackStatus) => void }) {
+function SummaryCards({ records }: { records: OnlineWorkbook[] }) {
   return (
     <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
       {summary.map((item) => (
-        <button key={item.status} type="button" aria-label={`${item.title} 목록 보기`} aria-pressed={status === item.status} aria-controls="agency-review-table" onClick={() => onStatusChange(item.status)} className="flex h-[104px] cursor-pointer items-center justify-between rounded-[10px] border border-slate-200 bg-white px-7 text-left shadow-[0_1px_2px_rgba(15,23,42,0.03)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+        <div key={item.status} className="flex h-[104px] items-center justify-between rounded-[10px] border border-slate-200 bg-white px-7 text-left shadow-[0_1px_2px_rgba(15,23,42,0.03)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
           <span>
             <span className="block text-lg font-semibold text-slate-700">{item.title}</span>
             <span className={cn("mt-1 block text-sm", item.color)}>{item.description}</span>
@@ -207,7 +203,7 @@ function SummaryCards({ records, status, onStatusChange }: { records: OnlineWork
             {records.filter((record) => record.status === item.status).length}
             <span className="ml-1 text-sm font-normal">건</span>
           </span>
-        </button>
+        </div>
       ))}
     </section>
   )
@@ -225,8 +221,6 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
   const [query, setQuery] = React.useState("")
   const [selectedIds, setSelectedIds] = React.useState<string[]>([])
   const [sort, setSort] = React.useState<{ key: SortKey; direction: "asc" | "desc" }>({ key: "submittedAt", direction: "desc" })
-  const [filtersOpen, setFiltersOpen] = React.useState(true)
-  const [guideOpen, setGuideOpen] = React.useState(true)
   const [notice, setNotice] = React.useState("")
   const [actionDialog, setActionDialog] = React.useState<ActionDialog>(null)
   const [page, setPage] = React.useState(1)
@@ -363,64 +357,25 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
   const bulkClass = "h-9 gap-2 border-slate-200 bg-white px-4 text-[13px] font-normal text-slate-700 shadow-sm hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 disabled:bg-white disabled:text-slate-300"
   const selectedRecords = records.filter((record) => selectedIds.includes(record.id))
   const selectedFlowerEligibleCount = selectedRecords.filter((record) => record.flowers === 0 && (!record.reviewId || record.status !== "작성전")).length
-  const activeFilterCount = [level, writingFilter, status, aiRemaining, reportFilter, flower].filter((value) => value !== "all").length + (query ? 1 : 0)
 
   return (
     <div className="w-full space-y-4 pb-2 text-slate-700">
-      <SummaryCards records={records} status={status} onStatusChange={setStatus} />
+      <SummaryCards records={records} />
 
-      <section className="border border-blue-100 bg-[#edf7ff] text-sm leading-7 text-blue-600">
-        <button type="button" aria-expanded={guideOpen} aria-controls="agency-workbook-guide" onClick={() => setGuideOpen(open => !open)} className="flex w-full cursor-pointer items-center justify-between px-6 py-3 text-left font-semibold focus-visible:outline-2 focus-visible:outline-blue-600">
-          <span>온라인 독후감 이용 안내</span><span className="flex items-center gap-1 font-normal">{guideOpen ? "접기" : "펼치기"}<ChevronDown aria-hidden="true" className={cn("size-4 transition-transform", guideOpen && "rotate-180")} /></span>
-        </button>
-        <div id="agency-workbook-guide" hidden={!guideOpen} className="mx-6 mb-3 border-t border-blue-100">
-          <section>
-            <ol className="list-decimal divide-y divide-blue-100 pl-7 text-sm leading-5 text-blue-600">
-              <li className="py-2"><strong>1차 제출:</strong> 학생이 글을 제출하면 목록에 <strong>피드백 작성 전</strong>으로 표시됩니다.</li>
-              <li className="py-2"><strong>1차 피드백:</strong> 작성글 확인 → AI 피드백 생성(선택) → 내용 확인·수정 → <strong>[2차 작성 요청]</strong> 또는 <strong>[1차 완료]</strong> 선택 → 저장 → 학생에게 전송 순서로 처리합니다.</li>
-              <li className="py-2"><strong>학생 확인:</strong> <strong>[1차 완료]</strong>를 선택한 글은 학생이 피드백을 확인하면 활동이 끝나고, <strong>[2차 작성 요청]</strong>을 선택한 글은 학생이 피드백을 확인한 뒤 2차 작성을 시작합니다.</li>
-              <li className="py-2"><strong>2차 피드백:</strong> 학생의 2차 제출 → 피드백 작성·저장 → 학생에게 전송 → 학생 확인 후 활동이 최종 완료됩니다.</li>
-            </ol>
-            <p className="border-t border-blue-100 py-2 text-sm leading-5 text-blue-600">AI 피드백은 차수별 최대 2회까지 생성할 수 있습니다. 학생 전송 후에는 수정·재전송할 수 없으며, 학부모 발송은 차수별 1회만 가능합니다.</p>
-          </section>
-        </div>
+      <section className="rounded border border-[#bae7ff] bg-[#e6f7ff] px-6 py-4 text-[13px] leading-[22px] text-[#1890ff]">
+        <ul className="list-disc pl-4"><li>피드백 작성전인 온라인 독후감을 우선적으로 처리해 주세요.</li><li>일괄 AI 피드백 생성 후에도 상태는 피드백 작성전으로 유지되니, 내용을 확인 후 저장해 주세요.</li><li>AI 피드백 생성은 차수별 최대 2회까지 사용 가능해요.</li><li>피드백 저장 후, 꼭 학생에게 전송해 주세요.</li><li>학부모 발송은 1회만 가능하니 신중히 진행해 주세요.</li></ul>
       </section>
-
-      {filtersOpen && (
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
-            <div className="flex items-center gap-2">
-              <span className="grid size-8 place-items-center rounded-lg bg-blue-50 text-blue-600"><SlidersHorizontal className="size-4" /></span>
-              <h2 className="font-bold text-slate-800">목록 필터</h2>
-              {activeFilterCount > 0 && <span className="rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-bold text-white">{activeFilterCount}개 적용</span>}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" onClick={reset} disabled={activeFilterCount === 0 && !keyword} className="h-8 px-3 text-xs text-slate-500 hover:text-blue-700"><RefreshCw className="mr-1.5 size-3.5" />초기화</Button>
-              <button type="button" onClick={() => setFiltersOpen(false)} className="flex h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 hover:text-blue-700">접기 <ChevronDown className="size-4 rotate-180" /></button>
-            </div>
-          </div>
-
-          <div className="px-5 py-4">
-            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              <FilterMenu label="책읽기 레벨" value={level} onValueChange={setLevel} options={[{ value: "all", label: "전체" }, ...[1, 2, 3, 4, 5, 6].map((item) => ({ value: String(item), label: `${item}레벨` }))]} />
-              <FilterMenu label="차수" value={writingFilter} onValueChange={setWritingFilter} options={writingFilterOptions} />
-              <FilterMenu label="피드백 상태" value={status} onValueChange={setStatus} options={[{ value: "all", label: "전체" }, { value: "작성전", label: "피드백 작성 전" }, { value: "작성완료", label: "피드백 작성 완료" }, { value: "전송완료", label: "피드백 전송 완료" }]} />
-              <FilterMenu label="AI 잔여 횟수" value={aiRemaining} onValueChange={setAiRemaining} options={[{ value: "all", label: "전체" }, { value: "0", label: "0회 남음" }, { value: "1", label: "1회 남음" }, { value: "2", label: "2회 남음" }]} />
-              <FilterMenu label="평가 보고서" value={reportFilter} onValueChange={setReportFilter} options={reportFilterOptions} />
-              <FilterMenu label="섬초롱꽃" value={flower} onValueChange={setFlower} options={[{ value: "all", label: "전체" }, { value: "0", label: "미지급" }, ...[5, 10, 15, 20].map((amount) => ({ value: String(amount), label: `${amount}개 지급` }))]} />
-              <form className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row" onSubmit={(event) => { event.preventDefault(); setQuery(keyword) }}>
-                <div className="relative min-w-[220px] flex-1">
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                  <Input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="학생명 또는 도서명으로 검색" className="h-9 rounded-full border-slate-200 bg-slate-50 pl-10 text-sm shadow-none focus-visible:bg-white" />
-                </div>
-                <Button type="submit" className="h-9 rounded-full bg-blue-600 px-5 hover:bg-blue-700">검색</Button>
-              </form>
-            </div>
-          </div>
-        </section>
-      )}
-      {!filtersOpen && <div className="flex justify-end"><button type="button" onClick={() => setFiltersOpen(true)} className="flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 shadow-sm hover:border-blue-300 hover:text-blue-700"><SlidersHorizontal className="size-4" />필터 펼치기{activeFilterCount > 0 && <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] text-white">{activeFilterCount}</span>}<ChevronDown className="size-4" /></button></div>}
-
+      <section className="rounded border border-[#e5e7eb] bg-white p-5">
+        <div className="grid gap-x-8 gap-y-4 md:grid-cols-3">
+          <FilterMenu label="책읽기 레벨" value={level} onValueChange={setLevel} options={[{value:"all",label:"전체"},...[1,2,3,4,5,6].map(i=>({value:String(i),label:`${i}레벨`}))]} />
+          <FilterMenu label="차수" value={writingFilter} onValueChange={setWritingFilter} options={writingFilterOptions} />
+          <FilterMenu label="피드백 상태" value={status} onValueChange={setStatus} options={[{value:"all",label:"전체"},{value:"작성전",label:"피드백 작성 전"},{value:"작성완료",label:"피드백 작성 완료"},{value:"전송완료",label:"피드백 전송 완료"}]} />
+          <FilterMenu label="AI 잔여 횟수" value={aiRemaining} onValueChange={setAiRemaining} options={[{value:"all",label:"전체"},{value:"0",label:"0회 남음"},{value:"1",label:"1회 남음"},{value:"2",label:"2회 남음"}]} />
+          <FilterMenu label="평가 보고서" value={reportFilter} onValueChange={setReportFilter} options={reportFilterOptions} />
+          <FilterMenu label="섬초롱꽃" value={flower} onValueChange={setFlower} options={[{value:"all",label:"전체"},{value:"0",label:"미지급"},...[5,10,15,20].map(i=>({value:String(i),label:`${i}개 지급`}))]} />
+        </div>
+        <form className="mt-4 flex flex-wrap items-center gap-2" onSubmit={event=>{event.preventDefault();setQuery(keyword)}}><label htmlFor="review-search" className="mr-1 w-24 text-right text-[13px]">검색</label><Input id="review-search" value={keyword} onChange={e=>setKeyword(e.target.value)} placeholder="학생명 또는 도서명 검색" className="h-8 max-w-72 rounded text-sm shadow-none" /><div className="ml-auto flex gap-2"><Button type="button" variant="outline" onClick={reset} className="h-8 rounded"><RefreshCw size={14}/>초기화</Button><Button type="submit" className="h-8 rounded bg-[#1890ff] text-white"><Search size={14}/>검색</Button></div></form>
+      </section>
       {notice && <div role="status" className="border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">{notice}</div>}
 
       <section id="agency-review-table" className="min-h-[700px] bg-white px-3 pt-4">

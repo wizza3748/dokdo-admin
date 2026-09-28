@@ -12,7 +12,7 @@ const seed: ReviewSeed = {
   at: "2026-09-01T00:00:00Z", status: "전송완료", answers: ["책을 읽고 생각을 작성하였습니다."], secondState: "available",
 }
 
-test("입력 전 로컬 구평가는 공통 9개로 변경하고 작성글·피드백·사용횟수를 보존한다", () => {
+test("입력 전 로컬 구평가는 공통 8개로 변경하고 작성글·피드백·사용횟수를 보존한다", () => {
   const db = createSeededReviewDatabase([seed]), record = db.records[0]
   delete record.assessment
   delete record.teacherScores
@@ -23,7 +23,7 @@ test("입력 전 로컬 구평가는 공통 9개로 변경하고 작성글·피�
   const legacy = expandLegacyReviewScores(db), before = structuredClone(legacy)
   const next = upgradeUnscoredMockAssessments(legacy)
   const updated = next.records[0]
-  assert.equal(updated.assessment?.criteria.length, 9)
+  assert.equal(updated.assessment?.criteria.length, 8)
   assert.equal(assessmentAreas(1, updated).length, 5)
   assert.ok(validAiScores(1, updated.aiScores, updated))
   for (const key of ["answers", "feedback", "reportFeedback", "itemFeedback", "aiUsed", "history"] as const) assert.deepEqual(updated[key], record[key])
@@ -41,10 +41,10 @@ test("선생님 점수가 일부라도 입력된 활동은 로컬 전환으로 �
   assert.deepEqual(upgradeUnscoredMockAssessments(legacy), legacy)
 })
 
-test("AI는 영역별 5개 점수, 선생님은 세부 9개 점수로 서로 다른 입력을 검증한다", () => {
+test("AI는 영역별 5개 점수, 선생님은 세부 8개 점수로 서로 다른 입력을 검증한다", () => {
   const db = createSeededReviewDatabase([seed]), record = db.records[0]
   assert.equal(Object.keys(record.aiScores!).length, 5)
-  assert.equal(Object.keys(record.teacherScores!).length, 9)
+  assert.equal(Object.keys(record.teacherScores!).length, 8)
   assert.ok(validAiScores(1, record.aiScores, record))
   assert.ok(validScores(1, record.teacherScores, record))
   assert.equal(validAiScores(1, record.teacherScores, record), false)
@@ -60,7 +60,7 @@ test("배점 설정을 바꾸어도 기존 기준·보고서·2차 최초 생성
   try {
     configured[0].max = 25
     assert.equal(assessmentCriteria(1)[0].max, 25)
-    assert.equal(assessmentCriteria(1, first)[0].max, 20)
+    assert.equal(assessmentCriteria(1, first)[0].max, oldMax)
     assert.deepEqual(reportAreaScores(db.reviews[0], first), areas)
     const actor: ReviewActor = { role: "student", studentId: "student", name: "학생" }
     const next = applyReviewCommand(db, { type: "start-second", recordId: first.id }, actor, "new-second", "2026-09-14T00:00:00Z")

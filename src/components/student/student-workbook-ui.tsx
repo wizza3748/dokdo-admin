@@ -238,5 +238,5 @@ export function YellowFooter({ children, single = false }: { children: React.Rea
 }
 
 export function NotFound() {
-  return <div className="grid min-h-screen place-items-center bg-[#f5f7f9]"><div className="text-center"><BookOpen className="mx-auto size-12 text-[#188fd0]" /><h1 className="mt-4 text-xl font-black">독후감을 찾을 수 없습니다.</h1><Link href="/student/exploration-record" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#239cdf] px-5 py-3 font-black text-white"><ChevronLeft className="size-4" />탐험 기록으로 돌아가기</Link></div></div>
+  return <div className="grid min-h-screen place-items-center bg-[#f5f7f9]"><div className="text-center"><BookOpen className="mx-auto size-12 text-[#188fd0]" /><h1 className="mt-4 text-xl font-black">독후감을 찾을 수 없습니다.</h1><Link href="/student/exploration-record?tab=workbook" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#239cdf] px-5 py-3 font-black text-white"><ChevronLeft className="size-4" />온라인 독후감 목록으로 돌아가기</Link></div></div>
 }

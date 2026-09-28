@@ -1,7 +1,7 @@
 export type ReviewAssessmentCriterion = { id: string; area: string; name: string; max: number; description: string }
 
 // Area strings are also persisted score keys. Rename labels without moving or losing marks.
-export const reviewAreaLabel = (area: string) => area === "구성 및 조직력" ? "구성과 조직력" : area
+export const reviewAreaLabel = (area: string) => area === "구성 및 조직력" ? "구성과 조직력" : area === "표현과 전달력" ? "표현력" : area
 export const reviewCriterionLabel = (criterion: ReviewAssessmentCriterion) => criterion.area === "감상과 깨달음" && criterion.name === "구체성" ? "감상의 구체성" : criterion.name
 
 export const legacyAssessmentCriteria: ReviewAssessmentCriterion[] = [
@@ -24,20 +24,67 @@ export type ReviewAssessmentSnapshot = {
 }
 
 const commonCriteria: ReviewAssessmentCriterion[] = [
-  { id: "accuracy", area: "내용 요약", name: "내용의 정확성", max: 20, description: "책의 내용을 정확하게 이해하고 해당 독후감 템플릿에서 요약·설명에 필요한 내용을 충분히 담아 적절하게 정리했는가?" },
-  { id: "logic", area: "내용 요약", name: "논리성", max: 10, description: "요약한 내용(사건·정보) 사이의 관계가 자연스럽게 드러나는가?\n이야기책\n저학년: 사건 간 시공간·인과 관계에 따른 흐름 등\n고학년: 시공간과 인과 관계에 따른 흐름, 이야기 구조(발단·전개·절정·결말)에 따른 전개 등\n정보 책: 개념 간 관계\n저학년: 개념 소개- 구체적인 설명(중심 문장-뒷받침 문장)\n고학년: 정의-예시, 원인-결과, 비교·대조, 문제 상황-해결 방안 등" },
-  { id: "specific", area: "감상과 깨달음", name: "구체성", max: 20, description: "책의 구체적인 장면·사건·정보를 바탕으로 자신의 생각이나 느낌을 제시하고 그 이유와 개인적인 반응을 구체적으로 드러냈는가?" },
-  { id: "original", area: "발상과 독창성", name: "독창성", max: 10, description: "책의 인물·사건·정보를 그대로 되풀이하는 것을 넘어 자신의 판단이나 해석을 제시하고 그 이유를 설명했는가?" },
-  { id: "flexible", area: "발상과 독창성", name: "융통성", max: 10, description: "책의 인물·사건·정보·상황을 다른 관점이나 조건으로 바꾸어 생각하고 그에 따라 무엇이 달라질지를 확장하여 평가했는가?" },
-  { id: "unity", area: "구성 및 조직력", name: "완결성과 통일성", max: 10, description: "완결성: 독후감 템플릿이 요구하는 각 항목을 빠짐 없이 작성되었는가?\n통일성: 각 부분이 책과 관련된 하나의 주제나 내용으로 통합되는가?" },
-  { id: "cohesion", area: "구성 및 조직력", name: "결속성", max: 10, description: "작성한 글의 문장·문단 사이의 표현상 연결이 자연스러운가?" },
-  { id: "expression", area: "표현과 전달력", name: "표현의 정확성", max: 5, description: "평가 오류 유형(맞춤법 / 띄어쓰기 / 문장 호응·문법 / 낱말 선택 / 문장부호) 종류의 개수에 따라 차감합니다." },
-  { id: "delivery", area: "표현과 전달력", name: "전달력", max: 5, description: "자신의 생각을 읽는 사람이 이해하기 쉽게 전달했는가?\n(맞춤법·띄어쓰기·문법 오류를 바로잡았다고 가정해도 남는 문장 구조상의 이해 저해 요인 여부)" },
+  {
+    "id": "accuracy",
+    "area": "내용 요약",
+    "name": "요약의 정확성",
+    "max": 10,
+    "description": "요약한 내용이  책 내용과 일치하는가? 오류는 없는가?\n  • 인물, 사건, 배경(이야기책)이나 정보(정보 책)의 개념에 대한 서술의 정확성"
+  },
+  {
+    "id": "sufficiency",
+    "area": "내용 요약",
+    "name": "요약의 충분성",
+    "max": 20,
+    "description": "책을 읽지 않은 사람도 이해할 만큼 충분히 요약했는가? 요약한 내용이 다음과 같은 흐름으로 자연스럽게 연결되는가?\n  • 이야기책: 시공간·인과 관계(전 레벨) / 이야기 구조(발단·전개·절정·결말)(4~6레벨) 등\n  • 정보 책: 중심 문장과 뒷받침 문장의 관계(전 레벨) / 정의-예시·원인-결과·비교·대조·문제 상황-해결 방안 등(4~6레벨)"
+  },
+  {
+    "id": "specific",
+    "area": "감상과 깨달음",
+    "name": "감상의 구체성",
+    "max": 20,
+    "description": "‘재미있었다.’와 같은 형식적이고 막연한 반응에 그치지 않고 자신만의 생각이 드러나도록 서술했는가?\n감상을 자신의 경험이나 가치, 상상한 내용 등으로 확장하여 구체적으로 서술했는가?"
+  },
+  {
+    "id": "original",
+    "area": "발상과 독창성",
+    "name": "감상의 창의성",
+    "max": 20,
+    "description": "책 내용에 대한 자신만의 창의적인 생각을 담아 서술했는가? 그 관점을 하나의 일관된 시각으로 끝까지 밀고 나가며 깊이 있게 전개했는가?\n  • 유형1: 책 내용과 관련하여 자신만의 참신한 해석을 제시하고 그렇게 생각한 이유를 서술했는가? \n  • 유형2: 책 내용을 책에 명시되지 않은 다른 관점(인물의 입장 등)이나 다른 조건(선택·상황이 달랐다면)으로 바꾸어 생각해보며, 그로부터 원작에는 없던 새로운 이해나 예측을  서술했는가?"
+  },
+  {
+    "id": "unity",
+    "area": "구성 및 조직력",
+    "name": "논리성",
+    "max": 10,
+    "description": "자신의 생각을 적절한 이유와 근거를 들어 논리적으로 전개했는가?(글에 모순되거나 타당하지 않은 내용이 섞여 있지 않는가?)\n템플릿의 항목 간, 항목 안의 내용이 책과 관련된 하나의 주제나 내용으로 통합되도록 전개했는가?\n＊1~3레벨: 모든 항목이 같은 책·같은 화제를 벗어나지 않고 서로 모순되지 않으면 통일성이 충족된 것으로 본다."
+  },
+  {
+    "id": "cohesion",
+    "area": "구성 및 조직력",
+    "name": "응집성",
+    "max": 10,
+    "description": "문장 사이, 문단 사이가 접속어·지시어 등의 언어적 연결 장치를 통해 자연스럽게 이어지는가?\n＊1~3레벨: 한 항목 내에서 문장 간 연결이 자연스러우면 응집성이 충족된 것으로 본다."
+  },
+  {
+    "id": "expression",
+    "area": "표현과 전달력",
+    "name": "표현의 정확성",
+    "max": 5,
+    "description": "표현상의 오류 없이 정확하게 서술했는가? (오류 유형의 수에 따라 1점씩 차감함.)\n  • 오류 유형: ⓐ맞춤법 오류 / ⓑ띄어쓰기 오류 / ⓒ문장 부호의 부적절한 사용 / ⓓ구어체 사용(줄임말 등) / ⓔ어휘 선택의 오류(예: 선생님은 우리를 교육시킨다[교육한다].)"
+  },
+  {
+    "id": "delivery",
+    "area": "표현과 전달력",
+    "name": "문장력",
+    "max": 5,
+    "description": "읽기 저해 요인 없이 명료하게 이해할 수 있도록 서술했는가?(저해 요인 유형의 수에 따라 1점씩 차감함.)\n  • 저해 요인: ⓕ짧은 문장만 이어지거나 한 문장이 너무 긺./ ⓖ같은 어구의 불필요한 반복으로 여러 문장이 단조로움. / ⓗ문장 성분의 일부 누락(예: 표지가 귀여워서.) / ⓘ문장 성분 간의 호응이 맞지 않음.(예: 왜냐하면 집에 갔다.) / ⓙ문장의 중의적 표현(예: 친구가 쓴 책[친구가 저술한 책/ 친구가 사용한 책])"
+  }
 ]
 
 /** Add level-specific groups here later. Persisted assessment snapshots are never rewritten. */
 export const REVIEW_ASSESSMENT_CONFIG = {
-  version: "2026-09-14-common-9",
+  version: "2026-09-28-common-8",
   groups: [
     { id: "common", label: "전 레벨 공통", minLevel: 1, maxLevel: 6, criteria: commonCriteria },
   ],

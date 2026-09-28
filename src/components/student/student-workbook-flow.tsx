@@ -322,9 +322,9 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
       {view !== "write" && view !== "rewrite" && (
         <button
           type="button"
-          onClick={() => router.push("/student/exploration-record")}
+          onClick={goToList}
           className="fixed bottom-6 left-7 z-20 grid size-14 place-items-center rounded-full border-4 border-white bg-white text-[#0797dc] shadow-[0_5px_24px_rgba(0,0,0,.18)]"
-          aria-label="탐험 기록으로 돌아가기"
+          aria-label="온라인 독후감 목록으로 돌아가기"
         >
           <span className="text-2xl">⌂</span>
         </button>
