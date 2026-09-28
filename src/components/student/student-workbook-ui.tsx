@@ -140,7 +140,7 @@ export function WritingFooter({ questionIndex, dirty, onPrevious, onNext, onSave
   )
 }
 
-export function RewriteScreen({ template, answers, setAnswers, dirty, onPrevious, onSave, onSubmit }: { template: WorkbookTemplate; answers: string[]; setAnswers: React.Dispatch<React.SetStateAction<string[]>>; dirty: boolean; onPrevious: () => void; onSave: () => void; onSubmit: () => void }) {
+export function RewriteScreen({ template, answers, setAnswers, dirty, submissionTooShort, onPrevious, onSave, onSubmit }: { template: WorkbookTemplate; answers: string[]; setAnswers: React.Dispatch<React.SetStateAction<string[]>>; dirty: boolean; submissionTooShort: boolean; onPrevious: () => void; onSave: () => void; onSubmit: () => void }) {
   const [editingIndex, setEditingIndex] = React.useState<number | null>(null)
 
   return (
@@ -183,7 +183,7 @@ export function RewriteScreen({ template, answers, setAnswers, dirty, onPrevious
           </div>
         </section>
       </main>
-      <footer className="fixed inset-x-0 bottom-0 z-40 h-[68px] bg-[#4a5e77]"><div className="mx-auto flex h-full max-w-[930px] items-center justify-between"><button type="button" onClick={onPrevious} className="flex h-11 items-center gap-2 rounded bg-[#34475f] px-5 font-black text-white"><ArrowLeft className="size-4" />이전</button><div className="flex gap-2"><button type="button" disabled={!dirty} onClick={onSave} className="flex h-11 items-center gap-2 rounded bg-[#8f86ef] px-5 font-black text-white disabled:opacity-60"><Save className="size-4" />저장하기</button><button type="button" onClick={onSubmit} className="h-11 rounded bg-[#249ce0] px-7 font-black text-white">제출하기</button></div></div></footer>
+      <footer className="fixed inset-x-0 bottom-0 z-40 h-[68px] bg-[#4a5e77]"><div className="mx-auto flex h-full max-w-[930px] items-center justify-between"><button type="button" onClick={onPrevious} className="flex h-11 items-center gap-2 rounded bg-[#34475f] px-5 font-black text-white"><ArrowLeft className="size-4" />이전</button><div className="flex gap-2"><button type="button" disabled={!dirty} onClick={onSave} className="flex h-11 items-center gap-2 rounded bg-[#8f86ef] px-5 font-black text-white disabled:opacity-60"><Save className="size-4" />저장하기</button><button type="button" onClick={onSubmit} aria-disabled={submissionTooShort} className={cn("h-11 rounded bg-[#249ce0] px-7 font-black text-white", submissionTooShort && "opacity-45")}>제출하기</button></div></div></footer>
     </>
   )
 }

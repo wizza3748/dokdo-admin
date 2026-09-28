@@ -178,7 +178,9 @@ export function createSeededReviewDatabase(seeds: ReviewSeed[]): ReviewDatabase 
     const run = (command: ReviewCommand, actor = student) => {
       const requestId = `seed:${seed.common.id}:${++sequence}`
       const at = new Date(Date.parse(seed.at) + sequence * 60_000).toISOString()
-      db = applyReviewCommand(db, command, actor, requestId, at)
+      // Historical demo submissions predate the minimum-length rule. Reconstruct
+      // them unchanged; interactive submissions always use applyReviewCommand.
+      db = applyReviewCommandInternal(db, command, actor, requestId, at, true)
       return requestId
     }
     run({ type: "create", common: { ...seed.common, seeded: true } })
@@ -268,6 +270,16 @@ export function mergeReviewSeeds(existing: ReviewDatabase, seeds: ReviewDatabase
   return { ...existing, seedVersion: seeds.seedVersion, reviews: [...existing.reviews.map(c => { const repair = repairs.find(seed => seed.id === c.id); return repair ? { ...repair, progress: resetSeenDefaults ? repair.progress : c.progress } : c }), ...additions], records: [...existing.records.filter(r => !repairs.some(c => c.id === r.reviewId)), ...seeds.records.filter(r => [...additions, ...repairs].some(c => c.id === r.reviewId)).map(r => { const old = existing.records.find(o => o.id === r.id); return old ? { ...r, seenAt: resetSeenDefaults ? r.seenAt : old.seenAt, history: [...r.history, ...old.history.filter(h => !h.requestId.startsWith(`seed:${r.reviewId}:`) && !(resetSeenDefaults && h.action === "seen"))] } : r })] }
 }
 export const plainReviewText = (html: string) => html.replace(/<br\s*\/?\s*>|<\/(p|div)>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").trim()
+
+export const REVIEW_MIN_SUBMISSION_LENGTH = 100
+export const REVIEW_SHORT_SUBMISSION_MESSAGE = "독후감을 100자 이상 작성해야 제출할 수 있어요. 책의 내용과 내 생각을 조금 더 써 보세요."
+/** Count student text only, including spaces, but not markup or line breaks. */
+export function reviewWritingLength(contents: string[]) {
+  return contents.reduce((sum, content) => sum + Array.from(plainReviewText(content).replace(/[\r\n\u200b\ufeff]/g, "")).length, 0)
+}
+export function reviewSubmissionLength(template: ReviewTemplate, answers: Record<string, string>, body: string) {
+  return reviewWritingLength(reviewWritingMode(template) === "items" ? template.items.map(item => answers[item.id] ?? "") : [body])
+}
 export const scoreLabel = reviewScoreLabel
 
 /** Recalculate only derived values of existing reports, including sent reports.
@@ -424,6 +436,10 @@ export function validItemFeedback(items: ItemFeedback[]) {
 
 /** Pure command boundary shared by the API and regression tests. Never mutate previous records. */
 export function applyReviewCommand(database: ReviewDatabase, command: ReviewCommand, actor: ReviewActor, requestId: string, at: string): ReviewDatabase {
+  return applyReviewCommandInternal(database, command, actor, requestId, at)
+}
+
+function applyReviewCommandInternal(database: ReviewDatabase, command: ReviewCommand, actor: ReviewActor, requestId: string, at: string, restoringHistoricalSeed = false): ReviewDatabase {
   const db = normalizeReviewReportScores(normalizeReviewFeedbackScope(structuredClone(database)))
   requireCondition(["create", "switch-template", "start-second", "save-writing", "enter-rewrite", "submit", "seen", "reject", "send", "parent", "ai-start", "ai-result", "flower", "save-feedback"].includes(command.type), "지원하지 않는 작업입니다.")
   if (db.records.some(r => r.history.some(h => h.requestId === requestId))) return db
@@ -496,7 +512,8 @@ export function applyReviewCommand(database: ReviewDatabase, command: ReviewComm
     record.stage = "rewrite"
   } else if (command.type === "submit") {
     if (reviewWritingMode(review.template) === "items") record.body = composeReviewBody(review.template, record.answers)
-    requireCondition(record.writingStatus === "writing" && record.stage === "rewrite" && plainReviewText(record.body), "고쳐쓰기 본문을 작성해 주세요.")
+    requireCondition(record.writingStatus === "writing" && record.stage === "rewrite", "고쳐쓰기 본문을 작성해 주세요.")
+    requireCondition(restoringHistoricalSeed || reviewSubmissionLength(review.template, record.answers, record.body) >= REVIEW_MIN_SUBMISSION_LENGTH, REVIEW_SHORT_SUBMISSION_MESSAGE)
     record.finalBody = record.body; record.writingStatus = "submitted"; record.submittedAt = at; record.feedbackStatus = "작성전"; review.progress = `${prefix}-submitted`
   } else if (command.type === "seen") {
     requireCondition(record.feedbackStatus === "전송완료", "아직 전송되지 않은 피드백입니다.")

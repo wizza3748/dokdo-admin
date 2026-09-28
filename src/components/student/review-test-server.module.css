@@ -21,6 +21,20 @@
 .writingWorkspace .stageHeader{max-width:none;padding:24px 0 12px}
 .writingWorkspace .writing{max-width:none;padding:12px 0 100px;grid-template-columns:264px minmax(0,1fr)}
 .writingWorkspace .editorBody [contenteditable]{min-height:480px}
+.itemRewriteBody{display:grid;gap:8px;padding:16px}
+.rewriteItem{min-width:0;padding:0}
+.rewriteItem>h3{padding:16px 16px 0}
+.rewriteItem h3{font-size:16px;font-weight:700;line-height:24px;margin-bottom:12px}
+.rewriteItem>div:not(.rewriteItemPreview){margin:0 16px 16px}
+.rewriteItemPreview{position:relative;padding:16px;border:1px solid transparent;border-radius:8px;cursor:pointer;transition:border-color .15s,background-color .15s}
+.rewriteItemPreview:hover,.rewriteItemPreview:focus-visible{border-color:#67b8ff;background:#f8f8f8;outline:none}
+.rewriteItemPreview h3{padding-right:120px}
+.editItemHint{position:absolute;right:16px;top:10px;padding:2px 10px;border-radius:20px;background:#0077cb;color:white;font-size:11px;font-weight:700;opacity:0}
+.rewriteItemPreview:hover .editItemHint,.rewriteItemPreview:focus-visible .editItemHint{opacity:1}
+.rewriteItemText{padding-bottom:3px;border-bottom:2px dotted #d5e1e8;min-height:30px}
+.rewriteItemText>div,.rewriteItemText p{font-size:16px;line-height:28px}
+.emptyRewriteItem{color:#a1a8ae}
+.writingWorkspace .itemRewriteBody [contenteditable]{min-height:180px}
 .writingWorkspace[data-reference=true]{max-width:none;margin-right:400px;margin-left:max(0px,calc((100vw - 1720px)/2))}
 .writingTitle{display:flex;align-items:center;justify-content:space-between;gap:20px}
 .writingTitle h1>span{display:inline-flex;align-items:center;gap:6px;border-radius:20px;background:#eeeef0;color:#0077cb;font-weight:600}

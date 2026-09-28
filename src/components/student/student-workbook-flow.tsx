@@ -8,6 +8,7 @@ import { SelectionTitle, WorkbookTopBars, SelectionScreen, WritingScreen, Rewrit
 import { StudentHeader } from "@/components/student/student-header"
 import { StudentReviewFlow } from "@/components/student/student-review-flow"
 import { readReviews } from "@/lib/review-client"
+import { REVIEW_MIN_SUBMISSION_LENGTH, REVIEW_SHORT_SUBMISSION_MESSAGE, reviewWritingLength } from "@/lib/review-domain"
 import {
   getStudentAgencyWorkbookRecordId,
   syncStudentSubmittedAgencyWorkbooks,
@@ -22,7 +23,7 @@ import {
 } from "@/lib/student-workbooks"
 
 type ViewMode = "select" | "write" | "rewrite" | "result"
-type ModalMode = "preview" | "start" | "outline" | "switch" | "save" | "content-review" | "content-empty" | "submit" | "feedback" | null
+type ModalMode = "preview" | "start" | "outline" | "switch" | "save" | "content-review" | "content-empty" | "submit" | "short-submit" | "feedback" | null
 
 export function StudentWorkbookFlow({ id }: { id: string }) {
   const [modern, setModern] = React.useState<boolean | null>(null)
@@ -72,6 +73,7 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
 
   const template = workbook.templates.find((item) => item.id === selectedId) ?? workbook.templates[0]
   const dirty = answers.join("\n") !== savedAnswers.join("\n")
+  const submissionTooShort = reviewWritingLength(template.questions.map((_, index) => answers[index] ?? "")) < REVIEW_MIN_SUBMISSION_LENGTH
   const goToList = () => router.push(`/student/exploration-record?tab=workbook&month=${workbook.year}-${String(workbook.month).padStart(2, "0")}`)
   const listAction = <button type="button" onClick={goToList} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-[#147fbd] hover:underline focus-visible:outline-2 focus-visible:outline-[#249ce0]"><ArrowLeft aria-hidden="true" className="size-4" />온라인 독후감 목록</button>
 
@@ -162,6 +164,7 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
   }
 
   const confirmSubmit = async () => {
+    if (submissionTooShort) { setModal("short-submit"); return }
     setSavedAnswers(answers)
     persist({ status: "completed", selectedTemplateId: template.id, answers }, "제출이 완료되었어요.")
     const submittedAt = new Date()
@@ -244,7 +247,8 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
           dirty={dirty}
           onPrevious={() => setView("write")}
           onSave={saveAnswers}
-          onSubmit={() => setModal("submit")}
+          submissionTooShort={submissionTooShort}
+          onSubmit={() => setModal(submissionTooShort ? "short-submit" : "submit")}
         />
       )}
       {view === "result" && (
@@ -319,6 +323,7 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
           onConfirm={confirmSubmit}
         />
       )}
+      {modal === "short-submit" && <ConfirmModal title="제출 안내" description={REVIEW_SHORT_SUBMISSION_MESSAGE} single confirmLabel="확인" onClose={() => setModal(null)} onConfirm={() => setModal(null)} />}
       {view !== "write" && view !== "rewrite" && (
         <button
           type="button"

@@ -17,6 +17,7 @@ import type { StudentWorkbook } from "@/lib/student-workbooks"
 import { ReviewEditor, ReviewText } from "@/components/online-workbooks/review-ui"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Arrow as PopoverArrow } from "@radix-ui/react-popover"
+import { REVIEW_MIN_SUBMISSION_LENGTH, REVIEW_SHORT_SUBMISSION_MESSAGE, reviewSubmissionLength } from "@/lib/review-domain"
 
 type ReviewHook = ReturnType<typeof useReviews>
 
@@ -124,7 +125,8 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
   const [answers, setAnswers] = React.useState(record.answers)
   const [body, setBody] = React.useState(record.body)
   const [index, setIndex] = React.useState(record.itemIndex)
-  const [modal, setModal] = React.useState<"save" | "rewrite" | "submit" | "previous-blocked" | null>(null)
+  const [editingRewriteItem, setEditingRewriteItem] = React.useState<string | null>(null)
+  const [modal, setModal] = React.useState<"save" | "rewrite" | "submit" | "short-submit" | "previous-blocked" | null>(null)
   const [pendingMove, setPendingMove] = React.useState<number | "rewrite" | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [message, setMessage] = React.useState("")
@@ -138,9 +140,7 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
     ? (itemRewrite ? JSON.stringify(answers) !== JSON.stringify(record.answers) : body !== record.body)
     : JSON.stringify(answers) !== JSON.stringify(record.answers)
   const dirty = contentDirty || checklistDirty
-  const hasRewriteContent = itemRewrite
-    ? Object.values(answers).some(answer => plainReviewText(answer))
-    : Boolean(plainReviewText(body))
+  const submissionTooShort = reviewSubmissionLength(common.template, answers, body) < REVIEW_MIN_SUBMISSION_LENGTH
   const previousBlocked = rewrite && (contentDirty || record.rewriteEdited || record.initialStage === "rewrite")
   React.useEffect(() => { const guard = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); e.returnValue = "" } }; window.addEventListener("beforeunload", guard); return () => window.removeEventListener("beforeunload", guard) }, [dirty])
   React.useEffect(() => () => { if (messageTimerRef.current !== null) window.clearTimeout(messageTimerRef.current) }, [])
@@ -232,6 +232,7 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
     setModal(null)
   }
   const confirm = async () => {
+    if (modal === "submit" && submissionTooShort) { setModal("short-submit"); return }
     setBusy(true)
     if (modal === "rewrite") await enterRewrite()
     else if (modal === "submit" && (!dirty || await save())) await hook.run({ type: "submit", recordId: record.id })
@@ -249,7 +250,12 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
         {common.template.items.map((question, qi) => <section key={question.id} data-active={qi === index}><button type="button" onClick={() => rewrite ? setIndex(qi) : requestMove(qi)}><span>{plainReviewText(answers[question.id]) ? <Check size={15} /> : qi + 1}</span>{question.title}</button>{qi === index && <div><p>{question.description}</p>{question.example && <p className={ui.example}><strong>예시</strong>{question.example}</p>}</div>}</section>)}
       </aside>
       <section className={ui.editorCard}><header><h2>{rewrite ? common.template.title : <><span>{index + 1}</span>{item.title}</>}</h2>{!rewrite && <button type="button" disabled={busy || !dirty} onClick={() => void saveCurrent()}>저장</button>}</header>
-        <div className={ui.editorBody}>{!rewrite ? <ReviewEditor student label={`질문 항목별 작성 내용 ${index + 1}번 ${item.title}`} value={answers[item.id] ?? ""} onChange={value => setAnswers(a => ({ ...a, [item.id]: value }))} /> : itemRewrite ? common.template.items.map((q, qi) => <section key={q.id}><h3>{qi + 1}. {q.title}</h3><ReviewEditor student label={`고쳐쓰기 ${qi + 1}번 항목`} value={answers[q.id] ?? ""} onChange={value => setAnswers(a => ({ ...a, [q.id]: value }))} /></section>) : <ReviewEditor student label="고쳐쓰기 본문" value={body} onChange={setBody} />}
+        <div className={cn(ui.editorBody, itemRewrite && ui.itemRewriteBody)}>{!rewrite ? <ReviewEditor student label={`질문 항목별 작성 내용 ${index + 1}번 ${item.title}`} value={answers[item.id] ?? ""} onChange={value => setAnswers(a => ({ ...a, [item.id]: value }))} /> : itemRewrite ? common.template.items.map((q, qi) => <section key={q.id} className={ui.rewriteItem}>
+          {editingRewriteItem === q.id ? <><h3>{qi + 1}. {q.title}</h3><ReviewEditor student label={`고쳐쓰기 ${qi + 1}번 항목`} value={answers[q.id] ?? ""} onChange={value => setAnswers(a => ({ ...a, [q.id]: value }))} /></> : <div role="button" tabIndex={0} className={ui.rewriteItemPreview} aria-label={`${qi + 1}번 ${q.title} 편집하기`} onClick={() => setEditingRewriteItem(q.id)} onKeyDown={event => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setEditingRewriteItem(q.id) } }}>
+            <h3>{qi + 1}. {q.title}</h3><span className={ui.editItemHint} aria-hidden="true">클릭하여 편집하기</span>
+            <div className={ui.rewriteItemText}>{answers[q.id]?.trim() ? <ReviewText value={answers[q.id]} /> : <p className={ui.emptyRewriteItem}>클릭하여 작성하세요.</p>}</div>
+          </div>}
+        </section>) : <ReviewEditor student label="고쳐쓰기 본문" value={body} onChange={setBody} />}
         </div>
       </section>
       {hasReference && referenceView !== null && <aside id="writing-reference" aria-label="작성 참고 자료" className={ui.reference}><nav><div role="tablist" aria-label="작성 참고 자료"><button id="writing-guide-tab" type="button" role="tab" aria-selected={referenceView === "guide"} aria-controls="writing-guide-panel" data-active={referenceView === "guide"} onClick={() => setReferenceView("guide")}>체크리스트 <span className={ui.checklistCount}>{guide.items.length}</span></button>{record.round === 2 && <button id="writing-first-tab" type="button" role="tab" aria-selected={referenceView === "first"} aria-controls="writing-first-panel" data-active={referenceView === "first"} onClick={() => setReferenceView("first")}>1차 기록</button>}</div><button type="button" aria-label="접기" onClick={() => setReferenceView(null)}>접기 <ChevronRight size={14} /></button></nav>
@@ -258,10 +264,11 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
       </aside>}
     </main>
     </div>
-    <footer className="fixed inset-x-0 bottom-0 z-40 min-h-[68px] bg-[#485766]"><div className="mx-auto flex min-h-[68px] max-w-none flex-wrap items-center justify-between gap-2 px-4 py-2"><div className="flex gap-2"><button type="button" disabled={busy || (!rewrite && index === 0)} aria-label={previousBlocked ? "이전 단계로 이동할 수 없는 이유 보기" : undefined} title={previousBlocked ? "이전 단계로 이동할 수 없어요" : undefined} onClick={() => { if (!busy) void previous() }} className={cn("flex h-11 items-center gap-2 rounded px-5 font-black text-white transition disabled:opacity-45", previousBlocked ? "border border-white/15 bg-[#65758a] text-white/65" : "bg-[#34475f]")}>{previousBlocked ? <LockKeyhole className="size-4" /> : <ArrowLeft className="size-4" />}이전</button>{<button type="button" className="flex h-11 items-center gap-2 rounded bg-[#4cc9b8] px-5 font-black text-white"><Smartphone className="size-4" />전자책 보기</button>}{canChangeReviewTemplate(record) && <button type="button" disabled={busy} onClick={() => setSwitching(true)} className="flex h-11 items-center gap-2 rounded bg-[#fa5d91] px-5 font-black text-white disabled:opacity-50"><RefreshCw className="size-4" />독후감 교체</button>}</div><div className="flex gap-2">{rewrite && <button type="button" disabled={busy || (!rewrite && !dirty)} onClick={() => void saveCurrent()} className="flex h-11 items-center gap-2 rounded bg-[#8f86ef] px-5 font-black text-white disabled:opacity-60"><Save className="size-4" />저장하기</button>}<button type="button" disabled={busy || (rewrite && !hasRewriteContent)} onClick={() => rewrite ? setModal("submit") : next()} className="flex h-11 items-center gap-2 rounded bg-[#249ce0] px-7 font-black text-white disabled:opacity-60">{rewrite ? "제출하기" : <>다음<ArrowRight className="size-4" /></>}</button></div></div></footer>
+    <footer className="fixed inset-x-0 bottom-0 z-40 min-h-[68px] bg-[#485766]"><div className="mx-auto flex min-h-[68px] max-w-none flex-wrap items-center justify-between gap-2 px-4 py-2"><div className="flex gap-2"><button type="button" disabled={busy || (!rewrite && index === 0)} aria-label={previousBlocked ? "이전 단계로 이동할 수 없는 이유 보기" : undefined} title={previousBlocked ? "이전 단계로 이동할 수 없어요" : undefined} onClick={() => { if (!busy) void previous() }} className={cn("flex h-11 items-center gap-2 rounded px-5 font-black text-white transition disabled:opacity-45", previousBlocked ? "border border-white/15 bg-[#65758a] text-white/65" : "bg-[#34475f]")}>{previousBlocked ? <LockKeyhole className="size-4" /> : <ArrowLeft className="size-4" />}이전</button>{<button type="button" className="flex h-11 items-center gap-2 rounded bg-[#4cc9b8] px-5 font-black text-white"><Smartphone className="size-4" />전자책 보기</button>}{canChangeReviewTemplate(record) && <button type="button" disabled={busy} onClick={() => setSwitching(true)} className="flex h-11 items-center gap-2 rounded bg-[#fa5d91] px-5 font-black text-white disabled:opacity-50"><RefreshCw className="size-4" />독후감 교체</button>}</div><div className="flex gap-2">{rewrite && <button type="button" disabled={busy || (!rewrite && !dirty)} onClick={() => void saveCurrent()} className="flex h-11 items-center gap-2 rounded bg-[#8f86ef] px-5 font-black text-white disabled:opacity-60"><Save className="size-4" />저장하기</button>}<button type="button" disabled={busy} aria-disabled={busy || (rewrite && submissionTooShort)} onClick={() => rewrite ? setModal(submissionTooShort ? "short-submit" : "submit") : next()} className={cn("flex h-11 items-center gap-2 rounded bg-[#249ce0] px-7 font-black text-white disabled:opacity-60", rewrite && submissionTooShort && "opacity-45")}>{rewrite ? "제출하기" : <>다음<ArrowRight className="size-4" /></>}</button></div></div></footer>
     {message && <div role="status" className="fixed bottom-24 left-1/2 z-[90] -translate-x-1/2 rounded-full bg-[#28333b] px-6 py-3 font-bold text-white shadow-xl">{message}</div>}
     {modal === "previous-blocked" && <ConfirmModal title="이전 단계로 이동할 수 없어요" description="고쳐쓰기에서 수정한 내용이 있어 차례대로 쓰기 화면으로 돌아갈 수 없어요." confirmLabel="확인" single onClose={() => setModal(null)} onConfirm={() => setModal(null)} />}
     {modal === "save" && <ConfirmModal title="저장 확인" onClose={closeSaveConfirm} onCancel={() => { if (!busy) void discardAndMove() }} onConfirm={() => { if (!busy) void saveAndMove() }} cancelLabel="아니오" confirmLabel="네" description={<>{"작성한 내용이 저장되지 않았어요! 저장하고 이동할까요?"}{pendingMove === "rewrite" && <><br />고쳐쓰기 단계로 가면 온라인 독후감을 교체할 수 없어요.</>}</>} />}
+    {modal === "short-submit" && <ConfirmModal title="제출 안내" description={REVIEW_SHORT_SUBMISSION_MESSAGE} single confirmLabel="확인" onClose={() => setModal(null)} onConfirm={() => setModal(null)} />}
     {(modal === "rewrite" || modal === "submit") && <ConfirmModal title={modal === "rewrite" ? "작성 내용 확인" : "저장 확인"} onClose={() => setModal(null)} onConfirm={() => { if (!busy) void confirm() }} confirmLabel={modal === "rewrite" ? "확인하기" : "제출하기"} description={modal === "rewrite" ? <>지금까지 작성한 내용을 모두 확인해볼까요?<br />고쳐쓰기 단계로 가면 온라인 독후감을 교체할 수 없어요.</> : record.round === 2 ? "2차 작성글을 제출할까요? 제출한 뒤에는 작성 내용을 수정할 수 없어요." : "작성한 내용을 제출할까요? 제출하면 다시 수정할 수 없어요."} />}
     {switching && <ConfirmModal title="독후감 교체 확인" description={<>작성 중인 독후감을 교체할까요?<br />지금까지 작성한 내용은 모두 삭제됩니다.</>} confirmLabel="교체하기" onClose={() => setSwitching(false)} onConfirm={async () => { if (busy) return; setBusy(true); await hook.run({ type: "switch-template", recordId: record.id }); setBusy(false) }} />}
   </>

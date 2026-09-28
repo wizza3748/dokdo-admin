@@ -181,7 +181,7 @@ function fixture(reportEnabled = false, rewriteMode: "items" | "continuous" = "c
   const write = (id = "qa-r1", edited = false) => {
     const record = db.records.find(r => r.id === id)!
     if (record.stage === "items") {
-      run({ type: "save-writing", recordId: id, answers: { "item-a": "이름 대신 번호로 불려서 어떤 마음이 들었나요?", "item-b": "나만의 이름으로 불리고 싶었어요." }, body: "", stage: "items", itemIndex: 1 })
+      run({ type: "save-writing", recordId: id, answers: { "item-a": "이름 대신 번호로 불려서 어떤 마음이 들었나요? 친구들과 함께 지낼 때 서로의 이름을 불러 주는 것이 왜 중요한지 더 자세히 말해 주세요.", "item-b": "나만의 이름으로 불리고 싶었어요. 이름을 불러 주면 다른 사람과 구별되는 소중한 존재라는 느낌이 들기 때문이에요." }, body: "", stage: "items", itemIndex: 1 })
       run({ type: "enter-rewrite", recordId: id })
     }
     if (edited) run({ type: "save-writing", recordId: id, answers: {}, body: db.records.find(r => r.id === id)!.body + "<b>이름을 존중해 주어야 해요.</b>", stage: "rewrite", itemIndex: 1 })
@@ -365,8 +365,11 @@ test("항목별 고쳐쓰기는 선택한 답변만 수정하고 최종 본문�
   assert.deepEqual(record.answers, { "item-a": "고친 질문", "item-b": "첫 대답" })
   assert.equal(record.body, "고친 질문\n\n첫 대답")
   assert.equal(record.rewriteEdited, true)
+  assert.throws(() => f.run({ type: "submit", recordId: "qa-r1" }), /100자 이상/)
+  const extendedAnswer = "첫 대답" + "가".repeat(100)
+  f.run({ type: "save-writing", recordId: "qa-r1", stage: "rewrite", answers: { "item-a": "고친 질문", "item-b": extendedAnswer }, body: "무시할 전체 본문", itemIndex: 1 })
   f.run({ type: "submit", recordId: "qa-r1" })
-  assert.equal(f.db.records[0].finalBody, "고친 질문\n\n첫 대답")
+  assert.equal(f.db.records[0].finalBody, `고친 질문\n\n${extendedAnswer}`)
 })
 
 for (const edited of [false, true]) test(`2차 최초 진입 분기: 1차 편집 ${edited}`, () => {
