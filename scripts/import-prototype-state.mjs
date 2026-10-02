@@ -5,9 +5,20 @@ import { PrototypeStore } from "../src/lib/prototype-store.ts"
 import { validateBrowserSnapshot } from "../src/lib/prototype-browser-snapshot.ts"
 
 nextEnv.loadEnvConfig(process.cwd())
-const store = new PrototypeStore()
-if (!process.env.UPSTASH_REDIS_REST_URL && !process.env.KV_REST_API_URL) throw new Error("원격 저장소 환경 변수가 필요합니다.")
 const directory = path.join(process.cwd(), ".local-state")
+const env = { ...process.env }
+// Sensitive Vercel variables are intentionally not downloadable by CLI. An authorized
+// storage-provider export can supply the two required credentials without logging them.
+try {
+  const credentials = JSON.parse(await readFile(path.join(directory, "redis-migration-credentials.json"), "utf8"))
+  for (const key of ["KV_REST_API_URL", "KV_REST_API_TOKEN"]) {
+    if (typeof credentials[key] !== "string" || !credentials[key] || credentials[key].includes("[SENSITIVE]")) throw new Error("저장소 연결 정보 검증 실패")
+    env[key] = credentials[key]
+  }
+} catch (error) { if (error.code !== "ENOENT") throw error }
+if (!env.DOKDO_STATE_NAMESPACE || env.DOKDO_STATE_NAMESPACE === "[SENSITIVE]") throw new Error("이전 대상 DOKDO_STATE_NAMESPACE를 명시해 주세요.")
+if (!env.UPSTASH_REDIS_REST_URL && !env.KV_REST_API_URL) throw new Error("원격 저장소 환경 변수가 필요합니다.")
+const store = new PrototypeStore({ env })
 let browserSnapshot = null
 try { browserSnapshot = validateBrowserSnapshot(JSON.parse(await readFile(path.join(directory, "browser-bootstrap.json"), "utf8"))) }
 catch (error) { if (error.code !== "ENOENT") throw error }

@@ -65,8 +65,10 @@ Vercel 배포는 임시 메모리에 저장하지 않고 오류를 표시합니�
 
 1. 기존 로컬 브라우저에서 `/local-migration`을 열어 현재 브라우저 데이터를 보관합니다.
 2. `.local-state`를 별도로 백업합니다. Git 및 배포 파일에는 포함하지 않습니다.
-3. 연결된 저장소 환경 변수를 로컬의 무시된 `.env.local`에 준비합니다.
-4. Node 24에서 `node scripts/import-prototype-state.mjs` 실행 후 이전 결과를 확인합니다.
+3. 저장소 연결 정보를 Git 제외 환경 파일 또는 승인된 저장소 내보내기로 준비합니다.
+   민감 환경 변수는 CLI에서 내려받을 수 없으며 `[SENSITIVE]`를 실제 값으로 사용하지 않습니다.
+4. 이전 대상 `DOKDO_STATE_NAMESPACE`를 명시하고 Node 24에서
+   `node scripts/import-prototype-state.mjs` 실행 후 이전 결과를 확인합니다.
 5. `npm run build` 성공 후 최신 코드를 배포하고 학생·기관·보고서 화면을 검증합니다.
 
 이전 스크립트는 비어 있는 원격 키에만 데이터를 가져오며 기존 원격 변경을 덮어쓰지 않습니다.
