@@ -49,5 +49,7 @@ test("과거 100자 미만 제출 샘플은 원문 그대로 복원하며 재제
   const db = createSeededReviewDatabase([seed])
   assert.equal(db.records[0].finalBody, seed.answers[0])
   const rejected = applyReviewCommand(db, { type: "reject", recordId: "old-r1" }, { role: "class", institutionId: "i", classId: "c", name: "선생님" }, "reject", "2026-09-28T00:00:00Z")
-  assert.throws(() => applyReviewCommand(rejected, { type: "submit", recordId: "old-r1" }, student, "resubmit", "2026-09-28T00:01:00Z"), { message: REVIEW_SHORT_SUBMISSION_MESSAGE })
+  assert.equal(rejected.records[0].stage, "items")
+  const rewriting = applyReviewCommand(rejected, { type: "enter-rewrite", recordId: "old-r1" }, student, "rewrite", "2026-09-28T00:00:30Z")
+  assert.throws(() => applyReviewCommand(rewriting, { type: "submit", recordId: "old-r1" }, student, "resubmit", "2026-09-28T00:01:00Z"), { message: REVIEW_SHORT_SUBMISSION_MESSAGE })
 })

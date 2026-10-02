@@ -101,11 +101,11 @@ export function studentReviewRecordStatus(review: ReviewCommon, record: ReviewRe
   return `${record.round}차 피드백 도착`
 }
 
-export type StudentReviewListAction = "이어서 쓰기" | "선생님 확인 중" | "피드백 확인하기" | "2차 글 시작하기" | "활동 완료"
+export type StudentReviewListAction = "이어서 쓰기" | "다시 쓰기" | "선생님 확인 중" | "피드백 확인하기" | "2차 글 시작하기" | "활동 완료"
 
 /** Student cards expose one useful next action instead of the internal workflow status. */
 export function studentReviewListAction(review: ReviewCommon, record: ReviewRecord): StudentReviewListAction {
-  if (record.writingStatus === "writing") return "이어서 쓰기"
+  if (record.writingStatus === "writing") return record.rejectedAt ? "다시 쓰기" : "이어서 쓰기"
   if (record.round === 1 && review.progress === "second-available") return "2차 글 시작하기"
   if (record.feedbackStatus !== "전송완료") return "선생님 확인 중"
   if (!record.seenAt) return "피드백 확인하기"
@@ -521,6 +521,8 @@ function applyReviewCommandInternal(database: ReviewDatabase, command: ReviewCom
   } else if (command.type === "reject") {
     requireCondition(canRejectReview(record), "AI 실행 이력이 없고 피드백 작성전인 경우만 반려할 수 있습니다.")
     record.writingStatus = "writing"; record.rejectedAt = at; record.feedback = ""; record.teacherScores = undefined; record.aiDraft = undefined
+    // A second round can inherit the first round's rewrite-only entry point.
+    record.stage = record.rewriteEdited || record.initialStage === "rewrite" ? "rewrite" : "items"
     record.itemFeedback = reviewFeedbackItems(review.template, review.template.items.map(i => ({ itemId: i.id, text: "", visible: true }))); review.progress = `${prefix}-writing`
   } else if (command.type === "ai-start") {
     // A browser closed between start/result must not permanently lock this record.

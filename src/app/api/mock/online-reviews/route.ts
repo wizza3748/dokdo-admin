@@ -1,26 +1,12 @@
 import { NextResponse } from "next/server"
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises"
-import path from "node:path"
 import { applyReviewCommand, canAccessReview, expandLegacyReviewScores, upgradeUnscoredMockAssessments, hydrateLegacyReviewFeedback, mergeReviewSeeds, normalizeReviewFeedbackScope, normalizeReviewReportScores, type ReviewActor, type ReviewCommand, type ReviewDatabase } from "@/lib/review-domain"
 import { getDefaultReviewDatabase } from "@/lib/review-seeds"
+import { prototypeStore } from "@/lib/prototype-store"
 
 export const runtime = "nodejs"
-const statePath = path.join(process.cwd(), ".local-state", "online-reviews.json")
-const shared = globalThis as typeof globalThis & { reviewQueue?: Promise<unknown> }
-async function readState(): Promise<ReviewDatabase> {
-  try {
-    const db = JSON.parse(await readFile(statePath, "utf8")) as ReviewDatabase
-    const scoped = normalizeReviewReportScores(normalizeReviewFeedbackScope(db))
-    // Persist approved report recalculation and item cleanup, not unrelated hydration changes.
-    if (scoped !== db) await writeState(scoped)
-    return normalizeReviewReportScores(normalizeReviewFeedbackScope(hydrateLegacyReviewFeedback(upgradeUnscoredMockAssessments(expandLegacyReviewScores(mergeReviewSeeds(scoped, getDefaultReviewDatabase()))))))
-  }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return getDefaultReviewDatabase(); throw error }
-}
-async function writeState(db: ReviewDatabase) {
-  await mkdir(path.dirname(statePath), { recursive: true })
-  await writeFile(`${statePath}.tmp`, JSON.stringify(db), "utf8")
-  await rename(`${statePath}.tmp`, statePath)
+function normalizedState(db: ReviewDatabase) {
+  const scoped = normalizeReviewReportScores(normalizeReviewFeedbackScope(db))
+  return normalizeReviewReportScores(normalizeReviewFeedbackScope(hydrateLegacyReviewFeedback(upgradeUnscoredMockAssessments(expandLegacyReviewScores(mergeReviewSeeds(scoped, getDefaultReviewDatabase()))))))
 }
 // Explicit demo identities, not production authentication. Replace at the real auth boundary.
 function actorFor(request: Request): ReviewActor {
@@ -44,27 +30,28 @@ function visibleState(db: ReviewDatabase, actor: ReviewActor, sharedRecordId?: s
   return { version: 1, reviews, records }
 }
 export async function GET(request: Request) {
-  // Reads may perform the one-time prototype migration; serialize them with writes.
-  const job = (shared.reviewQueue ?? Promise.resolve()).catch(() => undefined).then(async () => visibleState(await readState(), actorFor(request), new URL(request.url).searchParams.get("recordId")))
-  shared.reviewQueue = job.catch(() => undefined)
-  return NextResponse.json(await job, { headers: { "Cache-Control": "no-store" } })
+  try {
+    const db = await prototypeStore.update<ReviewDatabase>("online-reviews", getDefaultReviewDatabase, state => {
+      const scoped = normalizeReviewReportScores(normalizeReviewFeedbackScope(state))
+      return scoped
+    })
+    return NextResponse.json(visibleState(normalizedState(db), actorFor(request), new URL(request.url).searchParams.get("recordId")), { headers: { "Cache-Control": "no-store" } })
+  } catch (error) {
+    return NextResponse.json({ message: error instanceof Error ? error.message : "조회에 실패했습니다." }, { status: 503 })
+  }
 }
 export async function POST(request: Request) {
   const actor = actorFor(request)
   const payload = await request.json() as { command: ReviewCommand; requestId: string }
-  const job = (shared.reviewQueue ?? Promise.resolve()).catch(() => undefined).then(async () => {
+  try {
     if (!payload.requestId || !payload.command?.type) throw new Error("잘못된 요청입니다.")
-    const db = applyReviewCommand(await readState(), payload.command, actor, payload.requestId, new Date().toISOString())
-    await writeState(db)
-    return visibleState(db, actor)
-  })
-  shared.reviewQueue = job.catch(() => undefined)
-  try { return NextResponse.json(await job) }
+    const at = new Date().toISOString()
+    const db = await prototypeStore.update<ReviewDatabase>("online-reviews", getDefaultReviewDatabase, state => applyReviewCommand(normalizedState(state), payload.command, actor, payload.requestId, at))
+    return NextResponse.json(visibleState(db, actor))
+  }
   catch (error) { return NextResponse.json({ message: error instanceof Error ? error.message : "처리에 실패했습니다." }, { status: 400 }) }
 }
 export async function DELETE() {
-  const job = (shared.reviewQueue ?? Promise.resolve()).catch(() => undefined).then(() => writeState(getDefaultReviewDatabase()))
-  shared.reviewQueue = job
-  await job
+  await prototypeStore.update("online-reviews", getDefaultReviewDatabase, () => getDefaultReviewDatabase())
   return NextResponse.json({ ok: true })
 }

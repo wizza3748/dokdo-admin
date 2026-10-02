@@ -332,6 +332,62 @@ test("첫 제출 이후 작성 잠금, 반려 시 같은 레코드와 본문 보
   assert.equal(f.db.records[0].writingStatus, "writing")
 })
 
+for (const round of [1, 2] as const) for (const mode of ["items", "continuous"] as const) for (const edited of [false, true]) {
+  test(`${round}차 ${mode} 반려: 고쳐쓰기 편집 ${edited ? "있음" : "없음"}에 따라 재진입하고 원문·다른 차수를 보존한다`, () => {
+    const f = fixture(false, mode)
+    if (round === 2) {
+      f.write(); f.save()
+      f.run({ type: "send", recordId: "qa-r1" }, teacher)
+      f.run({ type: "seen", recordId: "qa-r1" })
+      f.run({ type: "start-second", recordId: "qa-r1" })
+    }
+    const id = `qa-r${round}`
+    f.write(id)
+    // Reopen only this isolated fixture to exercise both editor modes before submission.
+    if (edited) {
+      f.run({ type: "reject", recordId: id }, teacher)
+      f.run({ type: "enter-rewrite", recordId: id })
+      const record = f.db.records.find(r => r.id === id)!
+      f.run({ type: "save-writing", recordId: id, stage: "rewrite", itemIndex: 0,
+        answers: { ...record.answers, "item-a": record.answers["item-a"] + " 고쳐 쓴 내용" },
+        body: record.body + " 고쳐 쓴 내용" })
+      f.run({ type: "submit", recordId: id })
+    }
+    const before = structuredClone(f.db.records.find(r => r.id === id)!)
+    const others = structuredClone(f.db.records.filter(r => r.id !== id))
+    f.run({ type: "reject", recordId: id }, teacher)
+    const after = f.db.records.find(r => r.id === id)!
+    assert.equal(after.writingStatus, "writing")
+    assert.equal(after.stage, edited ? "rewrite" : "items")
+    assert.equal(after.rewriteEdited, edited)
+    assert.deepEqual(after.answers, before.answers)
+    assert.equal(after.body, before.body)
+    assert.equal(after.finalBody, before.finalBody)
+    assert.deepEqual(f.db.records.filter(r => r.id !== id), others)
+    assert.equal(studentReviewListAction(f.db.reviews[0], after), "다시 쓰기")
+    assert.equal(canRejectReview(after), false)
+    // The preserved content can be submitted again without creating another record.
+    if (after.stage === "items") f.run({ type: "enter-rewrite", recordId: id })
+    f.run({ type: "submit", recordId: id })
+    assert.equal(studentReviewListAction(f.db.reviews[0], f.db.records.find(r => r.id === id)!), "선생님 확인 중")
+    assert.equal(f.db.records.length, round)
+  })
+}
+
+test("1차 고쳐쓰기 이력을 이어받은 2차 반려는 차례대로 쓰기를 다시 허용하지 않는다", () => {
+  const f = fixture(); f.write("qa-r1", true); f.save()
+  f.run({ type: "send", recordId: "qa-r1" }, teacher)
+  f.run({ type: "seen", recordId: "qa-r1" })
+  f.run({ type: "start-second", recordId: "qa-r1" })
+  f.write("qa-r2")
+  f.run({ type: "reject", recordId: "qa-r2" }, teacher)
+  const second = f.db.records[1]
+  assert.equal(second.rewriteEdited, false)
+  assert.equal(second.initialStage, "rewrite")
+  assert.equal(second.stage, "rewrite")
+  assert.equal(studentReviewListAction(f.db.reviews[0], second), "다시 쓰기")
+})
+
 test("고쳐쓰기 변경 저장만 편집 플래그를 설정하고 되돌려도 유지", () => {
   const f = fixture()
   f.run({ type: "save-writing", recordId: "qa-r1", stage: "items", answers: { "item-a": "학생 원문" }, body: "", itemIndex: 0 })

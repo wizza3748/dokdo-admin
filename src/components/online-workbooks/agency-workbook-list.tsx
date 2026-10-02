@@ -70,9 +70,11 @@ function writingInfo(record: OnlineWorkbook) {
   return classification.writing
 }
 
-function secondDecisionInfo(record: OnlineWorkbook) {
+function progressInfo(record: OnlineWorkbook) {
   const classification = workbookClassification(record)
-  return classification.writing === "1차" ? classification.decision : "-"
+  if (classification.writing === "2차") return "2차 작성 완료"
+  if (classification.writing === "1차") return classification.decision === "2차 작성 요청" ? "2차 작성 요청" : "1차 작성 완료"
+  return "-"
 }
 
 function reportText(record: OnlineWorkbook) {
@@ -388,7 +390,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
             <Button variant="outline" disabled={!selectedFlowerEligibleCount} onClick={() => { setSelectedFlower(null); setActionDialog({ kind: "bulk", action: "flower" }) }} className={bulkClass}><Flower2 className="size-4" />일괄 섬초롱꽃 지급 ({selectedFlowerEligibleCount})</Button>
             <button type="button" aria-label="목록 검색" onClick={() => setQuery(keyword)} className="grid size-9 place-items-center rounded-full bg-blue-600 text-white"><Search className="size-4" /></button>
             <button type="button" aria-label="목록 새로고침" onClick={() => setRefreshKey(k => k + 1)} className="grid size-9 place-items-center rounded-full border border-slate-200 text-slate-500"><RefreshCw className="size-4" /></button>
-            <ReviewListTools tableId="agency-review-table" columns={["선택","고유번호","학생 이름","레벨","도서명","학생 제출일","피드백 작성일","차수","2차 작성 여부","피드백 상태","학부모 발송 여부","피드백 전송","학부모 발송","평가 보고서","섬초롱꽃","피드백 작성 (AI 잔여횟수)"]} />
+            <ReviewListTools tableId="agency-review-table" columns={["선택","고유번호","학생 이름","레벨","도서명","학생 제출일","피드백 작성일","차수","진행 상황","피드백 상태","학부모 발송 여부","피드백 전송","학부모 발송","평가 보고서","섬초롱꽃","피드백 작성 (AI 잔여횟수)"]} />
           </div>
         </div>
 
@@ -404,7 +406,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
                 <TableHead className="text-center"><button type="button" onClick={() => toggleSort("submittedAt")} className="font-semibold">학생 제출일 <span className="text-slate-300">◆</span></button></TableHead>
                 <TableHead className="text-center font-semibold">피드백 작성일</TableHead>
                 <TableHead className="text-center font-semibold">차수</TableHead>
-                <TableHead className="text-center font-semibold">2차 작성 여부</TableHead>
+                <TableHead className="text-center font-semibold">진행 상황</TableHead>
                 <TableHead className="text-center font-semibold">피드백 상태</TableHead>
                 <TableHead className="text-center font-semibold">학부모 발송 여부</TableHead>
                 <TableHead className="text-center font-semibold">피드백 전송</TableHead>
@@ -428,7 +430,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
                   <TableCell className="text-center">{record.submittedAt}</TableCell>
                   <TableCell className="text-center">{record.feedbackAt ?? ""}</TableCell>
                   <TableCell className="text-center font-semibold text-slate-600">{writingInfo(record)}</TableCell>
-                  <TableCell className="text-center">{secondDecisionInfo(record)}</TableCell>
+                  <TableCell className="text-center">{progressInfo(record)}</TableCell>
                   <TableCell className="text-center">{statusText[record.status]}</TableCell>
                   <TableCell className="text-center">{record.parentSent ? "발송완료" : "미발송"}</TableCell>
                   <TableCell className="text-center">{record.status === "전송완료" ? <Check className="mx-auto size-4 text-emerald-500" aria-label="학생 전송 완료" /> : <button type="button" aria-label={`${record.studentName} 학생에게 전송`} disabled={record.status !== "작성완료"} onClick={() => setActionDialog({ kind: "single-send", record })} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300"><Send className="size-4" /></button>}</TableCell>

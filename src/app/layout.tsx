@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/app/app-shell";
+import { PrototypeBootstrap } from "@/components/app/prototype-bootstrap";
 
 export const metadata: Metadata = {
   title: "Dokdo - Admin",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <AppShell>{children}</AppShell>
+        <PrototypeBootstrap enabled={process.env.VERCEL === "1"}>
+          <AppShell>{children}</AppShell>
+        </PrototypeBootstrap>
       </body>
     </html>
   );

@@ -8,7 +8,7 @@ import type { StudentWorkbook, WorkbookTemplate } from "@/lib/student-workbooks"
 type ViewMode = "select" | "write" | "rewrite" | "result"
 
 function ReportBadge() {
-  return <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-[#b9d8eb] bg-white px-2 py-1 text-xs font-bold text-[#147fbd] shadow-sm"><FileText aria-hidden="true" className="size-3.5 shrink-0" />평가 보고서 제공</span>
+  return <span className="inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#147fbd] bg-[#147fbd] px-3 py-1.5 text-sm font-bold leading-5 text-white shadow-sm"><FileText aria-hidden="true" className="size-4 shrink-0" />보고서</span>
 }
 
 export function SelectionTitle({ title }: { title: string }) {
@@ -43,13 +43,14 @@ export function SelectionScreen({ workbook, template, selectedId, onSelect, onPr
         </section>
         <section className="rounded-xl border-2 border-[#e1e7ea] bg-[#f9fbfc] p-6">
           <p className={cn("text-[14px] text-[#667078]", showReportGuide ? "mb-1" : "mb-5")}>※ 작성할 독후감을 선택해 주세요. 고쳐쓰기 전까지는 다른 독후감으로 바꿀 수 있어요.</p>
-          {showReportGuide && <p className="mb-5 text-[14px] text-[#667078]">※ 평가 보고서 제공 표시가 있는 템플릿은 피드백 완료 후 평가 보고서를 확인할 수 있어요.</p>}
+          {showReportGuide && <p className="mb-5 text-[14px] text-[#667078]">※ ‘보고서’ 표시가 있는 템플릿은 피드백 완료 후 평가 보고서를 확인할 수 있어요.</p>}
           <ul className="grid grid-cols-3 gap-4">
             {workbook.templates.map((item) => (
-              <li key={item.id} className="relative">
+              <li key={item.id} className="relative min-w-0">
                 {item.recommended && <BadgeCheck aria-label="추천" className="pointer-events-none absolute -right-1 -top-2 z-20 size-8 fill-[#ffad28] stroke-[#ffd45b]" />}
-                <button type="button" onClick={() => onSelect(item.id)} className={cn("relative flex h-[140px] w-full flex-col overflow-hidden rounded-xl border-2 p-4 text-left transition", selectedId === item.id ? "border-[#239cde] bg-[#cce8f8] text-[#198ed0]" : "border-[#e0e6e9] bg-[#fbfcfd] text-[#4b5359]") }>
-                  <strong className="pr-2 text-[20px] leading-7">{item.title}</strong>{item.reportEnabled && <span className="absolute bottom-3 left-2 z-10"><ReportBadge /></span>}
+                <button type="button" onClick={() => onSelect(item.id)} className={cn("relative flex h-full min-h-[140px] w-full min-w-0 flex-col overflow-hidden rounded-xl border-2 p-4 text-left transition", selectedId === item.id ? "border-[#239cde] bg-[#cce8f8] text-[#198ed0]" : "border-[#e0e6e9] bg-[#fbfcfd] text-[#4b5359]") }>
+                  <strong className="relative z-10 w-full break-words pr-2 text-[20px] leading-7">{item.title}</strong>
+                  <span className="relative z-10 mt-auto flex min-h-12 shrink-0 items-end pt-3">{item.reportEnabled && <ReportBadge />}</span>
                   <span className="absolute -bottom-2 right-2 grid size-16 place-items-center rounded-xl bg-[#e6ecef] text-white"><BookOpen className="size-9" /></span>
                 </button>
               </li>

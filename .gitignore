@@ -13,6 +13,8 @@
 # testing
 /coverage
 /.local-state/
+/.codex/
+/.codex-logs/
 
 # next.js
 /.next/

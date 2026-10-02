@@ -1,0 +1,7 @@
+.local-state/
+.codex/
+.codex-logs/
+.git/
+.next/
+node_modules/
+.env*

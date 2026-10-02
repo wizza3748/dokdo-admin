@@ -50,6 +50,32 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
+### 프로토타입 데이터 보존
+
+기존 화면과 기능은 그대로 사용합니다. 개발 서버에서는 `.local-state` JSON을,
+Vercel에서는 Redis REST 영구 저장소를 사용합니다. 저장소가 연결되지 않은
+Vercel 배포는 임시 메모리에 저장하지 않고 오류를 표시합니다.
+
+환경 변수는 Vercel 설정에만 등록하고 Git에 올리지 않습니다.
+
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (또는 `KV_REST_API_URL`, `KV_REST_API_TOKEN`)
+- `DOKDO_STATE_NAMESPACE`: 프로덕션과 Preview에 서로 다른 값 사용
+
+이전 절차:
+
+1. 기존 로컬 브라우저에서 `/local-migration`을 열어 현재 브라우저 데이터를 보관합니다.
+2. `.local-state`를 별도로 백업합니다. Git 및 배포 파일에는 포함하지 않습니다.
+3. 연결된 저장소 환경 변수를 로컬의 무시된 `.env.local`에 준비합니다.
+4. Node 24에서 `node scripts/import-prototype-state.mjs` 실행 후 이전 결과를 확인합니다.
+5. `npm run build` 성공 후 최신 코드를 배포하고 학생·기관·보고서 화면을 검증합니다.
+
+이전 스크립트는 비어 있는 원격 키에만 데이터를 가져오며 기존 원격 변경을 덮어쓰지 않습니다.
+학생 설정·템플릿·읽기 기록 등 브라우저 데이터는 최초 방문 시 복원한 뒤 기존처럼
+브라우저별로 보관됩니다. 이후 모든 브라우저 설정을 기기 간 동기화하는 기능은 아닙니다.
+온라인 독후감과 서버 제출 목록은 영구 저장소에 보관됩니다.
+이 프로젝트는 역할 쿼리로 접근하는 테스트용 프로토타입이며 실제 학생 개인정보를
+공개 URL에 올리는 운영 서비스로 사용하지 않습니다.
+
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

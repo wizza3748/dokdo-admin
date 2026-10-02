@@ -76,9 +76,9 @@ function Radar({ areas, second }: { areas: ReportArea[]; second: boolean }) {
 }
 function RoundWriting({ common, record, rounds }: { common: ReviewCommon; record: ReviewRecord; rounds: ReviewRecord[] }) {
   const items = reviewFeedbackItems(common.template, record.itemFeedback).filter(item => item.visible && plainReviewText(item.text))
-  return <ReportSheet common={common} rounds={rounds} label={record.round + "차 작성글과 피드백"}>
-    <Heading index={"0" + (record.round + 1)} title={record.round + "차 작성글과 피드백"} />
-    <div className={styles.writingGrid}><article><header><h3><BookOpen size={21} aria-hidden="true" />내가 쓴 {record.round}차 글</h3><p>{common.template.title}</p></header><div className={styles.richText}><ReviewText value={record.finalBody || "제출한 작성글이 없습니다."} /></div></article>
+  return <ReportSheet common={common} rounds={rounds} label={record.round + "차 작성 글과 피드백"}>
+    <Heading index={"0" + (record.round + 1)} title={record.round + "차 작성 글과 피드백"} />
+    <div className={styles.writingGrid}><article><header><h3><BookOpen size={21} aria-hidden="true" />내가 쓴 {record.round}차 글</h3><p>{common.template.title}</p></header><div className={styles.richText}><ReviewText value={record.finalBody || "제출한 작성 글이 없습니다."} /></div></article>
       <article className={styles.feedback}><header><h3><MessageCircle size={21} aria-hidden="true" />선생님의 {record.round}차 피드백</h3></header><div className={styles.richText}><h4>선생님의 한마디</h4><ReviewText value={record.feedback || "저장된 피드백이 없습니다."} />{items.length > 0 && <div className={styles.items}>{items.map((item, i) => <section key={item.itemId}><h4><span>{i + 1}</span>{common.template.items.find(t => t.id === item.itemId)?.title ?? "항목별 피드백"}</h4><ReviewText value={item.text} /></section>)}</div>}</div></article></div>
   </ReportSheet>
 }
