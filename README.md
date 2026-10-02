@@ -29,9 +29,11 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 1. 작업 전 `git status --short`로 사용자 변경사항을 확인합니다.
 2. 화면 구현 후 `npm run lint`와 `npm run build`를 실행합니다.
 3. 로컬 검증은 `npm run dev`로 실행한 뒤 관련 경로를 직접 확인합니다.
-4. 운영 배포는 연결된 Firebase App Hosting이 GitHub의 라이브 브랜치 push를 감지해 수행합니다.
+4. 현재 운영 배포는 Vercel `wizza1/dokdo-admin`이 GitHub `main` push를 감지해 수행합니다.
+   배포 `Ready` 상태와 [운영 URL](https://dokdo-admin.vercel.app/)의 주요 화면을 확인합니다.
 
-세부 Git 및 배포 수행 범위는 `AGENTS.md`를 따릅니다. `로컬 커밋만 해`는 로컬 커밋까지만, `GitHub 푸시에 Firebase 배포까지 해`는 App Hosting 배포 완료 확인까지를 의미합니다.
+세부 Git 및 배포 수행 범위는 `AGENTS.md`를 따릅니다. `로컬 커밋만 해`는 로컬 커밋까지만 수행합니다.
+Firebase는 이전 배포 정보로 보존하며, 명시적으로 요청한 경우에만 해당 배포를 확인합니다.
 
 온라인워크북 데이터는 현재 `src/lib/online-workbooks.ts`의 프로토타입 데이터입니다. 실제 API 연결 시 이 데이터 소스를 서버 요청으로 교체하면 됩니다.
 

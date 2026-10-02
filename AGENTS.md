@@ -24,9 +24,19 @@
 
 - GitHub 원격 저장소: `https://github.com/wizza3748/dokdo-admin.git`
 - 기본 작업 브랜치: `main`
+- 현재 기본 배포: Vercel `wizza1/dokdo-admin`
+- 현재 운영 URL: `https://dokdo-admin.vercel.app/`
+- 영구 저장소: Upstash Redis `dokdo-prototype-state` (Free)
+- Production 데이터 구분: `dokdo-admin:production:v1`
+- Preview 데이터 구분: `dokdo-admin:preview:v1`
+- 일반적인 `푸시 및 배포` 요청은 GitHub push 후 Vercel 자동 배포의 Ready 상태와 주요 화면을 확인한다. 명시적으로 Firebase 배포를 요청하면 위 Firebase 수행 규칙을 따른다.
+
+### 이전 Firebase 배포 정보 (기록 보존)
+
 - Firebase 프로젝트: `studio-5794660757-b438b`
 - Firebase App Hosting 백엔드: `dokdo-admin`
-- 운영 URL: `https://dokdo-admin--studio-5794660757-b438b.asia-east1.hosted.app/`
+- 이전 운영 URL: `https://dokdo-admin--studio-5794660757-b438b.asia-east1.hosted.app/`
+- Vercel 이전 작업에서 Firebase 백엔드 삭제나 설정 변경은 수행하지 않았다.
 
 ## 기본 검증
 
