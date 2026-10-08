@@ -72,7 +72,7 @@ export type ReviewRecord = {
   aiUsed: number; aiScores?: ReviewScores; teacherScores?: ReviewScores; report?: ReviewReport;
   parentContact: boolean; parentSentAt?: string; flowers: number; flowersAt?: string; rejectedAt?: string; history: ReviewHistory[];
 }
-export type ReviewDatabase = { version: 1; seedVersion?: number; reviews: ReviewCommon[]; records: ReviewRecord[] }
+export type ReviewDatabase = { version: 1; seedVersion?: number; reviews: ReviewCommon[]; records: ReviewRecord[]; pro?: import("./pro-types").ProState; studentPro?: import("./pro-selectors").StudentProView }
 export const reviewProgressLabels: Record<ReviewCommon["progress"], string> = {
   "first-writing": "1차 작성중", "first-submitted": "1차 작성완료", "first-saved": "1차 피드백 작성완료", "first-sent": "1차 피드백 도착",
   "second-available": "2차 작성가능", "second-writing": "2차 작성중", "second-submitted": "2차 작성완료", "second-saved": "2차 피드백 작성완료", "second-sent": "2차 피드백 도착", complete: "최종 완료",
@@ -130,6 +130,7 @@ export function studentReviewNotices(db: ReviewDatabase): StudentReviewNotice[] 
   })
   const unreadReviewIds = new Set(unreadFeedback.map(notice => notice.review.id))
   const writingRequests = db.reviews.flatMap(review => {
+    if (db.studentPro?.cases.some(c => c.reviewId === review.id && c.expired)) return []
     if (review.progress !== "second-available" || review.secondDecision !== "request" || unreadReviewIds.has(review.id)) return []
     if (db.records.some(record => record.reviewId === review.id && record.round === 2)) return []
     const first = db.records.find(record => record.reviewId === review.id && record.round === 1)
@@ -401,7 +402,8 @@ export function canAwardReview(record: ReviewRecord) { return record.writingStat
 export function canSendReview(review: ReviewCommon, record: ReviewRecord) { return record.writingStatus === "submitted" && record.feedbackStatus === "작성완료" && !record.aiDraft && !record.aiHistory.some(h => h.status === "running") && (!review.reportEnabled || (!!record.report && validScores(review.level, record.teacherScores, record) && validAiScores(review.level, record.aiScores, record))) }
 export function reportState(review: ReviewCommon, record: ReviewRecord) { return !review.reportEnabled ? "생성 불가" : record.report ? "생성 완료" : "생성 전" }
 
-export type ReviewCommand = {
+export type ReviewCommand = ReviewCommandBase & { proDesignate?: boolean }
+type ReviewCommandBase = {
   type: "create"; common: Omit<ReviewCommon, "createdAt" | "progress" | "reportEnabled">;
 } | { type: "start-second"; recordId: string }
   | { type: "switch-template"; recordId: string; template?: ReviewTemplate }

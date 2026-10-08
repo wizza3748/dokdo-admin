@@ -3,6 +3,8 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useReviews } from "@/lib/review-client"
+import { proTasks } from "@/lib/pro-selectors"
 import {
   BookOpenCheck,
   Building2,
@@ -97,7 +99,7 @@ const navConfig: NavItem[] = [
     id: "agency-students",
     title: "학생관리",
     icon: "GraduationCap",
-    children: [{ title: "학생목록", href: "/agency/students" }]
+    children: [{ title: "학생목록", href: "/agency/students" }, { title: "외부 관리 학생", href: "/agency/students/external" }]
   },
   {
     id: "agency-online-workbooks",
@@ -105,17 +107,23 @@ const navConfig: NavItem[] = [
     icon: "BookOpenCheck",
     children: [{ title: "온라인 독후감 목록", href: "/agency/online-workbooks" }]
   },
+  { id: "agency-pro", title: "독도 프로 관리", icon: "BookOpenCheck", children: [{ title: "주간 관리 현황", href: "/agency/pro-management" }, { title: "피드백 요일 설정", href: "/agency/pro-management/feedback-day" }] },
   { id: "student-label", title: "[학생프론트]", type: "label" },
   { id: "student-home", title: "홈", href: "/student", icon: "House" }
 ]
 
 export function AppNav() {
   const pathname = usePathname()
+  const { db } = useReviews("agency")
+  const proVisible = !!db.pro?.members.some(m => m.product === "pro") || !!db.pro?.cases.length
+  const proBadge = proTasks(db).badge
   const [openItems, setOpenItems] = React.useState<Record<string, boolean>>({})
 
   const isMatch = (href?: string) => {
     if (!href || href === "#") return false
     if (href === "/") return pathname === "/"
+    if (href === "/agency/pro-management") return pathname === href || pathname.startsWith(`${href}/students/`)
+    if (href === "/agency/students" && pathname === "/agency/students/external") return false
     return pathname.startsWith(href)
   }
 
@@ -156,7 +164,8 @@ export function AppNav() {
     <SidebarContent className="bg-white">
       <SidebarGroup className="px-3 py-4">
         <SidebarMenu className="gap-1">
-          {navConfig.map((item) => {
+          {navConfig.filter(item => item.id !== "agency-pro" || proVisible).map((original) => {
+            const item = original.id === "agency-pro" && proBadge ? { ...original, title: `${original.title} (${proBadge})` } : original
             if (item.type === "label") {
               return (
                 <SidebarGroupLabel key={item.id} className="mt-4 h-8 px-2 text-xs font-semibold tracking-wide text-slate-400 first:mt-0">

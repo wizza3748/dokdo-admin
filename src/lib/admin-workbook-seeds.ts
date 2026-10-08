@@ -1,6 +1,9 @@
 type WorkbookStatus = "작성전" | "작성완료" | "전송완료"
 
 export interface AdminWorkbookRow {
+  studentId?: string
+  external?: boolean
+  pro?: import("./online-workbooks").OnlineWorkbook["pro"]
   writingRound?: 1 | 2
   secondDecision?: "request" | "complete"
   reportStatus?: string

@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import { PRO_SEND_CONFIRM, PRO_BULK_SEND_CONFIRM } from "@/lib/pro-domain"
+import { ExternalBadge } from "@/components/pro-management/pro-common"
 import { ReviewListTools } from "./review-list-tools"
 import Link from "next/link"
 import {
@@ -140,7 +142,7 @@ const flowerCriteria = [
   { amount: 20, medal: "🏆", description: "주제에 대한 깊이 있는 분석, 창의적 해석과 독창적인 표현이 돋보이는 글" },
 ]
 
-function AlertDialog({ title, message, onClose, onConfirm }: { title: string; message: React.ReactNode; onClose: () => void; onConfirm: () => void }) {
+function AlertDialog({ title, message, onClose, onConfirm, confirmLabel = "확인" }: { title: string; message: React.ReactNode; onClose: () => void; onConfirm: () => void; confirmLabel?: string }) {
   return (
     <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/45 p-4">
       <div role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-[520px] rounded-2xl bg-white px-7 py-6 shadow-2xl">
@@ -148,7 +150,7 @@ function AlertDialog({ title, message, onClose, onConfirm }: { title: string; me
           <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-amber-400 text-sm font-black text-white">!</span>
           <div className="min-w-0 flex-1"><h2 className="text-xl font-bold text-slate-700">{title}</h2><div className="mt-4 text-[15px] leading-7 text-slate-600">{message}</div></div>
         </div>
-        <div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={onConfirm} className="bg-blue-600 hover:bg-blue-700">확인</Button></div>
+        <div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={onConfirm} className="bg-blue-600 hover:bg-blue-700">{confirmLabel}</Button></div>
       </div>
     </div>
   )
@@ -213,6 +215,8 @@ function SummaryCards({ records }: { records: OnlineWorkbook[] }) {
 
 export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "class" }) {
   const [records, setRecords] = React.useState(AGENCY_ONLINE_WORKBOOKS)
+  const [proOnly, setProOnly] = React.useState(false), [selectedOnly, setSelectedOnly] = React.useState(false), [studentId, setStudentId] = React.useState("")
+  React.useEffect(() => { const p = new URLSearchParams(window.location.search); setProOnly(p.get("pro") === "1"); setStudentId(p.get("studentId") ?? "") }, [])
   const [writingFilter, setWritingFilter] = React.useState("all")
   const [reportFilter, setReportFilter] = React.useState("all")
   const [level, setLevel] = React.useState("all")
@@ -246,11 +250,12 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     }
   }, [role, refreshKey])
 
-  React.useEffect(() => { setPage(1); setSelectedIds([]) }, [writingFilter, reportFilter, level, status, aiRemaining, flower, query, pageSize])
+  React.useEffect(() => { setPage(1); setSelectedIds([]) }, [writingFilter, reportFilter, level, status, aiRemaining, flower, query, pageSize, proOnly, selectedOnly, studentId])
 
   const filteredRecords = React.useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return records
+      .filter(r => (!proOnly || !!r.pro) && (!selectedOnly || !r.pro || r.pro.selected) && (!studentId || r.studentId === studentId))
       .filter((record) => {
         if (writingFilter === "all") return true
         const classification = workbookClassification(record)
@@ -267,7 +272,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
         return report === "생성 완료"
       })
       .filter((record) => level === "all" || record.level === Number(level))
-      .filter((record) => status === "all" || record.status === status)
+      .filter((record) => status === "all" || (!record.pro || record.pro.selected) && record.status === status)
       .filter((record) => aiRemaining === "all" || 2 - record.aiUsed === Number(aiRemaining))
       .filter((record) => flower === "all" || record.flowers === Number(flower))
       .filter((record) => !normalizedQuery || `${record.studentName} ${record.bookTitle}`.toLowerCase().includes(normalizedQuery))
@@ -280,7 +285,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
         const fallback = result || aDisplayNumber.localeCompare(bDisplayNumber, "ko", { numeric: true })
         return sort.direction === "asc" ? fallback : -fallback
       })
-  }, [records, level, status, aiRemaining, flower, query, sort, writingFilter, reportFilter])
+  }, [records, level, status, aiRemaining, flower, query, sort, writingFilter, reportFilter, proOnly, selectedOnly, studentId])
 
   const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -291,6 +296,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     : { key, direction: "asc" })
 
   const reset = () => {
+    setProOnly(false); setSelectedOnly(false); setStudentId(""); window.history.replaceState(null, "", window.location.pathname)
     setWritingFilter("all")
     setReportFilter("all")
     setLevel("all")
@@ -350,7 +356,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     if (updatedRecords.length) applyRecordUpdates(updatedRecords)
     const excludedCount = selectedRecords.length - eligibleRecords.length
     const labels = { ai: "AI 피드백 생성", send: "학생 전송", parent: "학부모 발송", flower: `섬초롱꽃 ${selectedFlower ?? 0}개 지급` }
-    setNotice(`${outcomes.join(" / ")} ${updatedRecords.length}건의 기존 데이터 ${labels[action]}을 완료했습니다.${excludedCount ? ` 조건에 맞지 않는 ${excludedCount}건은 제외했습니다.` : ""}`)
+    setNotice(`${outcomes.join(" / ")}${updatedRecords.length ? ` / 기존 ${updatedRecords.length}건 ${labels[action]} 완료` : ""}${excludedCount ? ` 조건에 맞지 않는 ${excludedCount}건은 제외했습니다.` : ""}`)
     setActionDialog(null)
     setSelectedFlower(null)
     setSelectedIds([])
@@ -362,7 +368,9 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
 
   return (
     <div className="w-full space-y-4 pb-2 text-slate-700">
-      <SummaryCards records={records} />
+      <SummaryCards records={records.filter(r => !r.pro || r.pro.selected)} />
+      <p className="text-xs text-slate-500">프로 학생은 피드백 대상으로 선정된 글만 집계합니다.</p>
+      <div className="flex flex-wrap items-center gap-4 text-sm"><label><input type="checkbox" checked={proOnly} onChange={e => setProOnly(e.target.checked)}/> 프로 학생만</label><label><input type="checkbox" checked={selectedOnly} onChange={e => setSelectedOnly(e.target.checked)}/> 피드백 대상만</label>{studentId && <span>학생 조건: {records.find(r => r.studentId === studentId)?.studentName ?? studentId}</span>}</div>
 
       <section className="rounded border border-[#bae7ff] bg-[#e6f7ff] px-6 py-4 text-[13px] leading-[22px] text-[#1890ff]">
         <ul className="list-disc pl-4"><li>피드백 작성전인 온라인 독후감을 우선적으로 처리해 주세요.</li><li>일괄 AI 피드백 생성 후에도 상태는 피드백 작성전으로 유지되니, 내용을 확인 후 저장해 주세요.</li><li>AI 피드백 생성은 차수별 최대 2회까지 사용 가능해요.</li><li>피드백 저장 후, 꼭 학생에게 전송해 주세요.</li><li>학부모 발송은 1회만 가능하니 신중히 진행해 주세요.</li></ul>
@@ -390,7 +398,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
             <Button variant="outline" disabled={!selectedFlowerEligibleCount} onClick={() => { setSelectedFlower(null); setActionDialog({ kind: "bulk", action: "flower" }) }} className={bulkClass}><Flower2 className="size-4" />일괄 섬초롱꽃 지급 ({selectedFlowerEligibleCount})</Button>
             <button type="button" aria-label="목록 검색" onClick={() => setQuery(keyword)} className="grid size-9 place-items-center rounded-full bg-blue-600 text-white"><Search className="size-4" /></button>
             <button type="button" aria-label="목록 새로고침" onClick={() => setRefreshKey(k => k + 1)} className="grid size-9 place-items-center rounded-full border border-slate-200 text-slate-500"><RefreshCw className="size-4" /></button>
-            <ReviewListTools tableId="agency-review-table" columns={["선택","고유번호","학생 이름","레벨","도서명","학생 제출일","피드백 작성일","차수","진행 상황","피드백 상태","학부모 발송 여부","피드백 전송","학부모 발송","평가 보고서","섬초롱꽃","피드백 작성 (AI 잔여횟수)"]} />
+            <ReviewListTools tableId="agency-review-table" columns={["선택","고유번호","학생 이름","레벨","도서명","학생 제출일","피드백 작성일","차수","진행 상황","관리 주차","피드백 대상","처리 기한","피드백 상태","학부모 발송 여부","피드백 전송","학부모 발송","평가 보고서","섬초롱꽃","피드백 작성 (AI 잔여횟수)"]} />
           </div>
         </div>
 
@@ -406,7 +414,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
                 <TableHead className="text-center"><button type="button" onClick={() => toggleSort("submittedAt")} className="font-semibold">학생 제출일 <span className="text-slate-300">◆</span></button></TableHead>
                 <TableHead className="text-center font-semibold">피드백 작성일</TableHead>
                 <TableHead className="text-center font-semibold">차수</TableHead>
-                <TableHead className="text-center font-semibold">진행 상황</TableHead>
+                <TableHead className="text-center font-semibold">진행 상황</TableHead><TableHead>관리 주차</TableHead><TableHead>피드백 대상</TableHead><TableHead>처리 기한</TableHead>
                 <TableHead className="text-center font-semibold">피드백 상태</TableHead>
                 <TableHead className="text-center font-semibold">학부모 발송 여부</TableHead>
                 <TableHead className="text-center font-semibold">피드백 전송</TableHead>
@@ -424,23 +432,23 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
                 <TableRow key={record.id} className="h-[46px] text-slate-700 hover:bg-slate-50" data-state={selectedIds.includes(record.id) ? "selected" : undefined}>
                   <TableCell className="text-center"><Checkbox aria-label={`${record.studentName} 학생 선택`} checked={selectedIds.includes(record.id)} onCheckedChange={(checked) => setSelectedIds((current) => checked ? [...current, record.id] : current.filter((id) => id !== record.id))} /></TableCell>
                   <TableCell className="whitespace-nowrap text-center tabular-nums">{record.displayNumber ?? record.id.padStart(5, "0")}</TableCell>
-                  <TableCell className="text-center">{record.studentName}</TableCell>
+                  <TableCell className="text-center">{record.studentName}{record.external && <ExternalBadge/>}</TableCell>
                   <TableCell className="text-center">{record.level}</TableCell>
                   <TableCell className="truncate text-center" title={record.bookTitle}>{record.bookTitle}</TableCell>
                   <TableCell className="text-center">{record.submittedAt}</TableCell>
                   <TableCell className="text-center">{record.feedbackAt ?? ""}</TableCell>
                   <TableCell className="text-center font-semibold text-slate-600">{writingInfo(record)}</TableCell>
-                  <TableCell className="text-center">{progressInfo(record)}</TableCell>
-                  <TableCell className="text-center">{statusText[record.status]}</TableCell>
-                  <TableCell className="text-center">{record.parentSent ? "발송완료" : "미발송"}</TableCell>
-                  <TableCell className="text-center">{record.status === "전송완료" ? <Check className="mx-auto size-4 text-emerald-500" aria-label="학생 전송 완료" /> : <button type="button" aria-label={`${record.studentName} 학생에게 전송`} disabled={record.status !== "작성완료"} onClick={() => setActionDialog({ kind: "single-send", record })} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300"><Send className="size-4" /></button>}</TableCell>
-                  <TableCell className="text-center">{record.parentSent ? <Check className="mx-auto size-4 text-emerald-500" aria-label="학부모 발송 완료" /> : <button type="button" aria-label={`${record.studentName} 학부모 발송`} title={record.parentContactRegistered === false ? "학부모 연락처가 등록되어 있지 않습니다." : undefined} disabled={record.status !== "전송완료" || record.parentContactRegistered === false} onClick={() => setActionDialog({ kind: "parent", record })} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300"><Mail className="size-4" /></button>}</TableCell>
+                  <TableCell className="text-center">{progressInfo(record)}</TableCell><TableCell>{record.pro?.period ?? "-"}</TableCell><TableCell>{record.pro?.selection ?? "-"}</TableCell><TableCell>{record.pro?.due ?? "-"}</TableCell>
+                  <TableCell className="text-center">{record.pro && !record.pro.selected ? "-" : statusText[record.status]}</TableCell>
+                  <TableCell className="text-center">{record.pro ? record.pro.selected ? record.pro.parentLabel : "-" : record.parentSent ? "발송완료" : "미발송"}</TableCell>
+                  <TableCell className="text-center">{record.pro && !record.pro.selected ? "-" : record.status === "전송완료" ? <Check className="mx-auto size-4 text-emerald-500" aria-label="학생 전송 완료" /> : <button type="button" aria-label={`${record.studentName} 학생에게 전송`} disabled={record.status !== "작성완료"} onClick={() => setActionDialog({ kind: "single-send", record })} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300"><Send className="size-4" /></button>}</TableCell>
+                  <TableCell className="text-center">{record.pro ? record.pro.selected ? "자동 발송" : "-" : record.parentSent ? <Check className="mx-auto size-4 text-emerald-500" aria-label="학부모 발송 완료" /> : <button type="button" aria-label={`${record.studentName} 학부모 발송`} title={record.parentContactRegistered === false ? "학부모 연락처가 등록되어 있지 않습니다." : undefined} disabled={record.status !== "전송완료" || record.parentContactRegistered === false} onClick={() => setActionDialog({ kind: "parent", record })} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300"><Mail className="size-4" /></button>}</TableCell>
                   <TableCell className="text-center"><ReportCell record={record} role={role} /></TableCell>
                   <TableCell className="text-center">{record.flowers ? <span>🌻&nbsp; {record.flowers}개</span> : "-"}</TableCell>
                   <TableCell className="text-center"><FeedbackAction record={record} role={role} /></TableCell>
                 </TableRow>
               ))}
-              {!filteredRecords.length && <TableRow><TableCell colSpan={16} className="h-40 text-center text-slate-400">조건에 맞는 온라인 독후감이 없습니다.</TableCell></TableRow>}
+              {!filteredRecords.length && <TableRow><TableCell colSpan={19} className="h-40 text-center text-slate-400">조건에 맞는 온라인 독후감이 없습니다.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </div>
@@ -451,12 +459,12 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
         </div>
       </section>
 
-      {actionDialog?.kind === "single-send" && <AlertDialog title="학생 전송" message={<p>{actionDialog.record.studentName} 학생에게 피드백을 전송할까요? 전송 후에는 수정할 수 없습니다.</p>} onClose={() => setActionDialog(null)} onConfirm={() => void sendSingleFeedback(actionDialog.record)} />}
+      {actionDialog?.kind === "single-send" && <AlertDialog title="학생 전송" confirmLabel="전송하기" message={<p>{actionDialog.record.pro && actionDialog.record.writingRound === 1 && actionDialog.record.secondDecision === "complete" ? PRO_SEND_CONFIRM : `${actionDialog.record.studentName} 학생에게 피드백을 전송할까요? 전송 후에는 수정할 수 없습니다.`}</p>} onClose={() => setActionDialog(null)} onConfirm={() => void sendSingleFeedback(actionDialog.record)} />}
       {actionDialog?.kind === "parent" && <AlertDialog title="학부모 발송" message={<p>{actionDialog.record.studentName} 학부모에게 발송하시겠습니까?</p>} onClose={() => setActionDialog(null)} onConfirm={confirmSingleParentSend} />}
 
       {actionDialog?.kind === "bulk" && actionDialog.action === "ai" && <AlertDialog title="AI 피드백 생성 실행" message={<><p>선택한 <strong>{selectedIds.length}</strong>개의 독후감에 AI 피드백 생성을 실행하시겠어요?</p><p>각 독후감의 AI 피드백 생성 가능 횟수에서 성공한 경우에만 1회씩 차감됩니다.</p><p>항목별보기는 총평과 항목별 피드백을, 이어보기는 총평만 생성합니다. 평가 보고서 제공 독후감은 평가 점수와 보고서용 총평도 생성합니다.</p><p>생성된 내용은 상세 화면에서 확인·수정한 후 저장해 주세요.</p></>} onClose={() => setActionDialog(null)} onConfirm={confirmBulkAction} />}
 
-      {actionDialog?.kind === "bulk" && actionDialog.action === "send" && <AlertDialog title="일괄 학생 전송" message={<p>선택한 {selectedIds.length}개의 피드백을 학생에게 전송하시겠습니까?</p>} onClose={() => setActionDialog(null)} onConfirm={confirmBulkAction} />}
+      {actionDialog?.kind === "bulk" && actionDialog.action === "send" && <AlertDialog title="일괄 학생 전송" confirmLabel="전송하기" message={<><p>선택한 {selectedIds.length}개의 피드백을 학생에게 전송하시겠습니까?</p>{selectedRecords.some(r => r.pro?.selected && r.status === "작성완료" && r.writingRound === 1 && r.secondDecision === "complete") && <p className="mt-3">{PRO_BULK_SEND_CONFIRM}</p>}</>} onClose={() => setActionDialog(null)} onConfirm={confirmBulkAction} />}
 
       {actionDialog?.kind === "bulk" && actionDialog.action === "parent" && <AlertDialog title="일괄 학부모 발송" message={<p>선택한 {selectedIds.length}개의 항목에 대해 학부모에게 발송하시겠습니까?</p>} onClose={() => setActionDialog(null)} onConfirm={confirmBulkAction} />}
 

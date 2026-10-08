@@ -3,6 +3,7 @@
 import * as React from "react"
 import ui from "./exploration-test-server.module.css"
 import { useReviews } from "@/lib/review-client"
+import { ProFeedbackUsage } from "./pro-feedback-status"
 import { StudentReviewRecordCard } from "./student-review-records"
 import { SecondReviewStartModal } from "./second-review-start-modal"
 import Image from "next/image"
@@ -108,8 +109,8 @@ export function ExplorationRecord() {
     return workbook ? [{ ...workbook, year: record.year, month: record.month, day: record.day, weekday: record.weekday }] : []
   })
   const transientWorkbookIds = new Set(transientWorkbooks.map((item) => item.id))
-  const visibleWorkbooks = [...transientWorkbooks, ...studentWorkbooks.filter((item) => !transientWorkbookIds.has(item.id))].filter((item) => item.year === year && item.month === month && !reviewHook.db.reviews.some(c => c.sourceWorkbookId === item.id))
-  const visibleBasics = [...transientReadingRecords, ...basicRecords].filter((item) => item.year === year && item.month === month && (tab === "전체" || item.type === tab) && (tab !== "책 읽기 탐험" || ((!readingLevel || String(item.level) === readingLevel) && (!readingAttempt || item.attempt === readingAttempt))))
+  const visibleWorkbooks = (reviewHook.db.studentPro ? [] : [...transientWorkbooks, ...studentWorkbooks.filter((item) => !transientWorkbookIds.has(item.id))].filter((item) => item.year === year && item.month === month && !reviewHook.db.reviews.some(c => c.sourceWorkbookId === item.id)))
+  const visibleBasics = (reviewHook.db.studentPro ? [] : [...transientReadingRecords, ...basicRecords]).filter((item) => item.year === year && item.month === month && (tab === "전체" || item.type === tab) && (tab !== "책 읽기 탐험" || ((!readingLevel || String(item.level) === readingLevel) && (!readingAttempt || item.attempt === readingAttempt))))
   const transientActivityByWorkbookId = new Map(transientReadingRecords.map(record => [record.workbookId, readingRecordActivityTimestamp(record)]))
   const transientActivityById = new Map(transientReadingRecords.map(record => [record.id, readingRecordActivityTimestamp(record)]))
   let sourceOrder = 0
@@ -128,7 +129,7 @@ export function ExplorationRecord() {
     result[row.day] = [...(result[row.day] ?? []), row]
     return result
   }, {})
-  const monthBasics = [...transientReadingRecords, ...basicRecords].filter(item => item.year === year && item.month === month)
+  const monthBasics = (reviewHook.db.studentPro ? [] : [...transientReadingRecords, ...basicRecords]).filter(item => item.year === year && item.month === month)
   const monthReviews = reviewHook.db.records.filter(record => reviewHook.db.reviews.some(c => c.id === record.reviewId && reviewActivityDate(c).monthKey === `${year}-${String(month).padStart(2,"0")}`))
   const tabCount = (name: TabName) => name === "온라인 독후감" ? monthReviews.length + visibleWorkbooks.length : name === "전체" ? monthBasics.length + monthReviews.length + visibleWorkbooks.length : monthBasics.filter(r => r.type === name).length
   const flowers = rows.reduce((sum, row) => sum + (row.kind === "review" ? row.item.flowers : 0), 0)
@@ -151,7 +152,7 @@ export function ExplorationRecord() {
   return (
     <div className={ui.page}>
       <StudentHeader />
-      {secondStart && <SecondReviewStartModal {...secondStart} run={reviewHook.run} onClose={() => setSecondStart(null)} />}
+      {secondStart && <SecondReviewStartModal {...secondStart} deadline={reviewHook.db.studentPro?.cases.find(c => `${c.reviewId}-r1` === secondStart.recordId)?.secondDeadline} run={reviewHook.run} onClose={() => setSecondStart(null)} />}
       <section className={ui.top}>
         <div className="mx-auto flex max-w-[920px] items-center justify-center gap-2">
           <button aria-label="이전 월" onClick={() => moveMonth(-1)} className="grid size-8 place-items-center rounded-full bg-[#2ca4e6] text-white transition hover:bg-[#168fd1]"><ChevronLeft className="size-5" /></button>
@@ -165,7 +166,7 @@ export function ExplorationRecord() {
 
       <main className={ui.layout}>
         <aside className={ui.calendar}><h2>{month}월의 탐험</h2><p className={ui.stats}><strong>{rows.length}</strong> 회 학습 <span><Image className="inline-block" src="/student-assets/flower-reward.svg" alt="섬초롱꽃" width={20} height={20} /> <b>{flowers}</b>개</span></p><div className={ui.days}>{["일","월","화","수","목","금","토"].map((d,i)=><span className={ui.weekday} key={d} data-sunday={i===0}>{d}</span>)}{Array.from({length:monthStart},(_,i)=><span key={`blank-${i}`} />)}{Array.from({length:monthDays},(_,i)=><span key={i} data-active={Boolean(grouped[i+1])} data-today={year===currentYear && month===currentMonth && i+1===currentDate.getDate()}>{i+1}</span>)}</div><footer><p><i />책 + 글　<i />책 또는 글　<i />그 외</p><p>이번 달 <strong>{days.length}일</strong> 탐험했어요</p></footer></aside>
-        <div className={ui.timeline}>{tab === "책 읽기 탐험" && <div className={ui.readingFilters}><label>레벨 <select aria-label="레벨" value={readingLevel} onChange={e=>setReadingLevel(e.target.value)}><option value="">선택</option>{[1,2,3,4,5,6].map(level=><option key={level} value={level}>{level}레벨</option>)}</select></label><label>탐험 구분 <select aria-label="탐험 구분" value={readingAttempt} onChange={e=>setReadingAttempt(e.target.value)}><option value="">선택</option><option>첫 탐험</option><option>재탐험</option></select></label></div>}{tab === "온라인 독후감" && <p className={ui.notice}>보고서는 제공되는 독후감에만 표시돼요.</p>}
+        <div className={ui.timeline}>{tab === "온라인 독후감" && <ProFeedbackUsage db={reviewHook.db}/>}{tab === "책 읽기 탐험" && <div className={ui.readingFilters}><label>레벨 <select aria-label="레벨" value={readingLevel} onChange={e=>setReadingLevel(e.target.value)}><option value="">선택</option>{[1,2,3,4,5,6].map(level=><option key={level} value={level}>{level}레벨</option>)}</select></label><label>탐험 구분 <select aria-label="탐험 구분" value={readingAttempt} onChange={e=>setReadingAttempt(e.target.value)}><option value="">선택</option><option>첫 탐험</option><option>재탐험</option></select></label></div>}{tab === "온라인 독후감" && <p className={ui.notice}>보고서는 제공되는 독후감에만 표시돼요.</p>}
         {days.length === 0 ? <div className="grid min-h-[390px] place-items-center rounded-[22px] bg-white text-[#999] shadow-[0_4px_18px_rgba(45,62,72,.08)]"><p>탐험 기록이 없는 달이에요</p></div> : (
           <div className="space-y-8">
             {days.map(day => {

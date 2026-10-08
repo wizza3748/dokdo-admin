@@ -1,5 +1,6 @@
 "use client"
 import * as React from "react"
+import { ProFeedbackUsage, ProFeedbackAction, ProSubmissionPrompt } from "./pro-feedback-status"
 import Link from "next/link"
 import Image from "next/image"
 import ui from "./review-test-server.module.css"
@@ -97,6 +98,7 @@ export function StudentReviewFlow({ workbook }: { workbook: StudentWorkbook }) {
   const records = hook.db.records.filter(r => r.reviewId === common?.id)
   const record = records.find(r => r.round === round) ?? records.at(-1)
   const selecting = !common || !!record?.templateSelectionPending
+  const expiredDraft = record?.round === 2 && record.writingStatus === "writing" && hook.db.studentPro?.cases.some(c => c.reviewId === common?.id && c.expired)
   const start = async () => {
     if (busy || !template) return
     setBusy(true)
@@ -108,7 +110,7 @@ export function StudentReviewFlow({ workbook }: { workbook: StudentWorkbook }) {
   return <div className={ui.root}><StudentHeader section="온라인 독후감" />
     {selecting && <SelectionTitle title={workbook.bookTitle} />}
     {hook.error && <p role="alert" className="mx-auto max-w-[930px] py-3 text-red-600">{hook.error}</p>}
-    {selecting ? <><div className="mx-auto max-w-[930px] px-4 pt-6">{fromRecords && <Link className="inline-flex items-center gap-2 text-sm font-bold text-[#147fbd] hover:underline" href={listHref}><ArrowLeft className="size-4" />온라인 독후감 목록</Link>}</div><SelectionScreen workbook={displayWorkbook} template={displayTemplate} selectedId={selected} onSelect={setSelected} onPreview={() => setPreview(true)} onStart={() => setStarting(true)} showReportGuide compactTop={fromRecords} /></> : record && (record.writingStatus === "writing" ? <ReviewWriting key={`${record.id}:${record.stage}`} common={common} record={record} first={records.find(r => r.round === 1)!} hook={hook} /> : <ReviewResult common={common} record={record} records={records} hook={hook} setRound={setRound} />)}
+    {selecting ? <><div className="mx-auto max-w-[930px] px-4 pt-6">{fromRecords && <Link className="inline-flex items-center gap-2 text-sm font-bold text-[#147fbd] hover:underline" href={listHref}><ArrowLeft className="size-4" />온라인 독후감 목록</Link>}</div><SelectionScreen workbook={displayWorkbook} template={displayTemplate} selectedId={selected} onSelect={setSelected} onPreview={() => setPreview(true)} onStart={() => setStarting(true)} showReportGuide compactTop={fromRecords} /></> : record && (expiredDraft ? <main className="mx-auto max-w-4xl p-8"><h1 className="text-xl font-bold">2차 제출 기한 종료 · 저장된 초안</h1><p className="my-4">저장한 글은 읽기만 할 수 있어요.</p><StudentResultContent common={record.stage === "items" ? { ...common, template: { ...common.template, rewriteMode: "items" } } : common} record={{ ...record, finalBody: record.body }}/><Link className="mt-5 block text-blue-600" href={listHref}>온라인 독후감 목록</Link></main> : record.writingStatus === "writing" ? <ReviewWriting key={`${record.id}:${record.stage}`} common={common} record={record} first={records.find(r => r.round === 1)!} hook={hook} /> : <ReviewResult common={common} record={record} records={records} hook={hook} setRound={setRound} />)}
     {preview && <PreviewModal template={displayTemplate} onClose={() => setPreview(false)} />}
     {starting && <StartConfirmModal onClose={() => setStarting(false)} onConfirm={() => { setStarting(false); setOutline(true) }} />}
     {outline && <OutlineModal template={displayTemplate} onClose={() => setOutline(false)} onStart={() => { if (!busy) void start() }} />}
@@ -235,7 +237,11 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
     if (modal === "submit" && submissionTooShort) { setModal("short-submit"); return }
     setBusy(true)
     if (modal === "rewrite") await enterRewrite()
-    else if (modal === "submit" && (!dirty || await save())) await hook.run({ type: "submit", recordId: record.id })
+    else if (modal === "submit" && (!dirty || await save())) {
+      if (hook.db.studentPro && record.round === 1) sessionStorage.setItem(`pro-submit-prompt:${common.id}`, "1")
+      const submitted = await hook.run({ type: "submit", recordId: record.id })
+      if (!submitted) sessionStorage.removeItem(`pro-submit-prompt:${common.id}`)
+    }
     setModal(null)
     setBusy(false)
   }
@@ -245,6 +251,7 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
       <ol>{["차례대로 쓰기", "고쳐쓰기", "나의 글 완성"].map((label, i) => <li key={label} data-active={i === (rewrite ? 1 : 0)} data-complete={rewrite && i === 0}><span>{rewrite && i === 0 ? <Check size={14} /> : i + 1}</span>{label}{i < 2 && <ChevronRight size={14} />}</li>)}{record.round === 2 && <li className={ui.roundBadge}>2차{record.initialStage === "rewrite" && <Popover><PopoverTrigger className={ui.roundInfo} aria-label="2차 고쳐쓰기 시작 안내">i</PopoverTrigger><PopoverContent className={ui.roundInfoContent} side="bottom" align="start" alignOffset={-42} sideOffset={8} aria-label="2차 고쳐쓰기 시작 안내">1차 고쳐쓰기에서 글을 고쳤기 때문에, 2차는 고쳐쓰기부터 시작해요. 차례대로 쓰기로는 돌아갈 수 없어요.<PopoverArrow className={ui.roundInfoArrow} width={12} height={7} /></PopoverContent></Popover>}</li>}</ol>
       <div className={ui.writingTitle}><h1>{common.bookTitle}<span><Pencil size={14} />{common.template.title}</span></h1>{hasReference && referenceView === null && <button type="button" className={ui.openChecklist} aria-expanded={false} aria-controls="writing-reference" onClick={() => setReferenceView("guide")}><ChevronLeft size={16} />체크리스트 보기</button>}</div>
     </header>
+    {record.round === 2 && <ProFeedbackAction db={hook.db} reviewId={common.id} round={2} submitted={false}/>}
     <main className={ui.writing}>
       <aside className={ui.questions}><header>질문 <small>{common.template.items.filter(q => plainReviewText(answers[q.id])).length}/{common.template.items.length} 작성</small></header>
         {common.template.items.map((question, qi) => <section key={question.id} data-active={qi === index}><button type="button" onClick={() => rewrite ? setIndex(qi) : requestMove(qi)}><span>{plainReviewText(answers[question.id]) ? <Check size={15} /> : qi + 1}</span>{question.title}</button>{qi === index && <div><p>{question.description}</p>{question.example && <p className={ui.example}><strong>예시</strong>{question.example}</p>}</div>}</section>)}
@@ -289,7 +296,7 @@ export function ReviewResult({ common, record, records, hook, setRound, external
   const secondSubmitted = second?.writingStatus === "submitted"
   const firstFeedback = first?.feedbackStatus === "전송완료"
   const secondFeedback = second?.feedbackStatus === "전송완료"
-  const canStartSecond = !external && firstSubmitted && firstFeedback && !!first?.seenAt && common.secondDecision === "request" && !second
+  const canStartSecond = !external && firstSubmitted && firstFeedback && !!first?.seenAt && common.secondDecision === "request" && !second && !hook.db.studentPro?.cases.some(c => c.reviewId === common.id && c.expired)
   const firstReport = common.reportEnabled && firstFeedback && first?.report
   const secondReport = common.reportEnabled && secondFeedback && second?.report
   const progressLabel = record.feedbackStatus === "전송완료" ? "활동 완료" : studentReviewProgressLabel(common.progress)
@@ -328,6 +335,7 @@ export function ReviewResult({ common, record, records, hook, setRound, external
     catch { setCopyMessage("복사 권한을 확인해 주세요.") }
   }
   return <>
+    {!external && <ProSubmissionPrompt db={hook.db} reviewId={common.id}/>}
     <main className={ui.result}>
       <header className={ui.resultHeader}>
         {!external && <ol><li><Check size={14} />차례대로 쓰기<span>›</span></li><li><Check size={14} />고쳐쓰기<span>›</span></li><li data-active="true"><b>3</b>나의 글 완성</li></ol>}
@@ -336,13 +344,13 @@ export function ReviewResult({ common, record, records, hook, setRound, external
       {secondSubmitted && <nav className={ui.resultTabs} role="tablist" aria-label="작성 글 보기"><button type="button" role="tab" aria-selected={!compareOpen && record.round === 1} data-active={!compareOpen && record.round === 1} onClick={() => selectWriting(1)}>1차 작성 글</button><button type="button" role="tab" aria-selected={!compareOpen && record.round === 2} data-active={!compareOpen && record.round === 2} onClick={() => selectWriting(2)}>2차 작성 글</button><button type="button" role="tab" aria-selected={compareOpen} data-active={compareOpen} onClick={toggleCompare}>나란히 보기</button></nav>}
       {canStartSecond && <div className={ui.secondRequest}><p>선생님의 피드백을 참고해 2차 글을 작성해 보세요.</p><button type="button" onClick={() => setSecondStart(true)}>2차 글 시작하기 →</button></div>}
       {compareOpen ? <section className={ui.resultCard} aria-label="작성 글 비교"><header><h2>{common.template.title}<small>1차 · 2차 나란히</small></h2><FeedbackToggle checked={compareFeedback} onChange={()=>setCompareFeedback(v=>!v)} /></header><div className={ui.compare}>{submitted.map(r => <article key={r.id}><h3>{r.round}차 작성 글</h3><InlineReviewContent common={common} record={r} showFeedback={compareFeedback} /><StudentResultContent common={common} record={r} showFeedback={compareFeedback} /></article>)}</div></section> : <div className={ui.resultGrid}>
-        <aside><BookPanel workbook={workbook} /><p className={ui.progress} aria-label={`독후감 상태: ${progressLabel}`}>{progressLabel}</p></aside>
+        <aside><BookPanel workbook={workbook} />{!external && <><ProFeedbackUsage db={hook.db}/><ProFeedbackAction db={hook.db} reviewId={common.id} round={record.round} submitted={record.writingStatus === "submitted"}/></>}<p className={ui.progress} aria-label={`독후감 상태: ${progressLabel}`}>{progressLabel}</p></aside>
         <article className={ui.resultCard}><header><h2>{common.template.title}</h2>{record.feedbackStatus === "전송완료" && <FeedbackToggle checked={feedbackRound === record.round} onChange={() => toggleFeedback(record)} />}</header><div className={ui.resultBody}><InlineReviewContent common={common} record={record} showFeedback={feedbackRound === record.round} /><StudentResultContent common={common} record={record} showFeedback={feedbackRound === record.round} /></div></article>
       </div>}
       {showListNavigation && <footer className={ui.resultFooter} data-compare={compareOpen}><Link href={`/student/exploration-record?tab=workbook&month=${reviewActivityDate(common).monthKey}`}><ArrowLeft size={18} />온라인 독후감 목록</Link><div><button type="button" onClick={() => void copyWriting()}><FileText size={18} />글 복사</button><a href="https://read365.edunet.net/Search" target="_blank" rel="noopener noreferrer"><BookOpen size={20} />독서로 이동</a></div></footer>}
       {copyMessage && <p role="status" className={cn("fixed left-1/2 z-[90] -translate-x-1/2 rounded-full bg-[#28333b] px-6 py-3 font-bold text-white shadow-xl", showListNavigation ? "bottom-24" : "bottom-6")}>{copyMessage}</p>}
     </main>
-    {secondStart && !external && first && <SecondReviewStartModal recordId={first.id} sourceWorkbookId={common.sourceWorkbookId} run={hook.run} onClose={() => setSecondStart(false)} onStarted={() => setRound(2)} />}
+    {secondStart && !external && first && <SecondReviewStartModal recordId={first.id} sourceWorkbookId={common.sourceWorkbookId} deadline={hook.db.studentPro?.cases.find(c => c.reviewId === common.id)?.secondDeadline} run={hook.run} onClose={() => setSecondStart(false)} onStarted={() => setRound(2)} />}
 
 
   </>

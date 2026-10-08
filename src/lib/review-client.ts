@@ -4,6 +4,18 @@ import { STUDENT_MOCK_STORAGE_KEYS } from "@/lib/student-mock-state"
 import { emptyReviewDatabase, type ReviewActor, type ReviewCommand, type ReviewDatabase } from "@/lib/review-domain"
 export type ReviewRole = ReviewActor["role"]
 const eventName = "dokdo-review-change"
+export function demoIdentityQuery(role: ReviewRole) {
+  if (typeof window === "undefined") return ""
+  const params = new URLSearchParams(window.location.search)
+  if (role === "student") {
+    const id = params.get("demoStudent")
+    if (id !== null) sessionStorage.setItem("dokdo-demo-student", id === "normal" ? "" : id)
+    const current = sessionStorage.getItem("dokdo-demo-student")
+    return current ? `&demoStudent=${encodeURIComponent(current)}` : ""
+  }
+  return params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""
+}
+export function notifyReviewChange() { window.dispatchEvent(new Event(eventName)); window.dispatchEvent(new Event("dokdo-workbook-change")) }
 function preserveLegacyProgress(db: ReviewDatabase): ReviewDatabase {
   if (typeof window === "undefined") return db
   try {
@@ -14,12 +26,12 @@ function preserveLegacyProgress(db: ReviewDatabase): ReviewDatabase {
   } catch { return db }
 }
 export async function readReviews(role: ReviewRole = "student", recordId?: string): Promise<ReviewDatabase> {
-  const response = await fetch(`/api/mock/online-reviews?role=${role}${recordId ? `&recordId=${encodeURIComponent(recordId)}` : ""}`, { cache: "no-store" })
+  const response = await fetch(`/api/mock/online-reviews?role=${role}${demoIdentityQuery(role)}${recordId ? `&recordId=${encodeURIComponent(recordId)}` : ""}`, { cache: "no-store" })
   if (!response.ok) throw new Error("온라인 독후감을 불러오지 못했습니다.")
   return preserveLegacyProgress(await response.json())
 }
 export async function commandReview(command: ReviewCommand, role: ReviewRole = "student", requestId = crypto.randomUUID()): Promise<ReviewDatabase> {
-  const response = await fetch(`/api/mock/online-reviews?role=${role}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command, requestId }) })
+  const response = await fetch(`/api/mock/online-reviews?role=${role}${demoIdentityQuery(role)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command, requestId }) })
   const result = await response.json()
   if (!response.ok) throw new Error(result.message || "처리에 실패했습니다.")
   window.dispatchEvent(new Event(eventName))

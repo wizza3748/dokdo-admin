@@ -24,7 +24,7 @@ export function StudentHeader({ section }: { section?: string }) {
     <header className="relative z-30 flex min-h-12 flex-wrap items-center justify-between gap-y-1 border-b border-[#dce4e8] bg-white px-3 py-1 sm:h-12 sm:flex-nowrap sm:px-6 sm:py-0">
       <Link href="/student" className="flex items-center gap-2 font-black text-[#171b1e]">
         <Image src="/student-assets/dokdo-logo.svg" alt="독도" width={40} height={34} priority />
-        <span>진독도</span>
+        <span>{db.studentPro?.name ?? "진독도"}</span>
       </Link>
       <div className="order-last w-full text-center text-sm sm:absolute sm:left-1/2 sm:order-none sm:w-auto sm:-translate-x-1/2">{section ? <strong>{section}</strong> : <><span className="text-[#454c51]">{todayLabel}</span><strong className="ml-2">탐험</strong></>}</div>
       <div className="flex items-center gap-2 text-[#078ed5] sm:gap-3">

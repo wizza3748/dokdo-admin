@@ -6,6 +6,9 @@ import { withWorkbookDisplayNumbers } from "@/lib/workbook-display-numbers"
 export type FeedbackStatus = "작성전" | "작성완료" | "전송완료"
 
 export interface OnlineWorkbook {
+  studentId?: string
+  external?: boolean
+  pro?: { selected: boolean; period: string; selection: string; due?: string; parentLabel: string }
   displayNumber?: string
   reviewId?: string
   writingRound?: 1 | 2

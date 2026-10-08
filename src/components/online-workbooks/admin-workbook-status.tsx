@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ExternalBadge } from "@/components/pro-management/pro-common"
 import type { AdminWorkbookRow } from "@/lib/admin-workbook-seeds"
 import {
   getAgencyWorkbookListAsync,
@@ -78,7 +79,7 @@ function SummaryCards({ records, selectedStatus, onSelect }: {
   return (
     <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
       {summary.map((item) => {
-        const matching = records.filter((record) => record.status === item.status)
+        const matching = records.filter((record) => (!record.pro || record.pro.selected) && record.status === item.status)
         const institutionCount = new Set(matching.map((record) => record.institution)).size
         const studentCount = new Set(matching.map((record) => `${record.institution}:${record.student}`)).size
         return (
@@ -108,6 +109,7 @@ function SummaryCards({ records, selectedStatus, onSelect }: {
 
 export function AdminWorkbookStatus() {
   const [studentRows, setStudentRows] = React.useState<AdminWorkbookRow[]>([])
+  const [proOnly, setProOnly] = React.useState(false)
   const [period, setPeriod] = React.useState<Period>("today")
   const [startDate, setStartDate] = React.useState("")
   const [endDate, setEndDate] = React.useState("")
@@ -135,7 +137,7 @@ export function AdminWorkbookStatus() {
 
   React.useEffect(() => {
     setPage(1)
-  }, [institution, level, status, flower, query, sort, writingRound, reportFilter, period, startDate, endDate, pageSize])
+  }, [institution, level, status, flower, query, sort, writingRound, reportFilter, period, startDate, endDate, pageSize, proOnly])
 
   React.useEffect(() => {
     let active = true
@@ -151,6 +153,7 @@ export function AdminWorkbookStatus() {
         reviewId: record.reviewId,
         institution: record.institution,
         student: record.studentName,
+        studentId: record.studentId, external: record.external, pro: record.pro,
         level: record.level,
         book: record.bookTitle,
         template: record.templateName,
@@ -174,16 +177,17 @@ export function AdminWorkbookStatus() {
   const baseFilteredRows = React.useMemo(() => {
     const normalized = query.trim().toLowerCase()
     return studentRows
+      .filter(row => !proOnly || !!row.pro)
       .filter((row) => matchesWorkbookClassification(row, writingRound, "전체", reportFilter))
       .filter((row) => period === "all" || ((!startDate || row.submittedAt >= startDate) && (!endDate || row.submittedAt <= endDate)))
       .filter((row) => institution === "all" || row.institution === institution)
       .filter((row) => level === "all" || row.level === Number(level))
       .filter((row) => flower === "all" || row.flowers === Number(flower))
       .filter((row) => !normalized || `${row.student} ${row.book}`.toLowerCase().includes(normalized))
-  }, [studentRows, institution, level, flower, query, writingRound, reportFilter, period, startDate, endDate])
+  }, [studentRows, institution, level, flower, query, writingRound, reportFilter, period, startDate, endDate, proOnly])
 
   const filteredRows = React.useMemo(() => baseFilteredRows
-    .filter((row) => status === "all" || row.status === status)
+    .filter((row) => status === "all" || (!row.pro || row.pro.selected) && row.status === status)
     .sort((a, b) => {
       const aDisplayNumber = a.displayNumber ?? a.id.padStart(5, "0")
       const bDisplayNumber = b.displayNumber ?? b.id.padStart(5, "0")
@@ -221,6 +225,7 @@ export function AdminWorkbookStatus() {
     setPeriod("today")
     setStartDate(today)
     setEndDate(today)
+    setProOnly(false)
     setInstitution("all")
     setLevel("all")
     setStatus("all")
@@ -257,6 +262,7 @@ export function AdminWorkbookStatus() {
 
       <div className="space-y-4 p-4">
         <SummaryCards records={baseFilteredRows} selectedStatus={status} onSelect={setStatus} />
+        <label className="inline-flex items-center gap-2 text-sm"><input type="checkbox" checked={proOnly} onChange={e => setProOnly(e.target.checked)}/>프로 학생만</label><p className="text-xs text-slate-500">프로 학생은 선정된 1차 및 연결된 2차 제출 건만 피드백 집계에 포함됩니다.</p>
 
         <section className="border border-blue-100 bg-[#edf7ff] text-sm leading-7 text-blue-600">
           <button type="button" aria-expanded={guideOpen} aria-controls="admin-workbook-guide" onClick={() => setGuideOpen(open => !open)} className="flex w-full cursor-pointer items-center justify-between px-6 py-3 text-left font-semibold focus-visible:outline-2 focus-visible:outline-blue-600">
@@ -346,7 +352,7 @@ export function AdminWorkbookStatus() {
                     <TableRow key={row.id} className="h-[46px] text-slate-700 hover:bg-slate-50">
                       <TableCell className="text-center tabular-nums">{row.displayNumber ?? row.id.padStart(5, "0")}</TableCell>
                       <TableCell className="max-w-[150px] truncate text-center" title={row.institution}>{row.institution}</TableCell>
-                      <TableCell className="text-center">{row.student}</TableCell>
+                      <TableCell className="text-center">{row.student}{row.external && <ExternalBadge/>}{row.pro && <Link className="ml-2 text-blue-600 underline" href={`/agency/pro-management/students/${row.studentId}?role=admin`}>프로 이력</Link>}</TableCell>
                       <TableCell className="text-center">{row.level}</TableCell>
                       <TableCell className="max-w-[180px] truncate text-center" title={row.book}>{row.book}</TableCell>
                       <TableCell className="max-w-[220px] truncate text-center" title={row.template}>{row.template}</TableCell>
@@ -354,7 +360,7 @@ export function AdminWorkbookStatus() {
                       <TableCell className="text-center">{secondDecisionInfo(row)}</TableCell>
                       <TableCell className="text-center">{row.submittedAt}</TableCell>
                       <TableCell className="text-center">{row.feedbackAt || "-"}</TableCell>
-                      <TableCell className="text-center">{statusText[row.status]}</TableCell>
+                      <TableCell className="text-center">{row.pro && !row.pro.selected ? "-" : statusText[row.status]}{row.pro && <p className="mt-1 text-xs text-slate-500">{row.pro.period} · {row.pro.selection}<br/>{row.pro.parentLabel}</p>}</TableCell>
                       <TableCell className="text-center">{row.flowers ? <span>🌻&nbsp; {row.flowers}개</span> : "-"}</TableCell>
                       <TableCell className="text-center">
                         {classification.report === "생성 완료" ? (

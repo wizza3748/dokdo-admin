@@ -1,10 +1,17 @@
 import { commandReview, readReviews, type ReviewRole } from "@/lib/review-client"
 import { sampleReviewAi, type ReviewDatabase } from "@/lib/review-domain"
 import type { OnlineWorkbook } from "@/lib/online-workbooks"
+import { dateLabel, weekLabel, weekStart } from "./pro-calendar"
+import { autoCandidates, proUsage } from "./pro-domain"
+import { caseParentLabel, selectionLabels } from "./pro-selectors"
 export function reviewListRows(db: ReviewDatabase): OnlineWorkbook[] {
   return db.records.filter(r => r.writingStatus === "submitted").map(r => {
     const common = db.reviews.find(c => c.id === r.reviewId)!
-    return { id: r.id, reviewId: common.id, writingRound: r.round, reportStatus: !common.reportEnabled ? "생성 불가" : r.report ? "생성 완료" : "생성 전", secondDecision: common.secondDecision, institution: common.institution, studentName: common.studentName, level: common.level, bookTitle: common.bookTitle, templateName: common.template.title, submittedAt: r.submittedAt?.slice(0, 10) ?? "", submittedAtTime: r.submittedAt ?? "", feedbackAt: r.savedAt?.slice(0, 10) ?? null, status: r.feedbackStatus, aiUsed: r.aiUsed, flowers: r.flowers, anomaly: false, parentSent: !!r.parentSentAt, parentContactRegistered: r.parentContact, feedbackText: r.feedback }
+    const member = db.pro?.members.find(m => m.id === common.studentId)
+    const c = db.pro?.cases.find(c => c.reviewId === common.id)
+    const expected = member && db.pro ? autoCandidates(db, member, weekStart(db.pro.clock)).slice(0, proUsage(db.pro, member, db.pro.clock).available).some(candidate => candidate.reviewId === common.id) : false
+    const proInfo = member?.product === "pro" || c ? { selected: !!c?.selectedAt, period: c ? `${weekLabel(c.week)}${r.round === 2 && c.secondWeek ? ` / 2차 ${weekLabel(c.secondWeek)}` : ""}` : "배정 대기", selection: r.round === 2 ? "수정본" : c?.selection ? selectionLabels[c.selection] : expected ? "자동 선정 예정" : "대상 아님", due: c && (c.selectedAt || expected) ? `${dateLabel(r.round === 2 ? c.secondDue : c.due)}${(r.round === 2 ? c.secondDue : c.due)! < db.pro!.clock && !r.sentAt ? " 지연" : ""}` : "-", parentLabel: caseParentLabel(c) } : undefined
+    return { studentId: common.studentId, external: member?.external, pro: proInfo, id: r.id, reviewId: common.id, writingRound: r.round, reportStatus: !common.reportEnabled ? "생성 불가" : r.report ? "생성 완료" : "생성 전", secondDecision: common.secondDecision, institution: common.institution, studentName: common.studentName, level: common.level, bookTitle: common.bookTitle, templateName: common.template.title, submittedAt: r.submittedAt?.slice(0, 10) ?? "", submittedAtTime: r.submittedAt ?? "", feedbackAt: r.savedAt?.slice(0, 10) ?? null, status: r.feedbackStatus, aiUsed: r.aiUsed, flowers: r.flowers, anomaly: false, parentSent: !!r.parentSentAt, parentContactRegistered: r.parentContact, feedbackText: r.feedback }
   })
 }
 export async function performReviewListAction(recordId: string, action: "ai" | "send" | "parent" | "flower", amount = 0, role: ReviewRole = "agency") {
