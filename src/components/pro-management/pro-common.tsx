@@ -7,8 +7,16 @@ import { addDays, dateLabel, kstDate, weekStart } from "@/lib/pro-calendar"
 import type { ProCommand } from "@/lib/pro-types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-export const panel = "rounded-lg border border-slate-200 bg-white p-5"
+export const panel = "min-w-0 rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.02)]"
 export const field = "h-9 rounded-md border border-slate-200 bg-white px-3 text-sm"
+export function ProBadge({ children, tone = "slate" }: { children: React.ReactNode; tone?: "slate" | "blue" | "amber" | "red" | "green" | "violet" }) {
+  const colors = { slate: "bg-slate-100 text-slate-600", blue: "bg-blue-50 text-blue-700", amber: "bg-amber-50 text-amber-800", red: "bg-rose-50 text-rose-700", green: "bg-emerald-50 text-emerald-700", violet: "bg-violet-50 text-violet-700" }
+  return <span className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold leading-4 ${colors[tone]}`}><span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current"/>{children}</span>
+}
+export function ProStatusBadge({ status }: { status: string }) {
+  const tone = status === "지연" || status === "미제출" ? "red" : status === "피드백 필요" ? "amber" : status === "2차 대기" ? "blue" : status === "관리 완료" ? "green" : "slate"
+  return <ProBadge tone={tone}>{status}</ProBadge>
+}
 export function ExternalBadge() { return <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-normal text-slate-600">외부</span> }
 export function useProManagement() {
   const [role, setRole] = React.useState<ReviewRole>("agency")

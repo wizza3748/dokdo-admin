@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { PRO_SEND_CONFIRM, PRO_BULK_SEND_CONFIRM } from "@/lib/pro-domain"
-import { ExternalBadge } from "@/components/pro-management/pro-common"
+import { ExternalBadge, ProBadge } from "@/components/pro-management/pro-common"
 import { ReviewListTools } from "./review-list-tools"
 import Link from "next/link"
 import {
@@ -370,12 +370,21 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     <div className="w-full space-y-4 pb-2 text-slate-700">
       <SummaryCards records={records.filter(r => !r.pro || r.pro.selected)} />
       <p className="text-xs text-slate-500">프로 학생은 피드백 대상으로 선정된 글만 집계합니다.</p>
-      <div className="flex flex-wrap items-center gap-4 text-sm"><label><input type="checkbox" checked={proOnly} onChange={e => setProOnly(e.target.checked)}/> 프로 학생만</label><label><input type="checkbox" checked={selectedOnly} onChange={e => setSelectedOnly(e.target.checked)}/> 피드백 대상만</label>{studentId && <span>학생 조건: {records.find(r => r.studentId === studentId)?.studentName ?? studentId}</span>}</div>
 
       <section className="rounded border border-[#bae7ff] bg-[#e6f7ff] px-6 py-4 text-[13px] leading-[22px] text-[#1890ff]">
         <ul className="list-disc pl-4"><li>피드백 작성전인 온라인 독후감을 우선적으로 처리해 주세요.</li><li>일괄 AI 피드백 생성 후에도 상태는 피드백 작성전으로 유지되니, 내용을 확인 후 저장해 주세요.</li><li>AI 피드백 생성은 차수별 최대 2회까지 사용 가능해요.</li><li>피드백 저장 후, 꼭 학생에게 전송해 주세요.</li><li>학부모 발송은 1회만 가능하니 신중히 진행해 주세요.</li></ul>
       </section>
       <section className="rounded border border-[#e5e7eb] bg-white p-5">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div role="group" aria-label="프로 관리 조회 조건" className="flex flex-wrap items-center gap-2">
+            <span className="mr-2 text-[13px] font-medium text-slate-600">조회 대상</span>
+            <button type="button" aria-pressed={!proOnly && !selectedOnly && !studentId} onClick={() => { setProOnly(false); setSelectedOnly(false); setStudentId("") }} className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", !proOnly && !selectedOnly && !studentId ? "border-blue-300 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600")}>전체 학생</button>
+            <label className={cn("flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium", proOnly ? "border-blue-300 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600")}><input type="checkbox" className="accent-blue-600" checked={proOnly} onChange={e => setProOnly(e.target.checked)}/>프로 학생만</label>
+            <label className={cn("flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium", selectedOnly ? "border-blue-300 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600")}><input type="checkbox" className="accent-blue-600" checked={selectedOnly} onChange={e => setSelectedOnly(e.target.checked)}/>피드백 대상만</label>
+            {studentId && <button type="button" onClick={() => setStudentId("")} aria-label="학생 조건 해제" className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs">{records.find(r => r.studentId === studentId)?.studentName ?? studentId}<X className="size-3"/></button>}
+          </div>
+          <Link className="text-xs font-medium text-blue-600 hover:underline" href="/agency/pro-management">프로 주간 관리 현황 →</Link>
+        </div>
         <div className="grid gap-x-8 gap-y-4 md:grid-cols-3">
           <FilterMenu label="책읽기 레벨" value={level} onValueChange={setLevel} options={[{value:"all",label:"전체"},...[1,2,3,4,5,6].map(i=>({value:String(i),label:`${i}레벨`}))]} />
           <FilterMenu label="차수" value={writingFilter} onValueChange={setWritingFilter} options={writingFilterOptions} />
@@ -414,7 +423,10 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
                 <TableHead className="text-center"><button type="button" onClick={() => toggleSort("submittedAt")} className="font-semibold">학생 제출일 <span className="text-slate-300">◆</span></button></TableHead>
                 <TableHead className="text-center font-semibold">피드백 작성일</TableHead>
                 <TableHead className="text-center font-semibold">차수</TableHead>
-                <TableHead className="text-center font-semibold">진행 상황</TableHead><TableHead>관리 주차</TableHead><TableHead>피드백 대상</TableHead><TableHead>처리 기한</TableHead>
+                <TableHead className="text-center font-semibold">진행 상황</TableHead>
+                <TableHead className="border-l border-blue-100 bg-blue-50/70 text-center font-semibold text-blue-700">관리 주차</TableHead>
+                <TableHead className="bg-blue-50/70 text-center font-semibold text-blue-700">피드백 대상</TableHead>
+                <TableHead className="border-r border-blue-100 bg-blue-50/70 text-center font-semibold text-blue-700">처리 기한</TableHead>
                 <TableHead className="text-center font-semibold">피드백 상태</TableHead>
                 <TableHead className="text-center font-semibold">학부모 발송 여부</TableHead>
                 <TableHead className="text-center font-semibold">피드백 전송</TableHead>
@@ -438,7 +450,10 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
                   <TableCell className="text-center">{record.submittedAt}</TableCell>
                   <TableCell className="text-center">{record.feedbackAt ?? ""}</TableCell>
                   <TableCell className="text-center font-semibold text-slate-600">{writingInfo(record)}</TableCell>
-                  <TableCell className="text-center">{progressInfo(record)}</TableCell><TableCell>{record.pro?.period ?? "-"}</TableCell><TableCell>{record.pro?.selection ?? "-"}</TableCell><TableCell>{record.pro?.due ?? "-"}</TableCell>
+                  <TableCell className="text-center">{progressInfo(record)}</TableCell>
+                  <TableCell className="border-l border-blue-100 bg-blue-50/25 text-center text-[13px]">{record.pro?.period ?? "-"}</TableCell>
+                  <TableCell className="bg-blue-50/25 text-center">{record.pro ? <ProBadge tone={record.pro.selection === "자동 선정 예정" ? "slate" : record.pro.selected ? record.writingRound === 2 ? "green" : "blue" : "slate"}>{record.pro.selection}</ProBadge> : "-"}</TableCell>
+                  <TableCell className="border-r border-blue-100 bg-blue-50/25 text-center text-[13px]">{record.pro?.due ?? "-"}</TableCell>
                   <TableCell className="text-center">{record.pro && !record.pro.selected ? "-" : statusText[record.status]}</TableCell>
                   <TableCell className="text-center">{record.pro ? record.pro.selected ? record.pro.parentLabel : "-" : record.parentSent ? "발송완료" : "미발송"}</TableCell>
                   <TableCell className="text-center">{record.pro && !record.pro.selected ? "-" : record.status === "전송완료" ? <Check className="mx-auto size-4 text-emerald-500" aria-label="학생 전송 완료" /> : <button type="button" aria-label={`${record.studentName} 학생에게 전송`} disabled={record.status !== "작성완료"} onClick={() => setActionDialog({ kind: "single-send", record })} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300"><Send className="size-4" /></button>}</TableCell>
