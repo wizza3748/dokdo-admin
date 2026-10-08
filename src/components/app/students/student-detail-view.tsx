@@ -75,7 +75,7 @@ export function StudentDetailView({ id, onBack }: StudentDetailViewProps) {
                     {/* Parent Info Group */}
                     <div className="space-y-6">
                         <InfoItem icon={User} label="부모님 성함" value="-" />
-                        <InfoItem icon={Phone} label="부모님 연락처" value="010-5056-0676" />
+                        <InfoItem icon={Phone} label="부모님 연락처" value="010-0000-0000" />
                     </div>
 
                     {/* Contact Info Group */}

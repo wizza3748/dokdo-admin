@@ -79,7 +79,7 @@ export function B2CStudentDetailView({ id, onBack }: B2CStudentDetailViewProps) 
                     {/* Parent Info Group */}
                     <div className="space-y-6">
                         <InfoItem icon={User} label="부모님 성함" value="신민선" />
-                        <InfoItem icon={Phone} label="부모님 연락처" value="010-4503-8375" />
+                        <InfoItem icon={Phone} label="부모님 연락처" value="010-0000-0000" />
                     </div>
 
                     {/* Contact Info Group */}
