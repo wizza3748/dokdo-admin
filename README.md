@@ -55,13 +55,16 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 ### 프로토타입 데이터 보존
 
 기존 화면과 기능은 그대로 사용합니다. 개발 서버에서는 `.local-state` JSON을,
-Vercel에서는 Redis REST 영구 저장소를 사용합니다. 저장소가 연결되지 않은
+Vercel에서는 Neon Postgres 무료 영구 저장소를 사용합니다. 기존 Upstash Redis와 연결 설정은 복구·비교용으로 보존합니다. 저장소가 연결되지 않은
 Vercel 배포는 임시 메모리에 저장하지 않고 오류를 표시합니다.
 
 환경 변수는 Vercel 설정에만 등록하고 Git에 올리지 않습니다.
 
-- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (또는 `KV_REST_API_URL`, `KV_REST_API_TOKEN`)
+- `DOKDO_STATE_PROVIDER=neon`: Neon을 명시적으로 선택합니다. Redis 변수가 남아 있어도 호출하지 않습니다.
+- `DATABASE_URL` (또는 `DOKDO_NEON_DATABASE_URL`, `POSTGRES_URL`): Neon 연결 정보, 클라이언트에 노출하지 않습니다.
 - `DOKDO_STATE_NAMESPACE`: 프로덕션과 Preview에 서로 다른 값 사용
+- 기존 Redis 드라이버는 보존합니다. 명시적으로 `redis`를 선택할 때만 복귀하며, Neon 오류 시 Redis나 로컬 파일로 자동 우회하지 않습니다.
+- 로컬 기본 환경은 기존 JSON 파일을 계속 사용합니다. Neon 검증은 별도 환경 파일과 테스트 namespace로 실행합니다.
 
 이전 절차:
 
@@ -69,14 +72,19 @@ Vercel 배포는 임시 메모리에 저장하지 않고 오류를 표시합니�
 2. `.local-state`를 별도로 백업합니다. Git 및 배포 파일에는 포함하지 않습니다.
 3. 저장소 연결 정보를 Git 제외 환경 파일 또는 승인된 저장소 내보내기로 준비합니다.
    민감 환경 변수는 CLI에서 내려받을 수 없으며 `[SENSITIVE]`를 실제 값으로 사용하지 않습니다.
-4. 이전 대상 `DOKDO_STATE_NAMESPACE`를 명시하고 Node 24에서
-   `node scripts/import-prototype-state.mjs` 실행 후 이전 결과를 확인합니다.
+4. Node 24에서 백업 경로와 이전 대상을 명시합니다.
+   `node --env-file=.local-state/neon.env scripts/import-prototype-state.mjs --provider neon --namespace dokdo-admin:production:v1 --source .local-state/backup`
+   Preview는 `dokdo-admin:preview:v1`로 따로 실행합니다. 스크립트가 테이블을 준비하고, 원본 일치 여부와 SHA256을 출력합니다. 원격 데이터가 이미 있으면 덮어쓰지 않습니다.
 5. `npm run build` 성공 후 최신 코드를 배포하고 학생·기관·보고서 화면을 검증합니다.
 
 이전 스크립트는 비어 있는 원격 키에만 데이터를 가져오며 기존 원격 변경을 덮어쓰지 않습니다.
 학생 설정·템플릿·읽기 기록 등 브라우저 데이터는 최초 방문 시 복원한 뒤 기존처럼
 브라우저별로 보관됩니다. 이후 모든 브라우저 설정을 기기 간 동기화하는 기능은 아닙니다.
 온라인 독후감과 서버 제출 목록은 영구 저장소에 보관됩니다.
+Neon의 `dokdo_prototype_state` 테이블은 기존 JSON 구조를 유지하며, 원자적 비교·저장으로 동시 변경 유실을 방지합니다.
+변경 없는 데이터는 본문 대신 짧은 지문으로 확인합니다. 화면 조회는 60초 공통 타이머로 합치고,
+숨긴 탭 또는 3분 이상 조작하지 않은 화면에서는 자동 조회를 멈춥니다. 복귀·재조작 및 저장 후에는 다시 갱신하며,
+신청·전송 등 처리 요청은 서버의 최신 상태와 시각으로 검증합니다. 무료 한도는 사용량에 따라 별도로 확인해야 합니다.
 이 프로젝트는 역할 쿼리로 접근하는 테스트용 프로토타입이며 실제 학생 개인정보를
 공개 URL에 올리는 운영 서비스로 사용하지 않습니다.
 

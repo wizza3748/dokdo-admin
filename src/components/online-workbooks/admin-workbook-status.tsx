@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { subscribeReviewRefresh } from "@/lib/review-refresh"
 import Link from "next/link"
 import { ChevronDown, CircleHelp, Download, FileText, RefreshCw, Search } from "lucide-react"
 
@@ -12,7 +13,6 @@ import { ExternalBadge } from "@/components/pro-management/pro-common"
 import type { AdminWorkbookRow } from "@/lib/admin-workbook-seeds"
 import {
   getAgencyWorkbookListAsync,
-  subscribeStudentSubmittedAgencyWorkbooks,
   type FeedbackStatus,
 } from "@/lib/online-workbooks"
 import { cn } from "@/lib/utils"
@@ -141,9 +141,11 @@ export function AdminWorkbookStatus() {
 
   React.useEffect(() => {
     let active = true
+    let sequence = 0
     const syncRows = async () => {
+      const request = ++sequence
       const records = await getAgencyWorkbookListAsync("admin")
-      if (!active) return
+      if (!active || request !== sequence) return
       setStudentRows(records.map((record) => ({
         id: record.id,
         displayNumber: record.displayNumber,
@@ -164,13 +166,10 @@ export function AdminWorkbookStatus() {
         flowers: record.flowers,
       })))
     }
-    void syncRows()
-    const unsubscribe = subscribeStudentSubmittedAgencyWorkbooks(() => void syncRows())
-    const interval = window.setInterval(() => void syncRows(), 1500)
+    const unsubscribe = subscribeReviewRefresh(syncRows)
     return () => {
       active = false
       unsubscribe()
-      window.clearInterval(interval)
     }
   }, [refreshKey])
 

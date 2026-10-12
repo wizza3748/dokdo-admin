@@ -1,5 +1,6 @@
 "use client"
 import * as React from "react"
+import { reviewReads, subscribeReviewRefresh } from "@/lib/review-refresh"
 import { STUDENT_MOCK_STORAGE_KEYS } from "@/lib/student-mock-state"
 import { emptyReviewDatabase, type ReviewActor, type ReviewCommand, type ReviewDatabase } from "@/lib/review-domain"
 export type ReviewRole = ReviewActor["role"]
@@ -15,7 +16,7 @@ export function demoIdentityQuery(role: ReviewRole) {
   }
   return params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""
 }
-export function notifyReviewChange() { window.dispatchEvent(new Event(eventName)); window.dispatchEvent(new Event("dokdo-workbook-change")) }
+export function notifyReviewChange() { reviewReads.invalidate(); window.dispatchEvent(new Event(eventName)); window.dispatchEvent(new Event("dokdo-workbook-change")) }
 function preserveLegacyProgress(db: ReviewDatabase): ReviewDatabase {
   if (typeof window === "undefined") return db
   try {
@@ -26,16 +27,19 @@ function preserveLegacyProgress(db: ReviewDatabase): ReviewDatabase {
   } catch { return db }
 }
 export async function readReviews(role: ReviewRole = "student", recordId?: string): Promise<ReviewDatabase> {
-  const response = await fetch(`/api/mock/online-reviews?role=${role}${demoIdentityQuery(role)}${recordId ? `&recordId=${encodeURIComponent(recordId)}` : ""}`, { cache: "no-store" })
-  if (!response.ok) throw new Error("온라인 독후감을 불러오지 못했습니다.")
-  return preserveLegacyProgress(await response.json())
+  const url = `/api/mock/online-reviews?role=${role}${demoIdentityQuery(role)}${recordId ? `&recordId=${encodeURIComponent(recordId)}` : ""}`
+  const db = await reviewReads.read<ReviewDatabase>(url, async () => {
+    const response = await fetch(url, { cache: "no-store" })
+    if (!response.ok) throw new Error("온라인 독후감을 불러오지 못했습니다.")
+    return response.json()
+  })
+  return preserveLegacyProgress(db)
 }
 export async function commandReview(command: ReviewCommand, role: ReviewRole = "student", requestId = crypto.randomUUID()): Promise<ReviewDatabase> {
   const response = await fetch(`/api/mock/online-reviews?role=${role}${demoIdentityQuery(role)}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command, requestId }) })
   const result = await response.json()
   if (!response.ok) throw new Error(result.message || "처리에 실패했습니다.")
-  window.dispatchEvent(new Event(eventName))
-  window.dispatchEvent(new Event("dokdo-workbook-change"))
+  notifyReviewChange()
   return preserveLegacyProgress(result)
 }
 export function useReviews(role: ReviewRole = "student", recordId?: string) {
@@ -52,11 +56,7 @@ export function useReviews(role: ReviewRole = "student", recordId?: string) {
     finally { if (sequence === requestSequence.current) setLoaded(true) }
   }, [role, recordId])
   React.useEffect(() => {
-    void refresh()
-    const listener = () => { void refresh() }
-    window.addEventListener(eventName, listener); window.addEventListener("focus", listener)
-    const interval = window.setInterval(listener, 4000)
-    return () => { window.removeEventListener(eventName, listener); window.removeEventListener("focus", listener); window.clearInterval(interval) }
+    return subscribeReviewRefresh(refresh)
   }, [refresh])
   const run = async (command: ReviewCommand, requestId?: string) => {
     try { const next = await commandReview(command, role, requestId); ++requestSequence.current; setDb(next); setError(""); return next }

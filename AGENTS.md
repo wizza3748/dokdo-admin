@@ -26,7 +26,8 @@
 - 기본 작업 브랜치: `main`
 - 현재 기본 배포: Vercel `wizza1/dokdo-admin`
 - 현재 운영 URL: `https://dokdo-admin.vercel.app/`
-- 영구 저장소: Upstash Redis `dokdo-prototype-state` (Free)
+- 현재 영구 저장소: Neon Postgres `dokdo-prototype-neon` (Free), `DOKDO_STATE_PROVIDER=neon`
+- 기존 Upstash Redis `dokdo-prototype-state` (Free)는 데이터·연결 설정을 그대로 보존하며 자동으로 사용하지 않는다.
 - Production 데이터 구분: `dokdo-admin:production:v1`
 - Preview 데이터 구분: `dokdo-admin:preview:v1`
 - 일반적인 `푸시 및 배포` 요청은 GitHub push 후 Vercel 자동 배포의 Ready 상태와 주요 화면을 확인한다. 명시적으로 Firebase 배포를 요청하면 위 Firebase 수행 규칙을 따른다.

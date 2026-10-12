@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { subscribeReviewRefresh } from "@/lib/review-refresh"
 import { PRO_SEND_CONFIRM, PRO_BULK_SEND_CONFIRM } from "@/lib/pro-domain"
 import { ExternalBadge, ProBadge } from "@/components/pro-management/pro-common"
 import { ReviewListTools } from "./review-list-tools"
@@ -27,7 +28,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import {
   AGENCY_ONLINE_WORKBOOKS,
   getAgencyWorkbookListAsync,
-  subscribeStudentSubmittedAgencyWorkbooks,
   upsertStudentSubmittedAgencyWorkbook,
   type FeedbackStatus,
   type OnlineWorkbook,
@@ -236,17 +236,16 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
 
   React.useEffect(() => {
     let active = true
+    let sequence = 0
     const syncRecords = async () => {
-      try { const nextRecords = await getAgencyWorkbookListAsync(role); if (active) setRecords(nextRecords) }
-      catch { if (active) setNotice("목록을 불러오지 못했습니다. 새로고침해 주세요.") }
+      const request = ++sequence
+      try { const nextRecords = await getAgencyWorkbookListAsync(role); if (active && request === sequence) setRecords(nextRecords) }
+      catch { if (active && request === sequence) setNotice("목록을 불러오지 못했습니다. 새로고침해 주세요.") }
     }
-    void syncRecords()
-    const unsubscribe = subscribeStudentSubmittedAgencyWorkbooks(() => void syncRecords())
-    const interval = window.setInterval(() => void syncRecords(), 1500)
+    const unsubscribe = subscribeReviewRefresh(syncRecords)
     return () => {
       active = false
       unsubscribe()
-      window.clearInterval(interval)
     }
   }, [role, refreshKey])
 

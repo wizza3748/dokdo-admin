@@ -329,9 +329,12 @@ export async function getSharedStudentSubmittedAgencyWorkbooks() {
   if (typeof window === "undefined") return [] as OnlineWorkbook[]
 
   try {
-    const response = await fetch(SHARED_SUBMISSIONS_API, { cache: "no-store" })
-    if (!response.ok) return [] as OnlineWorkbook[]
-    const parsed = await response.json() as unknown
+    const { reviewReads } = await import("@/lib/review-refresh")
+    const parsed = await reviewReads.read<unknown>(SHARED_SUBMISSIONS_API, async () => {
+      const response = await fetch(SHARED_SUBMISSIONS_API, { cache: "no-store" })
+      if (!response.ok) throw new Error("목록을 불러오지 못했습니다.")
+      return response.json()
+    })
     return Array.isArray(parsed) ? (parsed as OnlineWorkbook[]).map(normalizeStudentSubmittedRecord) : []
   } catch {
     return [] as OnlineWorkbook[]
@@ -362,6 +365,7 @@ export async function getAgencyWorkbookListAsync(role: "agency" | "class" | "adm
 }
 
 export async function syncStudentSubmittedAgencyWorkbooks() {
+  if (typeof window === "undefined") return
   const records = getStudentSubmittedAgencyWorkbooks()
   await Promise.all(records.map(async (record) => {
     try {
@@ -374,6 +378,9 @@ export async function syncStudentSubmittedAgencyWorkbooks() {
       // The local browser state remains available when the shared mock API is temporarily unavailable.
     }
   }))
+  const { reviewReads } = await import("@/lib/review-refresh")
+  reviewReads.invalidate()
+  window.dispatchEvent(new CustomEvent(AGENCY_WORKBOOK_CHANGE_EVENT))
 }
 
 export async function upsertStudentSubmittedAgencyWorkbook(record: OnlineWorkbook) {
@@ -397,6 +404,10 @@ export async function upsertStudentSubmittedAgencyWorkbook(record: OnlineWorkboo
   } catch {
     // The submission is still preserved in this origin's local mock state.
   }
+  // Notify again after the shared write, so another tab cannot keep a pre-save snapshot.
+  const { reviewReads } = await import("@/lib/review-refresh")
+  reviewReads.invalidate()
+  window.dispatchEvent(new CustomEvent(AGENCY_WORKBOOK_CHANGE_EVENT))
 }
 
 export async function rejectAgencyWorkbook(record: OnlineWorkbook) {
