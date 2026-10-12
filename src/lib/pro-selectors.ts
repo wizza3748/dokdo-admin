@@ -46,8 +46,12 @@ export function weeklyStudent(db: ReviewDatabase, member: ProMember, week: strin
   const tasks = [overdue.length, relevant.filter(f => f.week === week && f.due >= now).length, !submissions.length && remainingReminders.some(r => r.kind === "submission") ? 1 : 0, waiting.length && remainingReminders.some(r => r.kind === "revision") ? 1 : 0, !consulted && due && kstDate(due) === kstDate(now) ? 1 : 0, !consulted && lastWeek ? 1 : 0, lastWeek && usage.available > 0 ? 1 : 0]
   const status = overdue.length ? "지연" : relevant.length ? "피드백 필요" : !submissions.length && usage.available > 0 ? "미제출" : waiting.length ? "2차 대기" : submissions.some(c => !c.selectedAt) && usage.available > 0 && now < weekSchedule(week, weekdayFor(pro, member, week)).cutoff ? "자동 선정 대기" : cases.some(c => c.week === week && c.closedAt) ? "관리 완료" : usage.used >= usage.limit ? "한도 사용" : submissions.length ? "관리 완료" : "미제출"
   let missed = 0
-  for (let previous = addDays(week, -7); member.assignedAt && previous >= weekStart(member.assignedAt) && previous >= weekStart(member.effectiveAt); previous = addDays(previous, -7)) {
-    if (cases.some(c => c.week === previous && db.records.some(r => r.reviewId === c.reviewId && r.writingStatus === "submitted"))) break
+  const firstSubmissions = cases.flatMap(c => db.records.filter(r => r.reviewId === c.reviewId && r.round === 1 && r.writingStatus === "submitted" && r.submittedAt && r.submittedAt <= at).map(r => ({ week: c.week, at: r.submittedAt! })))
+  // Submission clears the warning immediately, including a post-cutoff submission
+  // assigned to next week's feedback. Drafts and second rounds do not clear it.
+  const submittedNow = firstSubmissions.some(r => r.week === week || r.at >= week)
+  for (let previous = addDays(week, -7); !submittedNow && member.assignedAt && previous >= weekStart(member.assignedAt) && previous >= weekStart(member.effectiveAt); previous = addDays(previous, -7)) {
+    if (firstSubmissions.some(r => r.week === previous)) break
     if (proUsage(pro, member, new Date(Date.parse(addDays(previous, 7)) - 1).toISOString()).available > 0) missed++
   }
   return { member, usage, cases, submissions, waiting, feedback: relevant, overdue, tasks, status, consultation, consulted, consultDue: due, missed }

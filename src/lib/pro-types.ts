@@ -20,7 +20,7 @@ export type ProAudit = { id: string; studentId: string; kind: string; at: string
 export type ProReminder = { id: string; studentId: string; week: string; kind: "submission" | "revision"; sequence: 1 | 2; at: string; actor: string; cancelledAt?: string }
 export type ProConsultation = { id: string; studentId: string; month: string; result: "유선 상담 완료" | "부재 후 카톡 상담으로 대체" | "미진행"; actualAt: string; memo: string; actor: string; at: string; previousId?: string }
 export type ProState = {
-  version: 1; clock: string; effectiveAt: string; effectiveMonth: string;
+  version: 1; clock: string; clockMode?: "real" | "test"; effectiveAt: string; effectiveMonth: string;
   members: ProMember[]; cases: ProCase[];
   schedules: { institutionId: string; teacherId: string; weekday: number; from: string }[];
   audit: ProAudit[]; reminders: ProReminder[]; consultations: ProConsultation[];
@@ -29,6 +29,7 @@ export type ProState = {
 export type ProCommand =
   | { type: "apply" | "cancel" | "designate" | "retry-parent"; reviewId: string }
   | { type: "clock"; at: string }
+  | { type: "clock-real" }
   | { type: "schedule"; weekday: number; teacherId: string }
   | { type: "limit"; studentId: string; limit: number; reason: string; memo: string }
   | { type: "cancel-debit"; reviewId: string; reason: string; memo: string }

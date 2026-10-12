@@ -12,7 +12,11 @@ import { emptyReviewDatabase, applyReviewCommand } from "../src/lib/review-domai
 import { studentProView, scopePro, weeklyStudent } from "../src/lib/pro-selectors.ts"
 const teacher = { role: "agency" as const, institutionId: "dokdo", name: "검증 선생님" }
 const student = { role: "student" as const, studentId: "pro-demo-1", name: "프로 신청예시" }
-const fixture = () => reconcilePro(initializePro(emptyReviewDatabase()))
+const fixture = () => {
+  const db = initializePro(emptyReviewDatabase())
+  db.pro!.clockMode = "test"
+  return reconcilePro(db)
+}
 test("KST 주차·목요일 귀속월·월요일 피드백·자정 경계", () => {
   assert.equal(managementMonth(midnight("2026-09-28")), "2026-10")
   assert.equal(monthWeeks("2026-10").length, 5)

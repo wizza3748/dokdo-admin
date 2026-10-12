@@ -3,6 +3,8 @@ import { addDays, consultationDate, kstDate, managementMonth, monthWeeks, second
 // @ts-expect-error Node tests use explicit TypeScript extensions.
 import { applyReviewCommand, type ReviewActor, type ReviewCommand, type ReviewDatabase, type ReviewRecord } from "./review-domain.ts"
 import type { ProCase, ProCommand, ProMember, ProState } from "./pro-types"
+// @ts-expect-error Node tests use explicit TypeScript extensions.
+import { atReviewTime, beginProClockTest, endProClockTest } from "./review-clock.ts"
 export const PRO_SEND_CONFIRM = "피드백을 전송하면 학부모에게 결과가 자동 발송됩니다. 전송 후에는 '2차 작성 요청'으로 변경할 수 없습니다."
 export const PRO_BULK_SEND_CONFIRM = "프로 학생의 '1차 완료' 건은 학부모에게 결과가 자동 발송됩니다. 전송 후에는 '2차 작성 요청'으로 변경할 수 없습니다."
 function check(value: unknown, message: string): asserts value { if (!value) throw new Error(message) }
@@ -127,13 +129,19 @@ export function reconcilePro(db: ReviewDatabase, at = db.pro?.clock ?? new Date(
   return db
 }
 function access(pro: ProState, actor: ReviewActor, member: ProMember) { check(actor.role === "student" ? actor.studentId === member.id : actor.role === "agency" && actor.institutionId === member.institutionId, "해당 학생의 처리 권한이 없습니다.") }
-export function applyProCommand(input: ReviewDatabase, command: ProCommand, actor: ReviewActor, requestId: string) {
-  const db = reconcilePro(structuredClone(input)), pro = db.pro!
+export function applyProCommand(input: ReviewDatabase, command: ProCommand, actor: ReviewActor, requestId: string, serverNow = new Date().toISOString()) {
+  if (command.type === "clock-real") {
+    check(actor.role === "agency" && !!actor.institutionId, "기관관리자만 테스트 시각을 변경할 수 있습니다.")
+    return reconcilePro(endProClockTest(structuredClone(input), serverNow))
+  }
+  const db = reconcilePro(atReviewTime(structuredClone(input), serverNow)), pro = db.pro!
   check(pro, "프로 관리 데이터가 없습니다.")
   if (pro.audit.some(h => h.id === requestId)) return db
   const at = pro.clock
   if (command.type === "clock") {
     check(actor.role === "agency" && !!actor.institutionId && !Number.isNaN(Date.parse(command.at)) && Date.parse(command.at) >= Date.parse(at) && Date.parse(command.at) <= Date.parse(addDays(at, 370)), "테스트 시간은 현재 시점 이후 1년 이내로만 진행할 수 있습니다.")
+    beginProClockTest(db)
+    pro.clockMode = "test"
     pro.clock = new Date(command.at).toISOString(); audit(pro, requestId, "테스트 시간 진행", pro.clock, actor.name, "", { before: at, after: pro.clock }); return reconcilePro(db)
   }
   if (command.type === "schedule") {
@@ -151,8 +159,8 @@ export function applyProCommand(input: ReviewDatabase, command: ProCommand, acto
   else check(actor.role === "agency", "기관관리자만 처리할 수 있습니다.")
   const month = managementMonth(at), before = proUsage(pro, member, at)
   if (command.type === "apply" || command.type === "designate") {
+    if (command.type === "apply" && c) check(at < c.cutoff, "제출 및 신청 마감이 지났습니다.")
     check(c && !c.selectedAt && !c.closedAt && !c.firstSentAt && c.week === weekStart(at) && firstRecord(db, c.reviewId).writingStatus === "submitted" && before.available > 0, "현재 주차의 제출글과 남은 신청 권수를 확인해 주세요.")
-    if (command.type === "apply") check(at < c.cutoff, "제출 및 신청 마감이 지났습니다.")
     select(pro, c, at, command.type === "apply" ? "student" : "teacher", actor.name)
   } else if (command.type === "cancel") {
     check(c?.selectedAt && !c.lockedAt && !c.firstSentAt && at < c.cutoff, "선생님 작성 시작 또는 마감 이후에는 취소할 수 없습니다.")
@@ -188,7 +196,7 @@ export function applyProCommand(input: ReviewDatabase, command: ProCommand, acto
 }
 /** Review and Pro changes commit together; failed commands never reserve/debit. */
 export function applyManagedReviewCommand(input: ReviewDatabase, command: ReviewCommand, actor: ReviewActor, requestId: string, realAt: string) {
-  let db = reconcilePro(structuredClone(input))
+  let db = reconcilePro(atReviewTime(structuredClone(input), realAt))
   const record = "recordId" in command ? db.records.find(r => r.id === command.recordId) : undefined
   const common = db.reviews.find(r => r.id === record?.reviewId)
   const member = memberFor(db, common?.studentId ?? (command.type === "create" ? actor.studentId ?? "" : ""))

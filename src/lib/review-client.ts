@@ -42,7 +42,15 @@ export function useReviews(role: ReviewRole = "student", recordId?: string) {
   const [db, setDb] = React.useState(emptyReviewDatabase)
   const [loaded, setLoaded] = React.useState(false)
   const [error, setError] = React.useState("")
-  const refresh = React.useCallback(async () => { try { setDb(await readReviews(role, recordId)); setError("") } catch (e) { setError(String(e)) } finally { setLoaded(true) } }, [role, recordId])
+  const requestSequence = React.useRef(0)
+  const refresh = React.useCallback(async () => {
+    const sequence = ++requestSequence.current
+    try {
+      const next = await readReviews(role, recordId)
+      if (sequence === requestSequence.current) { setDb(next); setError("") }
+    } catch (e) { if (sequence === requestSequence.current) setError(String(e)) }
+    finally { if (sequence === requestSequence.current) setLoaded(true) }
+  }, [role, recordId])
   React.useEffect(() => {
     void refresh()
     const listener = () => { void refresh() }
@@ -51,7 +59,7 @@ export function useReviews(role: ReviewRole = "student", recordId?: string) {
     return () => { window.removeEventListener(eventName, listener); window.removeEventListener("focus", listener); window.clearInterval(interval) }
   }, [refresh])
   const run = async (command: ReviewCommand, requestId?: string) => {
-    try { const next = await commandReview(command, role, requestId); setDb(next); setError(""); return next }
+    try { const next = await commandReview(command, role, requestId); ++requestSequence.current; setDb(next); setError(""); return next }
     catch (e) { setError(e instanceof Error ? e.message : "처리에 실패했습니다."); return null }
   }
   return { db, loaded, error, run, refresh }

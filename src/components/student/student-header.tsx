@@ -6,19 +6,17 @@ import { BellRing, ClipboardList, Menu, Megaphone } from "lucide-react"
 
 import { useReviews } from "@/lib/review-client"
 import { reviewActivityDate, studentReviewNotices } from "@/lib/review-domain"
+import { studentTodayLabel } from "@/lib/student-calendar"
 
-export function StudentHeader({ section }: { section?: string }) {
+export function StudentHeader({ section, now }: { section?: string; now?: string }) {
   const { db } = useReviews()
   const notices = studentReviewNotices(db)
   const firstNotice = notices[0]
   const noticeHref = firstNotice
     ? `/student/exploration-record?tab=workbook&month=${reviewActivityDate(firstNotice.review).monthKey}&notice=all#${firstNotice.record.id}`
     : "/student/exploration-record?tab=workbook"
-  const todayLabel = new Intl.DateTimeFormat("ko-KR", {
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-  }).format(new Date())
+  const effectiveNow = now ?? db.currentTime
+  const todayLabel = effectiveNow ? studentTodayLabel(effectiveNow) : "날짜 확인 중"
 
   return (
     <header className="relative z-30 flex min-h-12 flex-wrap items-center justify-between gap-y-1 border-b border-[#dce4e8] bg-white px-3 py-1 sm:h-12 sm:flex-nowrap sm:px-6 sm:py-0">

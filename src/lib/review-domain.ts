@@ -72,7 +72,7 @@ export type ReviewRecord = {
   aiUsed: number; aiScores?: ReviewScores; teacherScores?: ReviewScores; report?: ReviewReport;
   parentContact: boolean; parentSentAt?: string; flowers: number; flowersAt?: string; rejectedAt?: string; history: ReviewHistory[];
 }
-export type ReviewDatabase = { version: 1; seedVersion?: number; reviews: ReviewCommon[]; records: ReviewRecord[]; pro?: import("./pro-types").ProState; studentPro?: import("./pro-selectors").StudentProView }
+export type ReviewDatabase = { version: 1; seedVersion?: number; reviews: ReviewCommon[]; records: ReviewRecord[]; pro?: import("./pro-types").ProState; studentPro?: import("./pro-selectors").StudentProView; currentTime?: string; proTestBaseline?: { pro: import("./pro-types").ProState; reviews: ReviewCommon[]; records: ReviewRecord[] } }
 export const reviewProgressLabels: Record<ReviewCommon["progress"], string> = {
   "first-writing": "1차 작성중", "first-submitted": "1차 작성완료", "first-saved": "1차 피드백 작성완료", "first-sent": "1차 피드백 도착",
   "second-available": "2차 작성가능", "second-writing": "2차 작성중", "second-submitted": "2차 작성완료", "second-saved": "2차 피드백 작성완료", "second-sent": "2차 피드백 도착", complete: "최종 완료",
@@ -270,7 +270,8 @@ export function mergeReviewSeeds(existing: ReviewDatabase, seeds: ReviewDatabase
   const resetSeenDefaults = (existing.seedVersion ?? 0) < 6 && (seeds.seedVersion ?? 1) >= 6
   return { ...existing, seedVersion: seeds.seedVersion, reviews: [...existing.reviews.map(c => { const repair = repairs.find(seed => seed.id === c.id); return repair ? { ...repair, progress: resetSeenDefaults ? repair.progress : c.progress } : c }), ...additions], records: [...existing.records.filter(r => !repairs.some(c => c.id === r.reviewId)), ...seeds.records.filter(r => [...additions, ...repairs].some(c => c.id === r.reviewId)).map(r => { const old = existing.records.find(o => o.id === r.id); return old ? { ...r, seenAt: resetSeenDefaults ? r.seenAt : old.seenAt, history: [...r.history, ...old.history.filter(h => !h.requestId.startsWith(`seed:${r.reviewId}:`) && !(resetSeenDefaults && h.action === "seen"))] } : r })] }
 }
-export const plainReviewText = (html: string) => html.replace(/<br\s*\/?\s*>|<\/(p|div)>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").trim()
+// Unanswered template items are absent from a draft's sparse answers map.
+export const plainReviewText = (html: string | null | undefined) => (html ?? "").replace(/<br\s*\/?\s*>|<\/(p|div)>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").trim()
 
 export const REVIEW_MIN_SUBMISSION_LENGTH = 100
 export const REVIEW_SHORT_SUBMISSION_MESSAGE = "독후감을 100자 이상 작성해야 제출할 수 있어요. 책의 내용과 내 생각을 조금 더 써 보세요."

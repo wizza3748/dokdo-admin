@@ -19,6 +19,7 @@ import { getReadingRoundQuiz } from "@/lib/reading-quiz-settings"
 import { getTransientReadingExplorationRecords, type TransientReadingExplorationRecord } from "@/lib/student-exploration-history"
 import { readingRecordActivityTimestamp, sortExplorationTimelineItems } from "@/lib/reading-record-summary"
 import { reviewActivityDate } from "@/lib/review-domain"
+import { studentCalendar, validStudentMonth } from "@/lib/student-calendar"
 import { getReadingRoundResultsByBook } from "@/lib/student-mock-state"
 import { cn } from "@/lib/utils"
 import { getWorkbookById, getWorkbookRuntime, studentWorkbooks, type StudentWorkbook } from "@/lib/student-workbooks"
@@ -65,11 +66,8 @@ export function ExplorationRecord() {
   const reviewHook = useReviews()
   const router = useRouter()
   const [secondStart, setSecondStart] = React.useState<{ recordId: string; sourceWorkbookId: string } | null>(null)
-  const currentDate = new Date()
-  const currentYear = currentDate.getFullYear()
-  const currentMonth = currentDate.getMonth() + 1
-  const [year, setYear] = React.useState(currentYear)
-  const [month, setMonth] = React.useState(currentMonth)
+  const [selectedMonth, setSelectedMonth] = React.useState<string>()
+  const { year, month, currentYear, currentMonth, currentDay } = studentCalendar(reviewHook.db.currentTime ?? "1970-01-01T00:00:00.000Z", selectedMonth)
   const [tab, setTab] = React.useState<TabName>("전체")
   const [readingLevel, setReadingLevel] = React.useState("")
   const [readingAttempt, setReadingAttempt] = React.useState("")
@@ -88,8 +86,8 @@ export function ExplorationRecord() {
     setMounted(true)
     const params = new URLSearchParams(window.location.search)
     if (params.get("tab") === "workbook") setTab("온라인 독후감")
-    const requestedMonth = /^(\d{4})-(\d{2})$/.exec(params.get("month") ?? "")
-    if (requestedMonth) { setYear(Number(requestedMonth[1])); setMonth(Number(requestedMonth[2])) }
+    const requestedMonth = params.get("month")
+    if (validStudentMonth(requestedMonth)) setSelectedMonth(requestedMonth)
     setTransientReadingRecords(getTransientReadingExplorationRecords())
     const handleWorkbookChange = () => refresh()
     const handleExplorationChange = () => setTransientReadingRecords(getTransientReadingExplorationRecords())
@@ -143,15 +141,20 @@ export function ExplorationRecord() {
     let nextYear = year
     if (nextMonth === 0) { nextMonth = 12; nextYear -= 1 }
     if (nextMonth === 13) { nextMonth = 1; nextYear += 1 }
-    setYear(nextYear)
-    setMonth(nextMonth)
+    const value = `${nextYear}-${String(nextMonth).padStart(2, "0")}`
+    setSelectedMonth(value)
+    const url = new URL(window.location.href)
+    url.searchParams.set("month", value)
+    window.history.replaceState(null, "", url)
   }
 
   const startSecondReview = (recordId: string, sourceWorkbookId: string) => setSecondStart({ recordId, sourceWorkbookId })
 
+  if (!reviewHook.db.currentTime) return <div className={ui.page}><StudentHeader /><p role="status" className="p-6 text-center">{reviewHook.error || "탐험 기록을 불러오고 있어요."}</p></div>
+
   return (
     <div className={ui.page}>
-      <StudentHeader />
+      <StudentHeader now={reviewHook.db.currentTime} />
       {secondStart && <SecondReviewStartModal {...secondStart} deadline={reviewHook.db.studentPro?.cases.find(c => `${c.reviewId}-r1` === secondStart.recordId)?.secondDeadline} run={reviewHook.run} onClose={() => setSecondStart(null)} />}
       <section className={ui.top}>
         <div className="mx-auto flex max-w-[920px] items-center justify-center gap-2">
@@ -165,8 +168,8 @@ export function ExplorationRecord() {
       </section>
 
       <main className={ui.layout}>
-        <aside className={ui.calendar}><h2>{month}월의 탐험</h2><p className={ui.stats}><strong>{rows.length}</strong> 회 학습 <span><Image className="inline-block" src="/student-assets/flower-reward.svg" alt="섬초롱꽃" width={20} height={20} /> <b>{flowers}</b>개</span></p><div className={ui.days}>{["일","월","화","수","목","금","토"].map((d,i)=><span className={ui.weekday} key={d} data-sunday={i===0}>{d}</span>)}{Array.from({length:monthStart},(_,i)=><span key={`blank-${i}`} />)}{Array.from({length:monthDays},(_,i)=><span key={i} data-active={Boolean(grouped[i+1])} data-today={year===currentYear && month===currentMonth && i+1===currentDate.getDate()}>{i+1}</span>)}</div><footer><p><i />책 + 글　<i />책 또는 글　<i />그 외</p><p>이번 달 <strong>{days.length}일</strong> 탐험했어요</p></footer></aside>
-        <div className={ui.timeline}>{tab === "온라인 독후감" && <ProFeedbackUsage db={reviewHook.db}/>}{tab === "책 읽기 탐험" && <div className={ui.readingFilters}><label>레벨 <select aria-label="레벨" value={readingLevel} onChange={e=>setReadingLevel(e.target.value)}><option value="">선택</option>{[1,2,3,4,5,6].map(level=><option key={level} value={level}>{level}레벨</option>)}</select></label><label>탐험 구분 <select aria-label="탐험 구분" value={readingAttempt} onChange={e=>setReadingAttempt(e.target.value)}><option value="">선택</option><option>첫 탐험</option><option>재탐험</option></select></label></div>}{tab === "온라인 독후감" && <p className={ui.notice}>보고서는 제공되는 독후감에만 표시돼요.</p>}
+<aside className={ui.calendar}><h2>{month}월의 탐험</h2><p className={ui.stats}><strong>{rows.length}</strong> 회 학습 <span><Image className="inline-block" src="/student-assets/flower-reward.svg" alt="섬초롱꽃" width={20} height={20} /> <b>{flowers}</b>개</span></p><div className={ui.days}>{["일","월","화","수","목","금","토"].map((d,i)=><span className={ui.weekday} key={d} data-sunday={i===0}>{d}</span>)}{Array.from({length:monthStart},(_,i)=><span key={`blank-${i}`} />)}{Array.from({length:monthDays},(_,i)=><span key={i} data-active={Boolean(grouped[i+1])} data-today={year===currentYear && month===currentMonth && i+1===currentDay}>{i+1}</span>)}</div><footer><p><i />책 + 글　<i />책 또는 글　<i />그 외</p><p>이번 달 <strong>{days.length}일</strong> 탐험했어요</p></footer></aside>
+        <div className={ui.timeline}>{tab === "온라인 독후감" && <ProFeedbackUsage db={reviewHook.db} loaded={reviewHook.loaded} error={reviewHook.error}/>}{tab === "책 읽기 탐험" && <div className={ui.readingFilters}><label>레벨 <select aria-label="레벨" value={readingLevel} onChange={e=>setReadingLevel(e.target.value)}><option value="">선택</option>{[1,2,3,4,5,6].map(level=><option key={level} value={level}>{level}레벨</option>)}</select></label><label>탐험 구분 <select aria-label="탐험 구분" value={readingAttempt} onChange={e=>setReadingAttempt(e.target.value)}><option value="">선택</option><option>첫 탐험</option><option>재탐험</option></select></label></div>}{tab === "온라인 독후감" && <p className={ui.notice}>보고서는 제공되는 독후감에만 표시돼요.</p>}
         {days.length === 0 ? <div className="grid min-h-[390px] place-items-center rounded-[22px] bg-white text-[#999] shadow-[0_4px_18px_rgba(45,62,72,.08)]"><p>탐험 기록이 없는 달이에요</p></div> : (
           <div className="space-y-8">
             {days.map(day => {
