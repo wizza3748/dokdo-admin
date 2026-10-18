@@ -3,13 +3,15 @@
 import { applyReviewCommand, type ReviewDatabase } from "./review-domain.ts"
 // @ts-expect-error Node tests use explicit TypeScript extensions.
 import { migrateProRecords } from "./pro-domain.ts"
+// @ts-expect-error Node tests use explicit TypeScript extensions.
+import { proDemoStudentName, refreshProDemoLabels } from "./pro-demo-labels.ts"
 import type { ProMember, ProState } from "./pro-types"
 export const PRO_FIXTURE_CLOCK = "2026-10-08T01:00:00.000Z"
 export function initializePro(input: ReviewDatabase): ReviewDatabase {
-  if (input.pro) return input
+  if (input.pro) return refreshProDemoLabels(input)
   let db = structuredClone(input)
   const effectiveAt = "2026-09-27T15:00:00.000Z"
-  const names = ["프로 신청예시", "프로 이월예시", "프로 권수소진", "프로 처리지연", "프로 수정대기", "프로 기록승계", "프로 배정대기", "프로 종료예시", "일반 외부예시", "타기관 프로예시"]
+  const names = Array.from({ length: 10 }, (_, i) => proDemoStudentName(`pro-demo-${i + 1}`) ?? "일반 외부예시")
   const members: ProMember[] = names.map<ProMember>((name, i) => ({ id: `pro-demo-${i + 1}`, name, account: `pro_example_${i + 1}`, level: 4, age: 11, product: i === 8 ? "normal" : "pro", status: i === 7 ? "ended" : "active", external: true, institutionId: i === 6 ? undefined : i === 9 ? "other-agency" : "dokdo", teacherId: "teacher-1", assignedAt: i === 6 ? undefined : effectiveAt, effectiveAt, effectiveMonth: "2026-10", endedAt: i === 7 ? "2026-10-05T00:00:00.000Z" : undefined, serviceEnd: "2027-12-31T14:59:00.000Z", parentContact: true, limits: Object.fromEntries(i === 2 ? [["2026-10", 1]] : []), overrides: {}, consultation: { nth: 2, weekday: 4, time: "15:00" } }))
   const pro: ProState = { version: 1, clock: PRO_FIXTURE_CLOCK, effectiveAt, effectiveMonth: "2026-10", members, cases: [], schedules: [{ institutionId: "dokdo", teacherId: "teacher-1", weekday: 7, from: effectiveAt }, { institutionId: "other-agency", teacherId: "teacher-1", weekday: 7, from: effectiveAt }], audit: [], reminders: [], consultations: [], processed: [], reminderSnapshots: [] }
   db.pro = pro
@@ -40,5 +42,5 @@ export function initializePro(input: ReviewDatabase): ReviewDatabase {
   add(7, "ended", "이전 달의 약속", "2026-10-02T00:00:00.000Z", "saved")
   add(8, "normal", "일반 외부 학생의 책", "2026-10-07T00:00:00.000Z")
   add(9, "other", "다른 기관의 책", "2026-10-07T00:00:00.000Z")
-  return migrateProRecords(db)
+  return refreshProDemoLabels(migrateProRecords(db))
 }

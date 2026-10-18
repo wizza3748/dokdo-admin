@@ -10,7 +10,13 @@ export const PRO_BULK_SEND_CONFIRM = "프로 학생의 '1차 완료' 건은 학�
 function check(value: unknown, message: string): asserts value { if (!value) throw new Error(message) }
 export function isActivePro(member?: ProMember, at?: string) { return !!member && member.product === "pro" && member.status === "active" && (!at || (!member.endedAt || at < member.endedAt) && at <= member.serviceEnd) }
 export function memberFor(db: ReviewDatabase, studentId: string) { return db.pro?.members.find(m => m.id === studentId) }
-export function weekdayFor(pro: ProState, member: ProMember, week: string) { return pro.schedules.filter(s => s.institutionId === member.institutionId && s.teacherId === member.teacherId && s.from <= week).sort((a, b) => b.from.localeCompare(a.from))[0]?.weekday ?? 7 }
+export function weekdayFor(pro: ProState, member: ProMember, week: string) {
+  const history = [...(member.matchingHistory ?? [])].sort((a, b) => a.at.localeCompare(b.at))
+  const matching = history.filter((entry, i) => (i === 0 ? weekStart(entry.at) : addDays(weekStart(entry.at), 7)) <= week).at(-1)
+  const institutionId = matching?.institutionId ?? member.institutionId
+  // Legacy teacherId is retained as historical data, not a scheduling partition.
+  return pro.schedules.filter(s => s.institutionId === institutionId && s.from <= week).sort((a, b) => b.from.localeCompare(a.from))[0]?.weekday ?? 7
+}
 export function proUsage(pro: ProState, member: ProMember, at: string, month = managementMonth(at)) {
   const cases = pro.cases.filter(c => c.studentId === member.id && c.month === month)
   const used = cases.filter(c => c.firstSentAt && c.firstSentAt <= at && (!c.debitCancelledAt || c.debitCancelledAt > at)).length
@@ -23,9 +29,36 @@ export function proUsage(pro: ProState, member: ProMember, at: string, month = m
   const previousUsed = cases.filter(c => c.firstSentAt && c.firstSentAt < week && (!c.debitCancelledAt || c.debitCancelledAt >= week)).length
   const previousPending = cases.filter(c => c.selectedAt && c.selectedAt < week && (!c.firstSentAt || c.firstSentAt >= week) && (!c.closedAt || c.closedAt >= week)).length
   const rollover = Math.max(0, Math.min(Math.max(0, elapsed - 1), limit) - previousUsed - previousPending)
-  return { month, week, used, pending, elapsed, limit, available, selected, total: selected + available, rollover }
+  // Use older opportunities first. Keep the week-start snapshot separate from the remaining balance.
+  const rolloverAvailable = Math.min(available, Math.max(0, Math.min(Math.max(0, elapsed - 1), limit) - used - pending))
+  return { month, week, used, pending, elapsed, limit, available, selected, total: selected + available, rollover, rolloverAvailable }
 }
 function firstRecord(db: ReviewDatabase, id: string) { return db.records.find(r => r.reviewId === id && r.round === 1)! }
+/** Shared by designation entry points and the final server-side write. */
+export function proDesignationIssue(db: ReviewDatabase, reviewId: string) {
+  const pro = db.pro, c = pro?.cases.find(item => item.reviewId === reviewId)
+  const common = db.reviews.find(item => item.id === reviewId)
+  const member = pro?.members.find(item => item.id === common?.studentId)
+  if (!pro || !member || !c || !member.institutionId) return "매칭 기관이 배정된 프로 학생의 제출글만 피드백 대상으로 지정할 수 있습니다."
+  if (c.selectedAt) return "이미 피드백 대상으로 선정된 글입니다. 목록에서 다시 확인해 주세요."
+  if (c.closedAt || c.firstSentAt) return "이미 처리가 종료된 글은 피드백 대상으로 지정할 수 없습니다."
+  if (firstRecord(db, reviewId)?.writingStatus !== "submitted") return "학생이 제출을 완료한 글만 피드백 대상으로 지정할 수 있습니다."
+  if (c.week < weekStart(pro.clock)) return "이전 주에 제출한 미선정 글은 피드백 대상으로 지정할 수 없습니다."
+  if (c.week > weekStart(pro.clock)) return "해당 관리 주차가 시작된 뒤 피드백 대상으로 지정할 수 있습니다."
+  if (!isActivePro(member, pro.clock)) return "프로 이용이 종료된 학생의 글은 피드백 대상으로 지정할 수 없습니다."
+  if (proUsage(pro, member, pro.clock).available <= 0) return "현재 남은 신청 권수가 0권이므로 이 글을 피드백 대상으로 지정할 수 없습니다."
+  return ""
+}
+export type ProDesignationPreview = { issue: string; quota?: { available: number; after: number } }
+/** Read-only confirmation snapshot; the final command still rechecks eligibility. */
+export function proDesignationPreview(db: ReviewDatabase, reviewId: string): ProDesignationPreview {
+  const issue = proDesignationIssue(db, reviewId)
+  if (issue) return { issue }
+  const pro = db.pro!, common = db.reviews.find(item => item.id === reviewId)!
+  const member = pro.members.find(item => item.id === common.studentId)!
+  const available = proUsage(pro, member, pro.clock).available
+  return { issue: "", quota: { available, after: available - 1 } }
+}
 function audit(pro: ProState, id: string, kind: string, at: string, actor: string, studentId: string, extra: Partial<ProState["audit"][number]> = {}) { pro.audit.push({ id, kind, at, actor, studentId, ...extra }) }
 function newCase(pro: ProState, member: ProMember, reviewId: string, submittedAt: string): ProCase {
   const initial = submissionPeriod(submittedAt, weekdayFor(pro, member, weekStart(submittedAt)))
@@ -44,6 +77,10 @@ function deliverParent(db: ReviewDatabase, c: ProCase, at: string) {
   if (prior) { c.parent.status = "sent"; c.parent.at = prior.parentSentAt; return }
   const record = sent[0]
   if (!record || !record.parentContact) { c.parent.status = "missing"; c.parent.at = at; c.parent.attempts.push({ at, result: "연락처 없음" }); return }
+  if (db.pro?.clockMode === "test" && c.parent.simulateFailureOnce) {
+    delete c.parent.simulateFailureOnce
+    c.parent.status = "failed"; c.parent.at = at; c.parent.attempts.push({ at, result: "프로토타입 발송 실패" }); return
+  }
   c.parent.status = "sent"; c.parent.at = at; c.parent.attempts.push({ at, result: "프로토타입 발송 성공" }); record.parentSentAt = at
 }
 function close(db: ReviewDatabase, c: ProCase, at: string, reason: string) {
@@ -86,7 +123,7 @@ export function migrateProRecords(db: ReviewDatabase) {
 }
 export function autoCandidates(db: ReviewDatabase, member: ProMember, week: string) {
   return (db.pro?.cases ?? []).filter(c => c.studentId === member.id && c.week === week && !c.selectedAt && !c.firstSentAt && !c.closedAt && firstRecord(db, c.reviewId)?.writingStatus === "submitted")
-    .sort((a, b) => (firstRecord(db, b.reviewId).submittedAt ?? "").localeCompare(firstRecord(db, a.reviewId).submittedAt ?? "") || b.reviewId.localeCompare(a.reviewId, undefined, { numeric: true }))
+    .sort((a, b) => (firstRecord(db, b.reviewId).submittedAt ?? "").localeCompare(firstRecord(db, a.reviewId).submittedAt ?? "") || firstRecord(db, b.reviewId).id.localeCompare(firstRecord(db, a.reviewId).id, undefined, { numeric: true }))
 }
 /** Catch-up events are ordered by policy time, never by the late read time. */
 export function reconcilePro(db: ReviewDatabase, at = db.pro?.clock ?? new Date().toISOString()) {
@@ -111,7 +148,7 @@ export function reconcilePro(db: ReviewDatabase, at = db.pro?.clock ?? new Date(
       if (!submitted) close(db, c, event.at, "2차 미제출 기한 종료")
     } else {
       const member = event.member!, week = event.week!
-      if (isActivePro(member, event.at)) {
+      if (isActivePro(member, event.at) && event.at >= member.effectiveAt) {
         if (event.kind === "auto") {
           // At a Monday midnight cutoff the opportunity still belongs to the previous week.
           const usageAt = new Date(Date.parse(event.at) - 1).toISOString()
@@ -145,11 +182,12 @@ export function applyProCommand(input: ReviewDatabase, command: ProCommand, acto
     pro.clock = new Date(command.at).toISOString(); audit(pro, requestId, "테스트 시간 진행", pro.clock, actor.name, "", { before: at, after: pro.clock }); return reconcilePro(db)
   }
   if (command.type === "schedule") {
-    check(actor.role === "agency" && Number.isInteger(command.weekday) && command.weekday >= 1 && command.weekday <= 7 && pro.members.some(m => m.institutionId === actor.institutionId && m.teacherId === command.teacherId), "요일 설정 권한 또는 입력값을 확인해 주세요.")
+    check(actor.role === "agency" && Number.isInteger(command.weekday) && command.weekday >= 1 && command.weekday <= 7 && pro.members.some(m => m.institutionId === actor.institutionId && m.product === "pro"), "요일 설정 권한 또는 입력값을 확인해 주세요.")
     const from = addDays(weekStart(at), 7)
-    pro.schedules = pro.schedules.filter(s => !(s.institutionId === actor.institutionId && s.teacherId === command.teacherId && s.from === from))
-    pro.schedules.push({ institutionId: actor.institutionId!, teacherId: command.teacherId, from, weekday: command.weekday })
-    audit(pro, requestId, "피드백 요일 변경", at, actor.name, "", { after: { from, weekday: command.weekday } }); return db
+    const before = pro.schedules.filter(s => s.institutionId === actor.institutionId)
+    pro.schedules = pro.schedules.filter(s => !(s.institutionId === actor.institutionId && s.from === from))
+    pro.schedules.push({ institutionId: actor.institutionId!, teacherId: "", from, weekday: command.weekday })
+    audit(pro, requestId, "피드백 요일 변경", at, actor.name, "", { institutionId: actor.institutionId, before, after: { from, weekday: command.weekday } }); return db
   }
   const c = "reviewId" in command ? pro.cases.find(c => c.reviewId === command.reviewId) : undefined
   const reminder = command.type === "cancel-reminder" ? pro.reminders.find(r => r.id === command.id) : undefined
@@ -157,30 +195,44 @@ export function applyProCommand(input: ReviewDatabase, command: ProCommand, acto
   check(member, "학생을 찾을 수 없습니다."); access(pro, actor, member)
   if (["apply", "cancel"].includes(command.type)) check(actor.role === "student", "학생만 신청·취소할 수 있습니다.")
   else check(actor.role === "agency", "기관관리자만 처리할 수 있습니다.")
+  if (command.type === "management-memo") {
+    check(member.product === "pro" && typeof command.text === "string", "관리 메모 입력값을 확인해 주세요.")
+    check(command.expectedRevision === (member.managementMemo?.revision ?? null), "관리 메모가 다른 화면에서 변경되었습니다. 입력 내용은 유지되니 최신 내용을 확인한 뒤 다시 저장해 주세요.")
+    const previous = member.managementMemo
+    member.managementMemo = { text: command.text, revision: requestId, at, actor: actor.name }
+    audit(pro, requestId, command.type, at, actor.name, member.id, { institutionId: actor.institutionId, before: previous, after: structuredClone(member.managementMemo) })
+    return db
+  }
   const month = managementMonth(at), before = proUsage(pro, member, at)
+  const auditMonth = c?.month ?? ("month" in command && command.month ? command.month : month)
+  const auditBefore = command.type === "consult-schedule" ? structuredClone({ consultation: member.consultation, overrides: member.overrides }) : proUsage(pro, member, at, auditMonth)
   if (command.type === "apply" || command.type === "designate") {
+    if (command.type === "designate") { const issue = proDesignationIssue(db, command.reviewId); check(!issue, issue) }
     if (command.type === "apply" && c) check(at < c.cutoff, "제출 및 신청 마감이 지났습니다.")
     check(c && !c.selectedAt && !c.closedAt && !c.firstSentAt && c.week === weekStart(at) && firstRecord(db, c.reviewId).writingStatus === "submitted" && before.available > 0, "현재 주차의 제출글과 남은 신청 권수를 확인해 주세요.")
     select(pro, c, at, command.type === "apply" ? "student" : "teacher", actor.name)
   } else if (command.type === "cancel") {
-    check(c?.selectedAt && !c.lockedAt && !c.firstSentAt && at < c.cutoff, "선생님 작성 시작 또는 마감 이후에는 취소할 수 없습니다.")
+    check(c?.selectedAt && c.selection === "student" && !c.lockedAt && !c.firstSentAt && at < c.cutoff, "본인이 신청한 글만 선생님 작성 시작 및 마감 전에 취소할 수 있습니다.")
     c.selectedAt = undefined; c.selection = undefined
   } else if (command.type === "limit") {
-    check(Number.isInteger(command.limit) && command.limit >= before.used + before.pending && command.reason.trim() && command.memo.trim(), "한도는 사용·선정 권수 이상인 정수이며 사유와 메모가 필요합니다.")
+    check(Number.isInteger(command.limit) && command.limit >= before.used + before.pending && command.reason.trim(), "한도는 사용·선정 권수 이상인 정수이며 조정 사유가 필요합니다.")
     member.limits[month] = command.limit
   } else if (command.type === "cancel-debit") {
     check(c?.firstSentAt && !c.debitCancelledAt && command.reason.trim() && command.memo.trim(), "차감 취소 가능 여부, 사유와 메모를 확인해 주세요.")
     c.debitCancelledAt = at
   } else if (command.type === "retry-parent") {
-    check(c?.closedAt && c.parent.status !== "sent", "성공 발송 이력이 있거나 관리 종료 전입니다."); deliverParent(db, c, at)
+    check(c?.closedAt && c.parent.status !== "sent", "성공 발송 이력이 있거나 관리 종료 전입니다.")
+    check(db.records.some(r => r.reviewId === c.reviewId && r.feedbackStatus === "전송완료" && r.parentContact), "학부모 연락처가 등록되어 있지 않습니다.")
+    deliverParent(db, c, at)
   } else if (command.type === "reminder") {
     check(weekStart(command.week) === weekStart(at), "이번 주 독려만 기록할 수 있습니다.")
     const previous = pro.reminders.filter(r => r.studentId === member.id && r.week === command.week && r.kind === command.kind && !r.cancelledAt)
-    check(!previous.some(r => r.sequence === command.sequence) && (command.sequence === 1 || previous.some(r => r.sequence === 1)), "동일 종류의 1차 독려부터 순서대로 기록해 주세요.")
+    check(!previous.some(r => r.sequence === command.sequence), "이미 기록한 회차입니다.")
+    check(command.sequence === 1 || previous.some(r => r.sequence === 1), "같은 종류의 1회 발송부터 기록해 주세요.")
     pro.reminders.push({ id: requestId, studentId: member.id, week: command.week, kind: command.kind, sequence: command.sequence, at, actor: actor.name })
   } else if (command.type === "cancel-reminder") {
     check(reminder && !reminder.cancelledAt && kstDate(reminder.at) === kstDate(at), "당일 기록만 취소할 수 있습니다.")
-    check(reminder.sequence === 2 || !pro.reminders.some(r => r.studentId === member.id && r.week === reminder.week && r.kind === reminder.kind && r.sequence === 2 && !r.cancelledAt), "2차 독려를 먼저 취소해 주세요.")
+    check(reminder.sequence === 2 || !pro.reminders.some(r => r.studentId === member.id && r.week === reminder.week && r.kind === reminder.kind && r.sequence === 2 && !r.cancelledAt), "2회 기록을 먼저 취소해 주세요.")
     reminder.cancelledAt = at
   } else if (command.type === "consult-schedule") {
     check(Number.isInteger(command.nth) && command.nth >= 1 && command.nth <= 5 && Number.isInteger(command.weekday) && command.weekday >= 1 && command.weekday <= 7 && /^([01]\d|2[0-3]):[0-5]\d$/.test(command.time), "상담 일정을 확인해 주세요.")
@@ -191,7 +243,7 @@ export function applyProCommand(input: ReviewDatabase, command: ProCommand, acto
     if (command.previousId) check(pro.consultations.some(c => c.id === command.previousId && c.studentId === member.id && c.month === command.month), "수정할 상담 기록이 없습니다.")
     pro.consultations.push({ ...command, id: requestId, actor: actor.name, at })
   }
-  audit(pro, requestId, command.type, at, actor.name, member.id, { month: c?.month ?? month, reviewId: c?.reviewId, before, after: proUsage(pro, member, at), ...("reason" in command ? { reason: command.reason, memo: command.memo } : {}) })
+  audit(pro, requestId, command.type, at, actor.name, member.id, { institutionId: actor.institutionId ?? member.institutionId, month: auditMonth, reviewId: c?.reviewId, before: auditBefore, after: command.type === "consult-schedule" ? structuredClone({ consultation: member.consultation, overrides: member.overrides }) : proUsage(pro, member, at, auditMonth), ...("reason" in command ? { reason: command.reason, memo: command.memo } : {}) })
   return db
 }
 /** Review and Pro changes commit together; failed commands never reserve/debit. */
@@ -206,7 +258,8 @@ export function applyManagedReviewCommand(input: ReviewDatabase, command: Review
   if (db.records.some(r => r.history.some(h => h.requestId === requestId))) return db
   if (managed && record) {
     if (c && !c.selectedAt && command.proDesignate && ["ai-start", "save-feedback"].includes(command.type)) {
-      check(actor.role === "agency" && actor.institutionId === c.institutionId && c.week === weekStart(at) && !c.closedAt && proUsage(pro!, member, at).available > 0, "현재 주차와 남은 신청 권수를 확인해 주세요.")
+      check(actor.role === "agency" && actor.institutionId === member.institutionId, "해당 학생의 처리 권한이 없습니다.")
+      const issue = proDesignationIssue(db, c.reviewId); check(!issue, issue)
       select(pro!, c, at, "teacher", actor.name)
     }
     if (["ai-start", "save-feedback", "send", "flower"].includes(command.type)) check(c?.selectedAt && (!c.closedAt || command.type === "flower"), "선정된 프로 관리 대상만 처리할 수 있습니다. 미선정 글은 대상 지정 확인 후 진행해 주세요.")
@@ -225,6 +278,7 @@ export function applyManagedReviewCommand(input: ReviewDatabase, command: Review
   if (!nextCase) return db
   if (command.type === "submit" && record.round === 2) { const period = submissionPeriod(at, nextCase.weekday); nextCase.secondWeek = period.week; nextCase.secondDue = period.due }
   if (command.type === "reject" && record.round === 1) { nextCase.selectedAt = undefined; nextCase.selection = undefined; nextCase.lockedAt = undefined; audit(nextPro, `reject:${requestId}`, "1차 반려", at, actor.name, member.id, { reviewId: nextCase.reviewId, month: nextCase.month, week: nextCase.week }) }
+  if (command.type === "reject" && record.round === 2) { nextCase.secondWeek = undefined; nextCase.secondDue = undefined }
   if (["ai-start", "save-feedback"].includes(command.type)) nextCase.lockedAt ??= at
   if (command.type === "ai-result" && command.result && nextRecord.aiHistory.find(h => h.requestId === command.runId)?.status === "success") nextCase.aiSnapshots.push({ recordId: record.id, at, runId: command.runId, result: structuredClone(command.result) })
   if (command.type === "send") {

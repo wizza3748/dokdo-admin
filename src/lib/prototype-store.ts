@@ -40,7 +40,7 @@ export class PrototypeStore {
 
   constructor(options: StoreOptions = {}) {
     this.env = options.env ?? process.env
-    this.directory = options.directory ?? path.join(process.cwd(), ".local-state")
+    this.directory = options.directory ?? (this.env.VERCEL !== "1" && this.env.DOKDO_LOCAL_STATE_DIR ? path.resolve(this.env.DOKDO_LOCAL_STATE_DIR) : path.join(process.cwd(), ".local-state"))
     this.fetcher = options.fetcher ?? fetch
     this.now = options.now ?? Date.now
     this.sqlQuery = options.sql

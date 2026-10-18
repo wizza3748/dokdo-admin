@@ -14,6 +14,7 @@ function resolveTab(pathname: string): AdminTab {
   if (pathname === "/") return DASHBOARD_TAB
   if (pathname === "/agency/students/external") return { href: pathname, title: "외부 관리 학생" }
   if (pathname === "/agency/pro-management") return { href: pathname, title: "주간 관리 현황" }
+  if (pathname === "/agency/pro-management/student-front-test") return { href: pathname, title: "학생프론트 테스트" }
   if (pathname === "/agency/pro-management/feedback-day") return { href: pathname, title: "피드백 요일 설정" }
   if (pathname.startsWith("/agency/pro-management/students/")) return { href: pathname, title: "프로 학생 관리" }
   if (pathname === "/agency/students") return { href: pathname, title: "학생목록" }

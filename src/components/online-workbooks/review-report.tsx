@@ -82,8 +82,9 @@ function RoundWriting({ common, record, rounds }: { common: ReviewCommon; record
       <article className={styles.feedback}><header><h3><MessageCircle size={21} aria-hidden="true" />선생님의 {record.round}차 피드백</h3></header><div className={styles.richText}><h4>선생님의 한마디</h4><ReviewText value={record.feedback || "저장된 피드백이 없습니다."} />{items.length > 0 && <div className={styles.items}>{items.map((item, i) => <section key={item.itemId}><h4><span>{i + 1}</span>{common.template.items.find(t => t.id === item.itemId)?.title ?? "항목별 피드백"}</h4><ReviewText value={item.text} /></section>)}</div>}</div></article></div>
   </ReportSheet>
 }
-export function ReviewReportView({ id, role }: { id: string; role: ReviewRole }) {
+export function ReviewReportView({ id, role, shareToken }: { id: string; role: ReviewRole; shareToken?: string }) {
   const { db, loaded, error } = useReviews(role, role === "external" ? id : undefined)
+  const shareQuery = role === "external" && shareToken ? `&share=${encodeURIComponent(shareToken)}` : ""
   const record = db.records.find(r => r.id === id)
   const common = db.reviews.find(r => r.id === record?.reviewId)
   if (!loaded) return <p className={styles.empty} role="status">평가 보고서를 불러오고 있습니다.</p>
@@ -96,7 +97,7 @@ export function ReviewReportView({ id, role }: { id: string; role: ReviewRole })
   const criteria = assessmentCriteria(common.level, record)
   const improvement = reviewImprovementMessage(report.improvement ?? 0)
   return <div className={styles.document}>
-    <nav className={styles.toolbar} aria-label="평가 보고서 도구"><span><BookOpen size={17} />온라인 독후감 평가 보고서</span><div>{first && <a href={"/online-review/report/" + first.id + "?role=" + role} target="_blank" rel="noopener noreferrer">1차 보고서 ↗</a>}<button type="button" onClick={() => window.print()}><Printer size={16} />인쇄 / 파일 저장</button></div></nav>
+    <nav className={styles.toolbar} aria-label="평가 보고서 도구"><span><BookOpen size={17} />온라인 독후감 평가 보고서</span><div>{first && <a href={"/online-review/report/" + first.id + "?role=" + role + shareQuery} target="_blank" rel="noopener noreferrer">1차 보고서 ↗</a>}<button type="button" onClick={() => window.print()}><Printer size={16} />인쇄 / 파일 저장</button></div></nav>
     <ReviewReportScreen common={common} record={record} first={first} areas={areas} />
     <div className={styles.printOriginal}>
     <div className={styles.pages}>

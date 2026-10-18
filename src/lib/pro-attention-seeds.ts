@@ -4,15 +4,17 @@
 import { addDays, kstDate, managementMonth, weekStart } from "./pro-calendar.ts"
 // @ts-expect-error Node tests use explicit TypeScript extensions.
 import { applyReviewCommand, type ReviewDatabase } from "./review-domain.ts"
+// @ts-expect-error Node tests use explicit TypeScript extensions.
+import { proDemoStudentName, refreshProDemoLabels } from "./pro-demo-labels.ts"
 import type { ProMember } from "./pro-types"
 
 export const PRO_ATTENTION_EXAMPLES = [
-  { id: "pro-demo-attention", name: "프로 집중관리 예시", weeks: 2, bookTitle: "다시 시작하는 독서" },
-  { id: "pro-demo-hq-check", name: "프로 본사확인 예시", weeks: 3, bookTitle: "함께 읽는 즐거움" },
+  { id: "pro-demo-attention", name: proDemoStudentName("pro-demo-attention")!, weeks: 2, bookTitle: "다시 시작하는 독서" },
+  { id: "pro-demo-hq-check", name: proDemoStudentName("pro-demo-hq-check")!, weeks: 3, bookTitle: "함께 읽는 즐거움" },
 ] as const
 
 export function ensureProAttentionExamples(input: ReviewDatabase, serverNow: string): ReviewDatabase {
-  if (!input.pro || PRO_ATTENTION_EXAMPLES.every(example => input.pro!.members.some(m => m.id === example.id))) return input
+  if (!input.pro || PRO_ATTENTION_EXAMPLES.every(example => input.pro!.members.some(m => m.id === example.id))) return refreshProDemoLabels(input)
   let db = structuredClone(input)
   for (const example of PRO_ATTENTION_EXAMPLES) {
     if (db.pro!.members.some(m => m.id === example.id)) continue
@@ -41,5 +43,5 @@ export function ensureProAttentionExamples(input: ReviewDatabase, serverNow: str
     db = applyReviewCommand(db, { type: "save-writing", recordId: `${id}-r1`, stage: "items", itemIndex: 0, answers: { reason: body }, body: "" }, actor, `${id}:write`, serverNow)
     db = applyReviewCommand(db, { type: "enter-rewrite", recordId: `${id}-r1` }, actor, `${id}:rewrite`, serverNow)
   }
-  return db
+  return refreshProDemoLabels(db)
 }

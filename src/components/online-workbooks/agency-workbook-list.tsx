@@ -4,16 +4,19 @@ import * as React from "react"
 import { subscribeReviewRefresh } from "@/lib/review-refresh"
 import { PRO_SEND_CONFIRM, PRO_BULK_SEND_CONFIRM } from "@/lib/pro-domain"
 import { ExternalBadge, ProBadge } from "@/components/pro-management/pro-common"
+import { ProHelp } from "@/components/pro-management/pro-help"
 import { ReviewListTools } from "./review-list-tools"
+import { FeedbackAction } from "./review-feedback-action"
 import Link from "next/link"
 import {
   Bot,
   Check,
+  ChevronDown,
+  ChevronUp,
   CircleHelp,
   FileText,
   Flower2,
   Mail,
-  Pencil,
   RefreshCw,
   Search,
   Send,
@@ -21,6 +24,7 @@ import {
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { AgencyConfirmDialog } from "@/components/ui/agency-confirm-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -32,9 +36,11 @@ import {
   type FeedbackStatus,
   type OnlineWorkbook,
 } from "@/lib/online-workbooks"
-import { performReviewListAction } from "@/lib/review-list-adapter"
+import { eligibleReviewListAction, performReviewListAction } from "@/lib/review-list-adapter"
 import { cn } from "@/lib/utils"
+import { safeAgencyReturn, useReviewListPosition } from "@/lib/review-navigation"
 import { workbookClassification } from "@/lib/workbook-classification"
+import { agencyReviewColumns, legacyAgencyReviewColumns, matchesReviewAudience, matchesReviewSelection, reviewAudienceFromParams, reviewAudienceHelp, reviewAudienceLabels, reviewFiltersOpen, reviewSelectionFilter, reviewSelectionFilterOptions, reviewSelectionHelp, reviewStatusForSelection, reviewStatusLocked, type ReviewAudience, type ReviewSelectionFilter } from "@/lib/review-list-presentation"
 
 type SortKey = "id" | "submittedAt"
 type FilterOption = { value: string; label: string }
@@ -104,21 +110,6 @@ function ReportCell({ record, role }: { record: OnlineWorkbook; role: "agency" |
   )
 }
 
-function FeedbackAction({ record, role }: { record: OnlineWorkbook; role: "agency" | "class" }) {
-  const action = record.status === "작성전" ? "작성" : record.status === "작성완료" ? "수정" : "보기"
-  const isEditable = record.status !== "전송완료"
-  return (
-    <Link
-      href={`/agency/online-workbooks/${record.id}?role=${role}`}
-      aria-label={`${record.studentName} 피드백 ${action}, AI 사용 ${record.aiUsed}/2회`}
-      className="inline-flex items-center gap-2 font-medium text-blue-600 hover:underline"
-    >
-      <Pencil className={cn("size-4", isEditable ? "text-blue-600" : "text-slate-400")} />
-      <span className="tabular-nums">({record.aiUsed}/2)</span>
-    </Link>
-  )
-}
-
 function HeaderHint({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <span className="group relative inline-flex align-middle">
@@ -142,21 +133,11 @@ const flowerCriteria = [
   { amount: 20, medal: "🏆", description: "주제에 대한 깊이 있는 분석, 창의적 해석과 독창적인 표현이 돋보이는 글" },
 ]
 
-function AlertDialog({ title, message, onClose, onConfirm, confirmLabel = "확인" }: { title: string; message: React.ReactNode; onClose: () => void; onConfirm: () => void; confirmLabel?: string }) {
-  return (
-    <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/45 p-4">
-      <div role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-[520px] rounded-2xl bg-white px-7 py-6 shadow-2xl">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-amber-400 text-sm font-black text-white">!</span>
-          <div className="min-w-0 flex-1"><h2 className="text-xl font-bold text-slate-700">{title}</h2><div className="mt-4 text-[15px] leading-7 text-slate-600">{message}</div></div>
-        </div>
-        <div className="mt-5 flex justify-end gap-2"><Button variant="outline" onClick={onClose}>취소</Button><Button onClick={onConfirm} className="bg-blue-600 hover:bg-blue-700">{confirmLabel}</Button></div>
-      </div>
-    </div>
-  )
+function AlertDialog({ title, message, onClose, onConfirm, confirmLabel = "확인", busy = false }: { title: string; message: React.ReactNode; onClose: () => void; onConfirm: () => void; confirmLabel?: string; busy?: boolean }) {
+  return <AgencyConfirmDialog title={title} onClose={onClose} onConfirm={onConfirm} confirmLabel={confirmLabel} busy={busy}>{message}</AgencyConfirmDialog>
 }
 
-function FlowerDialog({ count, selectedFlower, onSelect, onClose, onConfirm }: { count: number; selectedFlower: number | null; onSelect: (amount: number) => void; onClose: () => void; onConfirm: () => void }) {
+function FlowerDialog({ count, selectedFlower, onSelect, onClose, onConfirm, busy = false }: { count: number; selectedFlower: number | null; onSelect: (amount: number) => void; onClose: () => void; onConfirm: () => void; busy?: boolean }) {
   return (
     <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/45 p-4">
       <div role="dialog" aria-modal="true" aria-label={`선택한 ${count}개 온라인 독후감에 섬초롱꽃을 지급할까요?`} className="w-full max-w-[750px] rounded-xl bg-white p-7 shadow-2xl">
@@ -166,24 +147,26 @@ function FlowerDialog({ count, selectedFlower, onSelect, onClose, onConfirm }: {
         <p className="mt-6 text-sm font-bold text-slate-700">지급 개수</p>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">{flowerCriteria.map((item) => <button key={item.amount} type="button" role="radio" aria-checked={selectedFlower === item.amount} onClick={() => onSelect(item.amount)} className={cn("rounded-lg border px-4 py-3 text-center text-sm transition-colors", selectedFlower === item.amount ? "border-blue-500 bg-blue-50 font-semibold text-blue-700" : "border-slate-200 text-slate-600 hover:border-blue-300")}><span>🌻　{item.amount}개</span></button>)}</div>
         <div className="mt-7 space-y-3 rounded-xl bg-[#eef6ff] p-5"><p className="font-bold text-slate-700">권장 기준 안내</p>{flowerCriteria.map((item) => <p key={item.amount} className="text-sm leading-6 text-slate-600">{item.medal} <strong>{item.amount}개:</strong> {item.description}</p>)}</div>
-        <div className="mt-7 flex justify-end gap-2"><Button variant="outline" onClick={onClose}>취소</Button><Button disabled={!selectedFlower} onClick={onConfirm} className="bg-blue-600 hover:bg-blue-700">확인</Button></div>
+        <div className="mt-7 flex justify-end gap-2"><Button disabled={busy} variant="outline" onClick={onClose}>취소</Button><Button disabled={!selectedFlower || busy} onClick={onConfirm} className="bg-blue-600 hover:bg-blue-700">확인</Button></div>
       </div>
     </div>
   )
 }
 
-function FilterMenu({ label, value, onValueChange, options }: {
+function FilterMenu({ label, value, onValueChange, options, className, disabled = false }: {
   label: string
   value: string
   onValueChange: (value: string) => void
-  options: FilterOption[]
+  options: readonly FilterOption[]
+  className?: string
+  disabled?: boolean
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-3"><span className="w-24 shrink-0 text-right text-[13px]">{label}</span><Select value={value} onValueChange={onValueChange}>
+    <div className={cn("flex min-w-0 items-center gap-2.5", className)}><span className="shrink-0 whitespace-nowrap text-[13px] font-medium text-slate-600">{label}</span><Select value={value} disabled={disabled} onValueChange={nextValue => { if (options.some(option => option.value === nextValue)) onValueChange(nextValue) }}>
       <SelectTrigger
         aria-label={label}
         className={cn(
-          "h-8 w-full min-w-0 gap-3 rounded border-slate-200 bg-white px-3 text-xs shadow-none hover:border-blue-300",
+          "h-9 w-full min-w-0 gap-3 rounded-md border-slate-200 bg-white px-3 text-[13px] shadow-none hover:border-blue-300",
           value !== "all" && "border-blue-300 bg-blue-50 text-blue-700"
         )}
       >
@@ -194,11 +177,11 @@ function FilterMenu({ label, value, onValueChange, options }: {
   )
 }
 
-function SummaryCards({ records }: { records: OnlineWorkbook[] }) {
+function SummaryCards({ records, status, onSelect, disabled = false }: { records: OnlineWorkbook[]; status: string; onSelect: (status: FeedbackStatus) => void; disabled?: boolean }) {
   return (
     <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
       {summary.map((item) => (
-        <div key={item.status} className="flex h-[104px] items-center justify-between rounded-[10px] border border-slate-200 bg-white px-7 text-left shadow-[0_1px_2px_rgba(15,23,42,0.03)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">
+        <button key={item.status} type="button" disabled={disabled} title={disabled ? "피드백 대상으로 선정된 글만 상태를 선택할 수 있습니다." : undefined} aria-pressed={status === item.status} onClick={() => onSelect(item.status)} className={cn("flex h-[104px] cursor-pointer items-center justify-between rounded-[10px] border bg-white px-7 text-left shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors enabled:hover:border-blue-300 disabled:cursor-default disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600", status === item.status ? "border-blue-500 ring-1 ring-blue-500" : "border-slate-200")}>
           <span>
             <span className="block text-lg font-semibold text-slate-700">{item.title}</span>
             <span className={cn("mt-1 block text-sm", item.color)}>{item.description}</span>
@@ -207,7 +190,7 @@ function SummaryCards({ records }: { records: OnlineWorkbook[] }) {
             {records.filter((record) => record.status === item.status).length}
             <span className="ml-1 text-sm font-normal">건</span>
           </span>
-        </div>
+        </button>
       ))}
     </section>
   )
@@ -215,8 +198,13 @@ function SummaryCards({ records }: { records: OnlineWorkbook[] }) {
 
 export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "class" }) {
   const [records, setRecords] = React.useState(AGENCY_ONLINE_WORKBOOKS)
-  const [proOnly, setProOnly] = React.useState(false), [selectedOnly, setSelectedOnly] = React.useState(false), [studentId, setStudentId] = React.useState("")
-  React.useEffect(() => { const p = new URLSearchParams(window.location.search); setProOnly(p.get("pro") === "1"); setStudentId(p.get("studentId") ?? "") }, [])
+  const [audience, setAudience] = React.useState<ReviewAudience>("all")
+  const [selectionFilter, setSelectionFilter] = React.useState<ReviewSelectionFilter>("all")
+  const statusLocked = reviewStatusLocked(selectionFilter)
+  const [studentId, setStudentId] = React.useState("")
+  const showPro = audience === "pro"
+  const columns = agencyReviewColumns(showPro)
+
   const [writingFilter, setWritingFilter] = React.useState("all")
   const [reportFilter, setReportFilter] = React.useState("all")
   const [level, setLevel] = React.useState("all")
@@ -233,13 +221,45 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
   const [pageSize, setPageSize] = React.useState(50)
   const [refreshKey, setRefreshKey] = React.useState(0)
   const [selectedFlower, setSelectedFlower] = React.useState<number | null>(null)
+  const [restored, setRestored] = React.useState(false), [loaded, setLoaded] = React.useState(false), [filterOpen, setFilterOpen] = React.useState(true)
+  const [originReturn, setOriginReturn] = React.useState(""), [busy, setBusy] = React.useState(false)
+  const [demoAgency, setDemoAgency] = React.useState("")
+  const filterPreferenceKey = `dokdo-review-search-${role}-filters`
+  const pendingAction = React.useRef(false), previousFilters = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    setDemoAgency(p.get("demoAgency") === "other-agency" ? "other-agency" : "")
+    const nextAudience = reviewAudienceFromParams(p)
+    const nextSelection = reviewSelectionFilter(p.get("selection"), nextAudience)
+    setAudience(nextAudience); setSelectionFilter(nextSelection); setStudentId(p.get("studentId") ?? "")
+    setWritingFilter(p.get("writing") ?? "all"); setReportFilter(p.get("report") ?? "all"); setLevel(p.get("level") ?? "all")
+    setStatus(reviewStatusForSelection(p.get("status") ?? "all", nextSelection)); setAiRemaining(p.get("ai") ?? "all"); setFlower(p.get("flower") ?? "all")
+    setKeyword(p.get("q") ?? ""); setQuery(p.get("q") ?? ""); setPage(Math.max(1, Number(p.get("page")) || 1))
+    setPageSize([10,20,50,100].includes(Number(p.get("size"))) ? Number(p.get("size")) : 50)
+    setSort({ key: p.get("sort") === "id" ? "id" : "submittedAt", direction: p.get("direction") === "asc" ? "asc" : "desc" })
+    let savedFilterState: string | null = null
+    try { savedFilterState = window.localStorage.getItem(`dokdo-review-search-${role}-filters`) } catch { /* Storage is optional. */ }
+    setFilterOpen(reviewFiltersOpen(p, savedFilterState)); setOriginReturn(safeAgencyReturn(p.get("returnTo"), "")); setRestored(true)
+  }, [role])
+  const toggleFilters = () => {
+    const nextOpen = !filterOpen
+    setFilterOpen(nextOpen)
+    try { window.localStorage.setItem(filterPreferenceKey, nextOpen ? "open" : "closed") } catch { /* Keep the current view usable without storage. */ }
+  }
+  const listParams = new URLSearchParams({ role, audience, studentId, writing: writingFilter, report: reportFilter, level, status, ai: aiRemaining, flower, q: query, page: String(page), size: String(pageSize), sort: sort.key, direction: sort.direction, filters: filterOpen ? "open" : "closed" })
+  if (showPro) listParams.set("selection", selectionFilter)
+  if (originReturn) listParams.set("returnTo", originReturn)
+  if (demoAgency) listParams.set("demoAgency", demoAgency)
+  const listUrl = `/agency/online-workbooks?${listParams}`
+  const listPosition = useReviewListPosition(loaded && restored, listUrl)
+  React.useEffect(() => { if (restored) window.history.replaceState(null, "", listUrl) }, [listUrl, restored])
 
   React.useEffect(() => {
     let active = true
     let sequence = 0
     const syncRecords = async () => {
       const request = ++sequence
-      try { const nextRecords = await getAgencyWorkbookListAsync(role); if (active && request === sequence) setRecords(nextRecords) }
+      try { const nextRecords = await getAgencyWorkbookListAsync(role); if (active && request === sequence) { setRecords(nextRecords); setLoaded(true) } }
       catch { if (active && request === sequence) setNotice("목록을 불러오지 못했습니다. 새로고침해 주세요.") }
     }
     const unsubscribe = subscribeReviewRefresh(syncRecords)
@@ -249,12 +269,19 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     }
   }, [role, refreshKey])
 
-  React.useEffect(() => { setPage(1); setSelectedIds([]) }, [writingFilter, reportFilter, level, status, aiRemaining, flower, query, pageSize, proOnly, selectedOnly, studentId])
+  React.useEffect(() => {
+    if (!restored) return
+    const value = JSON.stringify([writingFilter, reportFilter, level, status, selectionFilter, aiRemaining, flower, query, pageSize, audience, studentId])
+    if (previousFilters.current !== null && previousFilters.current !== value) { setPage(1); setSelectedIds([]) }
+    previousFilters.current = value
+  }, [restored, writingFilter, reportFilter, level, status, selectionFilter, aiRemaining, flower, query, pageSize, audience, studentId])
+
+  const audienceRecords = React.useMemo(() => records.filter(record => matchesReviewAudience(record, audience) && (!studentId || record.studentId === studentId)), [records, audience, studentId])
 
   const filteredRecords = React.useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
-    return records
-      .filter(r => (!proOnly || !!r.pro) && (!selectedOnly || !r.pro || r.pro.selected) && (!studentId || r.studentId === studentId))
+    return audienceRecords
+      .filter(record => matchesReviewSelection(record, selectionFilter))
       .filter((record) => {
         if (writingFilter === "all") return true
         const classification = workbookClassification(record)
@@ -284,7 +311,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
         const fallback = result || aDisplayNumber.localeCompare(bDisplayNumber, "ko", { numeric: true })
         return sort.direction === "asc" ? fallback : -fallback
       })
-  }, [records, level, status, aiRemaining, flower, query, sort, writingFilter, reportFilter, proOnly, selectedOnly, studentId])
+  }, [audienceRecords, level, status, selectionFilter, aiRemaining, flower, query, sort, writingFilter, reportFilter])
 
   const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -295,7 +322,8 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     : { key, direction: "asc" })
 
   const reset = () => {
-    setProOnly(false); setSelectedOnly(false); setStudentId(""); window.history.replaceState(null, "", window.location.pathname)
+    setAudience("all"); setStudentId(""); setPage(1)
+    setSelectionFilter("all")
     setWritingFilter("all")
     setReportFilter("all")
     setLevel("all")
@@ -315,30 +343,39 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
   }
 
   const sendSingleFeedback = async (record: OnlineWorkbook) => {
+    if (pendingAction.current || !eligibleReviewListAction(record, "send")) return
+    pendingAction.current = true; setBusy(true)
+    try {
     setActionDialog(null)
     if (record.reviewId) { try { await performReviewListAction(record.id, "send", 0, role); setRecords(await getAgencyWorkbookListAsync(role)); setNotice("피드백을 전송했습니다.") } catch (e) { setNotice(String(e)) } return }
     if (record.status !== "작성완료") return
     const nextRecord = { ...record, status: "전송완료" as const }
     applyRecordUpdates([nextRecord])
     setNotice(`${record.studentName} 학생에게 피드백을 전송했습니다.`)
+    } finally { pendingAction.current = false; setBusy(false) }
   }
 
   const confirmSingleParentSend = async () => {
-    if (!actionDialog || actionDialog.kind !== "parent") return
+    if (!actionDialog || actionDialog.kind !== "parent" || pendingAction.current) return
     const { record } = actionDialog
     if (record.status !== "전송완료" || record.parentSent || record.parentContactRegistered === false) return
+    pendingAction.current = true; setBusy(true)
+    try {
     if (record.reviewId) { try { await performReviewListAction(record.id, "parent", 0, role); setRecords(await getAgencyWorkbookListAsync(role)) } catch (e) { setNotice(String(e)); return } } else applyRecordUpdates([{ ...record, parentSent: true }])
     setNotice(`${record.studentName} 학생의 학부모에게 발송했습니다.`)
     setActionDialog(null)
+    } finally { pendingAction.current = false; setBusy(false) }
   }
 
   const confirmBulkAction = async () => {
-    if (!actionDialog || actionDialog.kind !== "bulk") return
+    if (!actionDialog || actionDialog.kind !== "bulk" || pendingAction.current) return
+    pendingAction.current = true; setBusy(true)
+    try {
     const allRecords = records.filter((record) => selectedIds.includes(record.id))
     const selectedRecords = allRecords.filter(r => !r.reviewId)
     const { action } = actionDialog
-    const outcomes: string[] = []
-    for (const r of allRecords.filter(r => r.reviewId)) { try { await performReviewListAction(r.id, action, selectedFlower ?? 0, role); outcomes.push(`${r.writingRound}차 ${r.studentName}: 성공`) } catch (e) { outcomes.push(`${r.writingRound}차 ${r.studentName}: 제외/실패 (${String(e)})`) } }
+    const outcomes: string[] = allRecords.filter(r => r.reviewId && !eligibleReviewListAction(r, action)).map(r => `${r.studentName} · ${r.bookTitle}: 제외 (${r.pro && !r.pro.selected ? "미선정" : action === "parent" && r.pro ? "프로 자동 발송 대상" : "처리 조건 미충족"})`)
+    for (const r of allRecords.filter(r => r.reviewId && eligibleReviewListAction(r, action))) { try { await performReviewListAction(r.id, action, selectedFlower ?? 0, role); outcomes.push(`${r.writingRound}차 ${r.studentName}: 성공`) } catch (e) { outcomes.push(`${r.writingRound}차 ${r.studentName}: 제외/실패 (${String(e)})`) } }
     if (outcomes.length) setRecords(await getAgencyWorkbookListAsync(role))
     const eligibleRecords = selectedRecords.filter((record) => {
       if (action === "ai") return record.status === "작성전" && record.aiUsed < 2
@@ -359,59 +396,70 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     setActionDialog(null)
     setSelectedFlower(null)
     setSelectedIds([])
+    } catch (e) { setNotice(e instanceof Error ? e.message : "처리에 실패했습니다. 상태를 새로고침해 주세요.") }
+    finally { pendingAction.current = false; setBusy(false) }
   }
 
   const bulkClass = "h-9 gap-2 border-slate-200 bg-white px-4 text-[13px] font-normal text-slate-700 shadow-sm hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 disabled:bg-white disabled:text-slate-300"
   const selectedRecords = records.filter((record) => selectedIds.includes(record.id))
-  const selectedFlowerEligibleCount = selectedRecords.filter((record) => record.flowers === 0 && (!record.reviewId || record.status !== "작성전")).length
+  const eligibleCount = (action: BulkAction) => selectedRecords.filter(record => eligibleReviewListAction(record, action)).length
+  const selectedFlowerEligibleCount = eligibleCount("flower")
 
   return (
-    <div className="w-full space-y-4 pb-2 text-slate-700">
-      <SummaryCards records={records.filter(r => !r.pro || r.pro.selected)} />
-      <p className="text-xs text-slate-500">프로 학생은 피드백 대상으로 선정된 글만 집계합니다.</p>
+    <div ref={listPosition} className="w-full space-y-4 pb-2 text-slate-700">
+      <SummaryCards records={audienceRecords.filter(r => !r.pro || r.pro.selected)} status={status} onSelect={setStatus} disabled={statusLocked} />
 
-      <section className="rounded border border-[#bae7ff] bg-[#e6f7ff] px-6 py-4 text-[13px] leading-[22px] text-[#1890ff]">
+      <details open className="rounded border border-[#bae7ff] bg-[#e6f7ff] px-6 py-4 text-[13px] leading-[22px] text-[#1890ff]"><summary className="mb-2 cursor-pointer font-semibold">온라인 독후감 관리 안내</summary>
         <ul className="list-disc pl-4"><li>피드백 작성전인 온라인 독후감을 우선적으로 처리해 주세요.</li><li>일괄 AI 피드백 생성 후에도 상태는 피드백 작성전으로 유지되니, 내용을 확인 후 저장해 주세요.</li><li>AI 피드백 생성은 차수별 최대 2회까지 사용 가능해요.</li><li>피드백 저장 후, 꼭 학생에게 전송해 주세요.</li><li>학부모 발송은 1회만 가능하니 신중히 진행해 주세요.</li></ul>
-      </section>
-      <section className="rounded border border-[#e5e7eb] bg-white p-5">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div role="group" aria-label="프로 관리 조회 조건" className="flex flex-wrap items-center gap-2">
-            <span className="mr-2 text-[13px] font-medium text-slate-600">조회 대상</span>
-            <button type="button" aria-pressed={!proOnly && !selectedOnly && !studentId} onClick={() => { setProOnly(false); setSelectedOnly(false); setStudentId("") }} className={cn("rounded-full border px-3 py-1.5 text-xs font-medium", !proOnly && !selectedOnly && !studentId ? "border-blue-300 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600")}>전체 학생</button>
-            <label className={cn("flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium", proOnly ? "border-blue-300 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600")}><input type="checkbox" className="accent-blue-600" checked={proOnly} onChange={e => setProOnly(e.target.checked)}/>프로 학생만</label>
-            <label className={cn("flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium", selectedOnly ? "border-blue-300 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600")}><input type="checkbox" className="accent-blue-600" checked={selectedOnly} onChange={e => setSelectedOnly(e.target.checked)}/>피드백 대상만</label>
-            {studentId && <button type="button" onClick={() => setStudentId("")} aria-label="학생 조건 해제" className="flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-xs">{records.find(r => r.studentId === studentId)?.studentName ?? studentId}<X className="size-3"/></button>}
+        {audienceRecords.some(record => record.external) && <p className="mt-3 font-semibold text-blue-800">프로 학생은 피드백 대상으로 선정된 글만 집계합니다.</p>}
+      </details>
+      <section aria-label="검색 조건" className="rounded-xl border border-slate-200 bg-white px-5 py-4">
+        <form onSubmit={event => { event.preventDefault(); setQuery(keyword) }}>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <div role="group" aria-label="조회 대상" className="flex flex-wrap items-center gap-2">
+              <span className="mr-1 inline-flex items-center gap-1.5 text-[13px] font-medium text-slate-600">조회 대상<ProHelp label="조회 대상 안내" lines={reviewAudienceHelp}/></span>
+              {(Object.keys(reviewAudienceLabels) as ReviewAudience[]).map(value => <button key={value} type="button" aria-pressed={audience === value} onClick={() => { setAudience(value); setSelectionFilter(reviewSelectionFilter(selectionFilter, value)); setStudentId("") }} className={cn("h-9 cursor-pointer rounded-full border px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600", audience === value ? "border-blue-300 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600 hover:bg-slate-50")}>{reviewAudienceLabels[value]}</button>)}
+              {studentId && <button type="button" onClick={() => setStudentId("")} aria-label="학생 조건 해제" className="flex h-9 items-center gap-2 rounded-full bg-slate-100 px-3 text-xs">{records.find(r => r.studentId === studentId)?.studentName ?? studentId}<X className="size-3"/></button>}
+            </div>
+            <FilterMenu label="피드백 상태" className="w-full sm:w-[260px]" value={status} onValueChange={setStatus} disabled={statusLocked} options={[{value:"all",label:"전체"},{value:"작성전",label:"피드백 작성 전"},{value:"작성완료",label:"피드백 작성 완료"},{value:"전송완료",label:"피드백 전송 완료"}]} />
+            {showPro && <FilterMenu label="피드백 대상" className="w-full sm:w-[280px]" value={selectionFilter} onValueChange={value => { const next = reviewSelectionFilter(value, audience); setSelectionFilter(next); setStatus(reviewStatusForSelection(status, next)) }} options={reviewSelectionFilterOptions} />}
+            {showPro && <Button asChild variant="outline" className="ml-auto h-9 border-blue-300 bg-blue-50 text-[13px] text-blue-700 shadow-none hover:bg-blue-100 hover:text-blue-700"><Link href={originReturn || "/agency/pro-management"}>주간 관리 현황</Link></Button>}
           </div>
-          <Link className="text-xs font-medium text-blue-600 hover:underline" href="/agency/pro-management">프로 주간 관리 현황 →</Link>
-        </div>
-        <div className="grid gap-x-8 gap-y-4 md:grid-cols-3">
-          <FilterMenu label="책읽기 레벨" value={level} onValueChange={setLevel} options={[{value:"all",label:"전체"},...[1,2,3,4,5,6].map(i=>({value:String(i),label:`${i}레벨`}))]} />
-          <FilterMenu label="차수" value={writingFilter} onValueChange={setWritingFilter} options={writingFilterOptions} />
-          <FilterMenu label="피드백 상태" value={status} onValueChange={setStatus} options={[{value:"all",label:"전체"},{value:"작성전",label:"피드백 작성 전"},{value:"작성완료",label:"피드백 작성 완료"},{value:"전송완료",label:"피드백 전송 완료"}]} />
-          <FilterMenu label="AI 잔여 횟수" value={aiRemaining} onValueChange={setAiRemaining} options={[{value:"all",label:"전체"},{value:"0",label:"0회 남음"},{value:"1",label:"1회 남음"},{value:"2",label:"2회 남음"}]} />
-          <FilterMenu label="평가 보고서" value={reportFilter} onValueChange={setReportFilter} options={reportFilterOptions} />
-          <FilterMenu label="섬초롱꽃" value={flower} onValueChange={setFlower} options={[{value:"all",label:"전체"},{value:"0",label:"미지급"},...[5,10,15,20].map(i=>({value:String(i),label:`${i}개 지급`}))]} />
-        </div>
-        <form className="mt-4 flex flex-wrap items-center gap-2" onSubmit={event=>{event.preventDefault();setQuery(keyword)}}><label htmlFor="review-search" className="mr-1 w-24 text-right text-[13px]">검색</label><Input id="review-search" value={keyword} onChange={e=>setKeyword(e.target.value)} placeholder="학생명 또는 도서명 검색" className="h-8 max-w-72 rounded text-sm shadow-none" /><div className="ml-auto flex gap-2"><Button type="button" variant="outline" onClick={reset} className="h-8 rounded"><RefreshCw size={14}/>초기화</Button><Button type="submit" className="h-8 rounded bg-[#1890ff] text-white"><Search size={14}/>검색</Button></div></form>
+          {filterOpen && <div id="review-search-details" className="mt-4 grid gap-x-5 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+              <FilterMenu label="책읽기 레벨" value={level} onValueChange={setLevel} options={[{value:"all",label:"전체"},...[1,2,3,4,5,6].map(i=>({value:String(i),label:`${i}레벨`}))]} />
+              <FilterMenu label="차수" value={writingFilter} onValueChange={setWritingFilter} options={writingFilterOptions} />
+              <FilterMenu label="AI 잔여 횟수" value={aiRemaining} onValueChange={setAiRemaining} options={[{value:"all",label:"전체"},{value:"0",label:"0회 남음"},{value:"1",label:"1회 남음"},{value:"2",label:"2회 남음"}]} />
+              <FilterMenu label="평가 보고서" value={reportFilter} onValueChange={setReportFilter} options={reportFilterOptions} />
+              <FilterMenu label="섬초롱꽃" value={flower} onValueChange={setFlower} options={[{value:"all",label:"전체"},{value:"0",label:"미지급"},...[5,10,15,20].map(i=>({value:String(i),label:`${i}개 지급`}))]} />
+          </div>}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+              {filterOpen && <div className="flex w-full min-w-0 items-center gap-2.5 sm:max-w-md"><label htmlFor="review-search" className="shrink-0 text-[13px] font-medium text-slate-600">검색</label><Input id="review-search" value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="학생명 또는 도서명 검색" className="h-9 rounded-md border-slate-200 text-[13px] shadow-none" /></div>}
+              <div className="ml-auto flex items-center gap-1.5">
+                <Button type="button" variant="ghost" onClick={reset} className="h-9 text-[13px] text-slate-600"><RefreshCw size={14}/>초기화</Button>
+                <Button type="submit" className="h-9 bg-blue-600 px-5 text-[13px] text-white hover:bg-blue-700"><Search size={14}/>검색</Button>
+                <Button type="button" variant="ghost" aria-expanded={filterOpen} aria-controls={filterOpen ? "review-search-details" : undefined} onClick={toggleFilters} className="h-9 text-[13px] text-slate-600">{filterOpen ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}{filterOpen ? "접기" : "펼치기"}</Button>
+              </div>
+          </div>
+        </form>
       </section>
       {notice && <div role="status" className="border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">{notice}</div>}
 
       <section id="agency-review-table" className="min-h-[700px] bg-white px-3 pt-4">
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
-          <h2 className="text-lg font-semibold text-slate-800">온라인 독후감 목록</h2>
+          <h2 className="text-lg font-semibold text-slate-800">온라인 독후감 목록 <span className="text-sm font-normal">{filteredRecords.length}건</span></h2>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button variant="outline" disabled={!selectedIds.length} onClick={() => setActionDialog({ kind: "bulk", action: "ai" })} className={bulkClass}><Bot className="size-4" />일괄 AI 피드백 생성 ({selectedIds.length})</Button>
-            <Button variant="outline" disabled={!selectedIds.length} onClick={() => setActionDialog({ kind: "bulk", action: "send" })} className={bulkClass}><Send className="size-4" />일괄 학생 전송</Button>
-            <Button variant="outline" disabled={!selectedIds.length} onClick={() => setActionDialog({ kind: "bulk", action: "parent" })} className={bulkClass}><Mail className="size-4" />일괄 학부모 발송</Button>
-            <Button variant="outline" disabled={!selectedFlowerEligibleCount} onClick={() => { setSelectedFlower(null); setActionDialog({ kind: "bulk", action: "flower" }) }} className={bulkClass}><Flower2 className="size-4" />일괄 섬초롱꽃 지급 ({selectedFlowerEligibleCount})</Button>
+            <Button variant="outline" disabled={busy || !eligibleCount("ai")} onClick={() => setActionDialog({ kind: "bulk", action: "ai" })} className={bulkClass}><Bot className="size-4" />일괄 AI 피드백 생성 ({eligibleCount("ai")})</Button>
+            <Button variant="outline" disabled={busy || !eligibleCount("send")} onClick={() => setActionDialog({ kind: "bulk", action: "send" })} className={bulkClass}><Send className="size-4" />일괄 학생 전송 ({eligibleCount("send")})</Button>
+            <Button variant="outline" disabled={busy || !eligibleCount("parent")} onClick={() => setActionDialog({ kind: "bulk", action: "parent" })} className={bulkClass}><Mail className="size-4" />일괄 학부모 발송 ({eligibleCount("parent")})</Button>
+            <Button variant="outline" disabled={busy || !selectedFlowerEligibleCount} onClick={() => { setSelectedFlower(null); setActionDialog({ kind: "bulk", action: "flower" }) }} className={bulkClass}><Flower2 className="size-4" />일괄 섬초롱꽃 지급 ({selectedFlowerEligibleCount})</Button>
             <button type="button" aria-label="목록 검색" onClick={() => setQuery(keyword)} className="grid size-9 place-items-center rounded-full bg-blue-600 text-white"><Search className="size-4" /></button>
             <button type="button" aria-label="목록 새로고침" onClick={() => setRefreshKey(k => k + 1)} className="grid size-9 place-items-center rounded-full border border-slate-200 text-slate-500"><RefreshCw className="size-4" /></button>
-            <ReviewListTools tableId="agency-review-table" columns={["선택","고유번호","학생 이름","레벨","도서명","학생 제출일","피드백 작성일","차수","진행 상황","관리 주차","피드백 대상","처리 기한","피드백 상태","학부모 발송 여부","피드백 전송","학부모 발송","평가 보고서","섬초롱꽃","피드백 작성 (AI 잔여횟수)"]} />
+            <ReviewListTools tableId="agency-review-table" columns={columns} legacyColumns={legacyAgencyReviewColumns} />
           </div>
         </div>
 
         <div className="min-h-[610px] overflow-auto border border-slate-200">
-          <Table className="min-w-[1640px] whitespace-nowrap text-[11px] 2xl:text-[13px]">
+          <Table className={cn("whitespace-nowrap text-[11px] 2xl:text-[13px]", showPro ? "min-w-[1640px]" : "min-w-[1340px]")}>
             <TableHeader className="bg-[#fafafa]">
               <TableRow className="h-14 hover:bg-transparent">
                 <TableHead className="text-center"><Checkbox aria-label="모든 항목 선택" checked={allSelected} onCheckedChange={(checked) => setSelectedIds(checked ? pageRecords.map((record) => record.id) : [])} /></TableHead>
@@ -420,12 +468,14 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
                 <TableHead className="text-center font-semibold">레벨</TableHead>
                 <TableHead className="text-center font-semibold">도서명</TableHead>
                 <TableHead className="text-center"><button type="button" onClick={() => toggleSort("submittedAt")} className="font-semibold">학생 제출일 <span className="text-slate-300">◆</span></button></TableHead>
+                {showPro && <>
+                  <TableHead className="text-center font-semibold text-blue-700">관리 주차</TableHead>
+                  <TableHead className="text-center font-semibold text-blue-700"><span className="inline-flex items-center gap-1">피드백 대상 <ProHelp label="피드백 대상 안내" lines={reviewSelectionHelp} /></span></TableHead>
+                  <TableHead className="text-center font-semibold text-blue-700">처리 기한</TableHead>
+                </>}
                 <TableHead className="text-center font-semibold">피드백 작성일</TableHead>
                 <TableHead className="text-center font-semibold">차수</TableHead>
                 <TableHead className="text-center font-semibold">진행 상황</TableHead>
-                <TableHead className="border-l border-blue-100 bg-blue-50/70 text-center font-semibold text-blue-700">관리 주차</TableHead>
-                <TableHead className="bg-blue-50/70 text-center font-semibold text-blue-700">피드백 대상</TableHead>
-                <TableHead className="border-r border-blue-100 bg-blue-50/70 text-center font-semibold text-blue-700">처리 기한</TableHead>
                 <TableHead className="text-center font-semibold">피드백 상태</TableHead>
                 <TableHead className="text-center font-semibold">학부모 발송 여부</TableHead>
                 <TableHead className="text-center font-semibold">피드백 전송</TableHead>
@@ -447,22 +497,24 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
                   <TableCell className="text-center">{record.level}</TableCell>
                   <TableCell className="truncate text-center" title={record.bookTitle}>{record.bookTitle}</TableCell>
                   <TableCell className="text-center">{record.submittedAt}</TableCell>
+                  {showPro && <>
+                    <TableCell className="text-center">{record.pro?.period ?? "-"}</TableCell>
+                    <TableCell className="text-center">{record.pro?.selection ?? "-"}</TableCell>
+                    <TableCell className="text-center">{record.pro?.due ?? "-"}{record.pro?.overdue && <span className="ml-1.5"><ProBadge tone="red">지연</ProBadge></span>}</TableCell>
+                  </>}
                   <TableCell className="text-center">{record.feedbackAt ?? ""}</TableCell>
                   <TableCell className="text-center font-semibold text-slate-600">{writingInfo(record)}</TableCell>
                   <TableCell className="text-center">{progressInfo(record)}</TableCell>
-                  <TableCell className="border-l border-blue-100 bg-blue-50/25 text-center text-[13px]">{record.pro?.period ?? "-"}</TableCell>
-                  <TableCell className="bg-blue-50/25 text-center">{record.pro ? <ProBadge tone={record.pro.selection === "자동 선정 예정" ? "slate" : record.pro.selected ? record.writingRound === 2 ? "green" : "blue" : "slate"}>{record.pro.selection}</ProBadge> : "-"}</TableCell>
-                  <TableCell className="border-r border-blue-100 bg-blue-50/25 text-center text-[13px]">{record.pro?.due ?? "-"}</TableCell>
                   <TableCell className="text-center">{record.pro && !record.pro.selected ? "-" : statusText[record.status]}</TableCell>
                   <TableCell className="text-center">{record.pro ? record.pro.selected ? record.pro.parentLabel : "-" : record.parentSent ? "발송완료" : "미발송"}</TableCell>
                   <TableCell className="text-center">{record.pro && !record.pro.selected ? "-" : record.status === "전송완료" ? <Check className="mx-auto size-4 text-emerald-500" aria-label="학생 전송 완료" /> : <button type="button" aria-label={`${record.studentName} 학생에게 전송`} disabled={record.status !== "작성완료"} onClick={() => setActionDialog({ kind: "single-send", record })} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300"><Send className="size-4" /></button>}</TableCell>
                   <TableCell className="text-center">{record.pro ? record.pro.selected ? "자동 발송" : "-" : record.parentSent ? <Check className="mx-auto size-4 text-emerald-500" aria-label="학부모 발송 완료" /> : <button type="button" aria-label={`${record.studentName} 학부모 발송`} title={record.parentContactRegistered === false ? "학부모 연락처가 등록되어 있지 않습니다." : undefined} disabled={record.status !== "전송완료" || record.parentContactRegistered === false} onClick={() => setActionDialog({ kind: "parent", record })} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300"><Mail className="size-4" /></button>}</TableCell>
                   <TableCell className="text-center"><ReportCell record={record} role={role} /></TableCell>
                   <TableCell className="text-center">{record.flowers ? <span>🌻&nbsp; {record.flowers}개</span> : "-"}</TableCell>
-                  <TableCell className="text-center"><FeedbackAction record={record} role={role} /></TableCell>
+                  <TableCell className="text-center"><FeedbackAction record={record} role={role} returnTo={listUrl} /></TableCell>
                 </TableRow>
               ))}
-              {!filteredRecords.length && <TableRow><TableCell colSpan={19} className="h-40 text-center text-slate-400">조건에 맞는 온라인 독후감이 없습니다.</TableCell></TableRow>}
+              {!filteredRecords.length && <TableRow><TableCell colSpan={columns.length} className="h-40 text-center text-slate-400">조건에 맞는 온라인 독후감이 없습니다.</TableCell></TableRow>}
             </TableBody>
           </Table>
         </div>
@@ -473,16 +525,16 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
         </div>
       </section>
 
-      {actionDialog?.kind === "single-send" && <AlertDialog title="학생 전송" confirmLabel="전송하기" message={<p>{actionDialog.record.pro && actionDialog.record.writingRound === 1 && actionDialog.record.secondDecision === "complete" ? PRO_SEND_CONFIRM : `${actionDialog.record.studentName} 학생에게 피드백을 전송할까요? 전송 후에는 수정할 수 없습니다.`}</p>} onClose={() => setActionDialog(null)} onConfirm={() => void sendSingleFeedback(actionDialog.record)} />}
-      {actionDialog?.kind === "parent" && <AlertDialog title="학부모 발송" message={<p>{actionDialog.record.studentName} 학부모에게 발송하시겠습니까?</p>} onClose={() => setActionDialog(null)} onConfirm={confirmSingleParentSend} />}
+      {actionDialog?.kind === "single-send" && <AlertDialog busy={busy} title="학생 전송" confirmLabel="전송하기" message={<p>{actionDialog.record.pro && actionDialog.record.writingRound === 1 && actionDialog.record.secondDecision === "complete" ? PRO_SEND_CONFIRM : `${actionDialog.record.studentName} 학생에게 피드백을 전송할까요? 전송 후에는 수정할 수 없습니다.`}</p>} onClose={() => { if (!busy) setActionDialog(null) }} onConfirm={() => void sendSingleFeedback(actionDialog.record)} />}
+      {actionDialog?.kind === "parent" && <AlertDialog busy={busy} title="학부모 발송" message={<p>{actionDialog.record.studentName} 학부모에게 발송하시겠습니까?</p>} onClose={() => { if (!busy) setActionDialog(null) }} onConfirm={confirmSingleParentSend} />}
 
-      {actionDialog?.kind === "bulk" && actionDialog.action === "ai" && <AlertDialog title="AI 피드백 생성 실행" message={<><p>선택한 <strong>{selectedIds.length}</strong>개의 독후감에 AI 피드백 생성을 실행하시겠어요?</p><p>각 독후감의 AI 피드백 생성 가능 횟수에서 성공한 경우에만 1회씩 차감됩니다.</p><p>항목별보기는 총평과 항목별 피드백을, 이어보기는 총평만 생성합니다. 평가 보고서 제공 독후감은 평가 점수와 보고서용 총평도 생성합니다.</p><p>생성된 내용은 상세 화면에서 확인·수정한 후 저장해 주세요.</p></>} onClose={() => setActionDialog(null)} onConfirm={confirmBulkAction} />}
+      {actionDialog?.kind === "bulk" && actionDialog.action === "ai" && <AlertDialog busy={busy} title="AI 피드백 생성 실행" message={<><p>선택한 <strong>{selectedIds.length}</strong>개의 독후감에 AI 피드백 생성을 실행하시겠어요?</p><p>각 독후감의 AI 피드백 생성 가능 횟수에서 성공한 경우에만 1회씩 차감됩니다.</p><p>항목별보기는 총평과 항목별 피드백을, 이어보기는 총평만 생성합니다. 평가 보고서 제공 독후감은 평가 점수와 보고서용 총평도 생성합니다.</p><p>생성된 내용은 상세 화면에서 확인·수정한 후 저장해 주세요.</p></>} onClose={() => { if (!busy) setActionDialog(null) }} onConfirm={confirmBulkAction} />}
 
-      {actionDialog?.kind === "bulk" && actionDialog.action === "send" && <AlertDialog title="일괄 학생 전송" confirmLabel="전송하기" message={<><p>선택한 {selectedIds.length}개의 피드백을 학생에게 전송하시겠습니까?</p>{selectedRecords.some(r => r.pro?.selected && r.status === "작성완료" && r.writingRound === 1 && r.secondDecision === "complete") && <p className="mt-3">{PRO_BULK_SEND_CONFIRM}</p>}</>} onClose={() => setActionDialog(null)} onConfirm={confirmBulkAction} />}
+      {actionDialog?.kind === "bulk" && actionDialog.action === "send" && <AlertDialog busy={busy} title="일괄 학생 전송" confirmLabel="전송하기" message={<><p>선택 {selectedIds.length}건 중 전송 가능한 {eligibleCount("send")}건을 학생에게 전송하시겠습니까? {selectedIds.length - eligibleCount("send")}건은 조건에 맞지 않아 제외됩니다.</p>{selectedRecords.some(r => r.pro?.selected && r.status === "작성완료" && r.writingRound === 1 && r.secondDecision === "complete") && <p className="mt-3">{PRO_BULK_SEND_CONFIRM}</p>}</>} onClose={() => { if (!busy) setActionDialog(null) }} onConfirm={confirmBulkAction} />}
 
-      {actionDialog?.kind === "bulk" && actionDialog.action === "parent" && <AlertDialog title="일괄 학부모 발송" message={<p>선택한 {selectedIds.length}개의 항목에 대해 학부모에게 발송하시겠습니까?</p>} onClose={() => setActionDialog(null)} onConfirm={confirmBulkAction} />}
+      {actionDialog?.kind === "bulk" && actionDialog.action === "parent" && <AlertDialog busy={busy} title="일괄 학부모 발송" message={<p>선택한 {selectedIds.length}개의 항목에 대해 학부모에게 발송하시겠습니까?</p>} onClose={() => { if (!busy) setActionDialog(null) }} onConfirm={confirmBulkAction} />}
 
-      {actionDialog?.kind === "bulk" && actionDialog.action === "flower" && <FlowerDialog count={selectedIds.length} selectedFlower={selectedFlower} onSelect={setSelectedFlower} onClose={() => { setActionDialog(null); setSelectedFlower(null) }} onConfirm={confirmBulkAction} />}
+      {actionDialog?.kind === "bulk" && actionDialog.action === "flower" && <FlowerDialog busy={busy} count={selectedIds.length} selectedFlower={selectedFlower} onSelect={setSelectedFlower} onClose={() => { if (!busy) { setActionDialog(null); setSelectedFlower(null) } }} onConfirm={confirmBulkAction} />}
     </div>
   )
 }

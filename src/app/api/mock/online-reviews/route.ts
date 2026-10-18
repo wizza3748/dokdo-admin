@@ -6,6 +6,8 @@ import { applyManagedReviewCommand } from "@/lib/pro-domain"
 import { updateReviewState, reviewActor, visibleReviewState } from "@/lib/review-server"
 export const runtime = "nodejs"
 export async function GET(request: Request) {
+  // Public results require an authenticated encrypted share token, not a guessed record ID.
+  if (new URL(request.url).searchParams.get("role") === "external") return NextResponse.json({version:1,reviews:[],records:[]},{status:403,headers:{"Cache-Control":"no-store"}})
   try {
     let serverNow = ""
     const db = await prototypeStore.update<ReviewDatabase>("online-reviews", getDefaultReviewDatabase, state => {

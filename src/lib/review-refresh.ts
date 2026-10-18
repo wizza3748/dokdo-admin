@@ -1,6 +1,7 @@
 "use client"
 
-import { ReviewReadCache } from "@/lib/review-read-cache"
+// @ts-expect-error Node regression tests load TypeScript sources directly.
+import { ReviewReadCache } from "./review-read-cache.ts"
 
 export const reviewReads = new ReviewReadCache()
 export const REVIEW_REFRESH_INTERVAL = 60_000

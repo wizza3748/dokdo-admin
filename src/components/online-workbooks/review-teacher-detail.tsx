@@ -1,17 +1,22 @@
 "use client"
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { PRO_SEND_CONFIRM, proUsage } from "@/lib/pro-domain"
-import { dateLabel, weekLabel, weekStart } from "@/lib/pro-calendar"
-import { caseParentLabel, selectionLabels } from "@/lib/pro-selectors"
+import { PRO_SEND_CONFIRM, proDesignationIssue, proDesignationPreview, type ProDesignationPreview } from "@/lib/pro-domain"
+import { dateLabel, weekLabel } from "@/lib/pro-calendar"
+import { caseParentLabel, proCaseStatus, selectionLabels } from "@/lib/pro-selectors"
+import { safeAgencyReturn } from "@/lib/review-navigation"
+import { reviewDesignationCopy, reviewManagementSelectionHelp, reviewManagementStatusPresentation, reviewManagementWeekLabel, reviewSelectionLabel } from "@/lib/review-list-presentation"
+import { weeklyDate } from "@/lib/pro-weekly-presentation"
+import { proStudentDeadline } from "@/lib/student-pro-presentation"
 import { commandPro } from "@/lib/pro-client"
-import { ExternalBadge } from "@/components/pro-management/pro-common"
+import { ExternalBadge, ProBadge } from "@/components/pro-management/pro-common"
+import { ProHelp } from "@/components/pro-management/pro-help"
 import { ArrowLeft, BookOpen, Bot, CheckCircle2, ChevronDown, FileText, GripVertical, Info, PencilLine } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { useReviews, type ReviewRole } from "@/lib/review-client"
+import { readReviews, useReviews, type ReviewRole } from "@/lib/review-client"
 import { reviewAiDialogCopy } from "@/lib/review-ai-dialog"
 import { canAwardReview, canRejectReview, canSendReview, reviewFeedbackItems, reviewIncludesItemFeedback, plainReviewText, reportState, scoreLabel, validAiScores, validItemFeedback, validScores, type ItemFeedback, type ReviewCommon, type ReviewRecord, type ReviewScores } from "@/lib/review-domain"
 import { previewReviewAi } from "@/lib/review-ai-preview"
@@ -19,6 +24,7 @@ import { ReviewAssessment } from "./review-assessment"
 import { TeacherReferencePanel } from "./teacher-reference-panel"
 import { TeacherStudentWriting } from "./teacher-student-writing"
 import { ItemReference, ReviewDialog, ReviewEditor, ReviewText } from "./review-ui"
+import { ReviewDesignationDetails } from "./review-designation-details"
 
 export function ReviewTeacherDetail({ id, role = "agency" }: { id: string; role?: ReviewRole }) {
   const hook = useReviews(role)
@@ -32,13 +38,22 @@ export function ReviewTeacherDetail({ id, role = "agency" }: { id: string; role?
 function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; record: ReviewRecord; hook: ReturnType<typeof useReviews>; role: ReviewRole }) {
   const router = useRouter()
   const [returnTo, setReturnTo] = React.useState("")
-  React.useEffect(() => { const url = new URLSearchParams(window.location.search).get("returnTo"); if (url?.startsWith("/agency/pro-management")) setReturnTo(url) }, [])
+  React.useEffect(() => { setReturnTo(safeAgencyReturn(new URLSearchParams(window.location.search).get("returnTo"), "")) }, [])
   const listUrl = returnTo || (role === "admin" ? "/admin/online-workbooks" : `/agency/online-workbooks?role=${role}`)
   const proMember = hook.db.pro?.members.find(m => m.id === common.studentId)
   const proCase = hook.db.pro?.cases.find(c => c.reviewId === common.id)
   const isPro = proMember?.product === "pro" || !!proCase
-  const [designateAction, setDesignateAction] = React.useState<"ai" | "save" | null>(null)
-  const canDesignate = !!proCase && !proCase.selectedAt && proCase.week === weekStart(hook.db.pro!.clock) && proUsage(hook.db.pro!, proMember!, hook.db.pro!.clock).available > 0
+  const managementWeekLabel = role === "admin" ? weekLabel : reviewManagementWeekLabel
+  const managementDueLabel = role === "admin" ? dateLabel : weeklyDate
+  const managementPeriod = proCase ? managementWeekLabel(record.round === 2 && proCase.secondWeek ? proCase.secondWeek : proCase.week) : "배정 대기"
+  const managementStatus = proCase ? proCaseStatus(hook.db, proCase) : "매칭 기관 배정 전"
+  const managementStatusDisplay = reviewManagementStatusPresentation(managementStatus)
+  const managementSelection = proCase?.selectedAt ? (role === "admin" && proCase.selection ? selectionLabels[proCase.selection] : reviewSelectionLabel(proCase.selection)) : "미선정"
+  const managementDue = proCase?.selectedAt ? managementDueLabel(record.round === 2 ? proCase.secondDue : proCase.due) : "-"
+  const secondSubmissionDeadline = proCase?.secondDeadline && (role === "admin" ? dateLabel(proCase.secondDeadline) : proStudentDeadline(proCase.secondDeadline, hook.db.pro!.clock))
+  const [designation, setDesignation] = React.useState<(ProDesignationPreview & { action: "ai" | "save" }) | null>(null)
+  const designationIssue = proDesignationIssue(hook.db, common.id)
+  const canDesignate = !designationIssue
   const secondRejectExpired = record.round === 2 && !!proCase?.secondDeadline && hook.db.pro!.clock >= proCase.secondDeadline
   const leave = () => !locked && dirty ? setModal("leave") : router.push(listUrl)
   const [feedback, setFeedback] = React.useState(record.aiDraft?.feedback ?? record.feedback)
@@ -65,6 +80,7 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
   const [assessmentOpen, setAssessmentOpen] = React.useState(false)
   const [amount, setAmount] = React.useState<number | null>(null)
   const [busy, setBusy] = React.useState(false)
+  const pendingAction = React.useRef(false)
   const [notice, setNotice] = React.useState("")
   const dragged = React.useRef<number | null>(null)
   const locked = role === "admin" || record.feedbackStatus === "전송완료" || record.writingStatus !== "submitted"
@@ -74,9 +90,21 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
   const dirty = feedback !== record.feedback || (common.reportEnabled && reportFeedback !== (record.reportFeedback ?? "")) || JSON.stringify(items) !== JSON.stringify(record.itemFeedback) || JSON.stringify(scores) !== JSON.stringify(record.teacherScores ?? {}) || (record.round === 1 && decision !== (common.secondDecision ?? ""))
   const valid = plainReviewText(feedback).length >= 10 && validItemFeedback(items) && (record.round === 2 || !!decision) && (!common.reportEnabled || (plainReviewText(reportFeedback).length >= 10 && validScores(common.level, scores, record) && validAiScores(common.level, record.aiScores, record)))
   React.useEffect(() => { const handler = (e: BeforeUnloadEvent) => { if (!locked && dirty) { e.preventDefault(); e.returnValue = "" } }; window.addEventListener("beforeunload", handler); return () => window.removeEventListener("beforeunload", handler) }, [dirty, locked])
+  const requestDesignation = async (action: "ai" | "save") => {
+    if (pendingAction.current || locked) return
+    pendingAction.current = true; setBusy(true); setAiDialogOpen(false)
+    try {
+      const db = await readReviews(role, undefined, { fresh: true })
+      const preview = role !== "agency" ? { issue: "기관관리자만 피드백 대상을 지정할 수 있습니다." } : proDesignationPreview(db, common.id)
+      setDesignation({ action, ...preview })
+    } catch { setDesignation({ action, issue: "지정 가능 여부를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요." }) }
+    finally { pendingAction.current = false; setBusy(false) }
+  }
   const generate = async (proDesignate = false) => {
-    if (isPro && !proCase?.selectedAt && !proDesignate) { setAiDialogOpen(false); setDesignateAction("ai"); return }
+    if (pendingAction.current) return
+    if (isPro && !proCase?.selectedAt && !proDesignate) { await requestDesignation("ai"); return }
     if (busy || locked || record.aiUsed >= 2) return
+    pendingAction.current = true
     setAiDialogOpen(false); setBusy(true)
     const requestId = crypto.randomUUID()
     const started = await hook.run({ type: "ai-start", recordId: record.id, proDesignate }, requestId)
@@ -103,29 +131,31 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
       else if (updated?.aiHistory.at(-1)?.reason?.startsWith("채점 불가:")) setNotice(`AI ${updated.aiHistory.at(-1)!.reason} 사용 횟수는 차감되지 않았습니다. 다시 생성해 주세요.`)
       else setNotice("AI 생성 실패: 기존 입력과 점수, 성공 횟수를 유지했습니다.")
     }
-    setBusy(false)
+    pendingAction.current = false; setBusy(false)
   }
   const save = async (proDesignate = false) => {
-    if (isPro && !proCase?.selectedAt && !proDesignate) { setDesignateAction("save"); return }
-    setBusy(true)
+    if (pendingAction.current || locked) return
+    if (isPro && !proCase?.selectedAt && !proDesignate) { await requestDesignation("save"); return }
+    pendingAction.current = true; setBusy(true)
     if (await hook.run({ type: "save-feedback", recordId: record.id, proDesignate, feedback, reportFeedback: common.reportEnabled ? reportFeedback : undefined, items, scores, decision: decision === "request" || decision === "complete" ? decision : undefined })) setNotice("피드백과 평가가 저장되었습니다.")
-    setBusy(false)
+    pendingAction.current = false; setBusy(false)
   }
   const requestAi = () => {
     if (locked || busy) return
+    if (isPro && !proCase?.selectedAt && designationIssue) { void requestDesignation("ai"); return }
     setAiDialogOpen(true)
   }
   const confirm = async () => {
-    if (!modal) return
+    if (!modal || pendingAction.current) return
     if (modal === "leave") { router.push(listUrl); return }
-    setBusy(true)
+    pendingAction.current = true; setBusy(true)
     const result = modal === "flower" ? await hook.run({ type: "flower", recordId: record.id, amount: amount! }) : await hook.run({ type: modal, recordId: record.id })
     if (result) { setNotice("처리되었습니다."); setModal(null); if (modal === "reject") router.push(listUrl) }
-    setBusy(false)
+    pendingAction.current = false; setBusy(false)
   }
   const controlClass = "h-8 rounded-[8px] px-[15px] text-sm font-normal shadow-none disabled:border-[#e4e4e7] disabled:bg-[#323639]/[0.04] disabled:text-[#323639]/25 disabled:opacity-100"
   const previewClass = controlClass + " border-[#1890ff] text-[#1890ff] hover:bg-[#e6f7ff] hover:text-[#1890ff]"
-  const parentPreview = record.feedbackStatus === "전송완료" && record.parentContact && <Button asChild variant="outline" className={previewClass}><a href={`/online-review/share/${record.id}`} target="_blank" rel="noopener noreferrer">학부모 발송 미리보기</a></Button>
+  const parentPreview = record.feedbackStatus === "전송완료" && record.parentContact && <Button asChild variant="outline" className={previewClass}><a href={`/online-review/share/${record.id}?role=${role}`} target="_blank" rel="noopener noreferrer">학부모 발송 미리보기</a></Button>
   const reportLink = common.reportEnabled && record.report && <a href={`/online-review/report/${record.id}?role=${role}`} target="_blank" rel="noopener noreferrer" aria-label={`${record.round}차 보고서 보기`} title={`${record.round}차 보고서 보기`} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 focus-visible:outline-2 focus-visible:outline-[#1890ff]"><FileText aria-hidden="true" className="size-4" /></a>
   const toggleExpandedItem = (itemId: string) => setExpandedItemIds(current => {
     const next = new Set(current)
@@ -142,19 +172,47 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
         <div className="overflow-x-auto">
           <table aria-label="학생 및 독후감 정보" className="w-full min-w-[1060px] border-collapse text-left text-sm [&_th]:border-r [&_th]:border-[#e8e8e8] [&_th]:bg-[#fafafa] [&_th]:px-2 [&_th]:py-3 [&_th]:font-medium [&_td]:border-r [&_td]:border-t [&_td]:border-[#e8e8e8] [&_td]:px-2 [&_td]:py-3">
             <thead><tr>{["학생명", "도서명(레벨)", "전자책", "길라잡이", "학생 제출일", "차수", "피드백 상태", "학부모 발송 여부", "평가 보고서", "섬초롱꽃"].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
-            <tbody><tr><td>{common.studentName}{proMember?.external && <ExternalBadge/>}</td><td>{common.bookTitle} ({common.level}레벨)</td><td className="text-center"><span title="이 작성글에는 전자책 열람 URL이 연결되어 있지 않습니다." className="inline-flex text-[#bfbfbf]"><BookOpen aria-label="전자책 연결 정보 없음" className="size-5" /></span></td><td className="text-center"><span title="길라잡이 연결 정보 없음">-</span></td><td>{record.submittedAt?.slice(0, 10) ?? "-"}</td><td className="whitespace-nowrap font-semibold text-[#0877b9]">{record.round}차</td><td><span className="whitespace-nowrap rounded bg-[#8c8c8c] px-2 py-1 text-xs text-white">피드백 {record.feedbackStatus}</span></td><td><span className="whitespace-nowrap rounded bg-[#8c8c8c] px-2 py-1 text-xs text-white">{record.parentSentAt ? "발송완료" : "미발송"}</span></td><td className="whitespace-nowrap">{common.reportEnabled ? (reportLink || reportState(common, record)) : <Popover><PopoverTrigger asChild><button type="button" className="inline-flex items-center gap-1 font-medium text-[#263747] hover:text-[#1890ff]">없음<Info className="size-3.5" /></button></PopoverTrigger><PopoverContent align="start" className="w-80 text-sm leading-6 text-[#596773]">학생이 선택한 독후감 템플릿은 평가 보고서를 제공하지 않습니다. 점수 평가 없이 {includeItemFeedback ? "[학생용] 총평과 항목별 피드백" : "[학생용] 총평"}을 작성해 주세요.</PopoverContent></Popover>}</td><td className="whitespace-nowrap">🌻 {record.flowers}개</td></tr></tbody>
+            <tbody><tr><td>{common.studentName}{proMember?.external && <ExternalBadge/>}</td><td>{common.bookTitle} ({common.level}레벨)</td><td className="text-center"><span title="이 작성글에는 전자책 열람 URL이 연결되어 있지 않습니다." className="inline-flex text-[#bfbfbf]"><BookOpen aria-label="전자책 연결 정보 없음" className="size-5" /></span></td><td className="text-center"><span title="길라잡이 연결 정보 없음">-</span></td><td>{record.submittedAt?.slice(0, 10) ?? "-"}</td><td className="whitespace-nowrap font-semibold text-[#0877b9]">{record.round}차</td><td><span className="whitespace-nowrap rounded bg-[#8c8c8c] px-2 py-1 text-xs text-white">{isPro && !proCase?.selectedAt ? "-" : `피드백 ${record.feedbackStatus}`}</span></td><td><span className="whitespace-nowrap rounded bg-[#8c8c8c] px-2 py-1 text-xs text-white">{isPro ? caseParentLabel(proCase) : record.parentSentAt ? "발송완료" : "미발송"}</span></td><td className="whitespace-nowrap">{common.reportEnabled ? (reportLink || reportState(common, record)) : <Popover><PopoverTrigger asChild><button type="button" className="inline-flex items-center gap-1 font-medium text-[#263747] hover:text-[#1890ff]">없음<Info className="size-3.5" /></button></PopoverTrigger><PopoverContent align="start" className="w-80 text-sm leading-6 text-[#596773]">학생이 선택한 독후감 템플릿은 평가 보고서를 제공하지 않습니다. 점수 평가 없이 {includeItemFeedback ? "[학생용] 총평과 항목별 피드백" : "[학생용] 총평"}을 작성해 주세요.</PopoverContent></Popover>}</td><td className="whitespace-nowrap">🌻 {record.flowers}개</td></tr></tbody>
           </table>
         </div>
       </div>
     </header>
-    {isPro && <section className="mx-5 mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm"><strong>프로 관리 · {proCase ? weekLabel(proCase.week) : "배정 대기"}</strong><p>{proCase?.selection ? selectionLabels[proCase.selection] : "미선정"} · 처리 기한 {dateLabel(record.round === 2 ? proCase?.secondDue : proCase?.due)} · {caseParentLabel(proCase)}</p>{proCase?.secondDeadline && <p>2차 제출 기한 {dateLabel(proCase.secondDeadline)} · 실제 제출 {record.round === 2 ? dateLabel(record.submittedAt) : "-"}</p>}{secondRejectExpired && <p>기한 안에 제출한 글입니다. 피드백을 작성해 주세요.</p>}{proCase?.closedAt && proCase.parent.status !== "sent" && role === "agency" && <Button variant="outline" size="sm" disabled={busy} onClick={async () => { setBusy(true); try { await commandPro({ type: "retry-parent", reviewId: common.id }); await hook.refresh() } catch (e) { setNotice(String(e)) } finally { setBusy(false) } }}>자동 발송 재시도</Button>}</section>}
+    {isPro && <section aria-label="프로 관리 정보" className="mx-5 mt-4 space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm">
+      {role === "admin" ? <>
+        <div className="flex flex-wrap items-center gap-3"><strong>프로 관리 · {managementPeriod}</strong><span className="rounded bg-white px-2 py-1 font-semibold text-blue-800">{managementStatus}</span></div>
+        <p>{managementSelection} · 처리 기한 {managementDue} · 학부모 {caseParentLabel(proCase)}</p>
+      </> : <div aria-label="프로 관리 항목" className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span className="inline-flex items-center gap-2 whitespace-nowrap"><ProBadge tone="blue" className="bg-blue-700 text-white">프로 관리</ProBadge><strong>{managementPeriod}</strong></span>
+        <span className="inline-flex items-center gap-2 whitespace-nowrap border-l border-blue-200 pl-4">
+          <ProBadge tone="blue" className="bg-blue-100">{managementStatusDisplay.label}</ProBadge>
+          {managementStatusDisplay.overdue && <ProBadge tone="red">지연</ProBadge>}
+          <ProHelp label="관리 상태 안내" lines={managementStatusDisplay.help}/>
+        </span>
+        <span className="inline-flex items-center gap-2 whitespace-nowrap border-l border-blue-200 pl-4">{managementSelection}<ProHelp label="선정 방식 안내" lines={reviewManagementSelectionHelp(managementSelection)}/></span>
+        <span className="whitespace-nowrap border-l border-blue-200 pl-4">처리 기한 {managementDue}</span>
+        <span className="whitespace-nowrap border-l border-blue-200 pl-4">학부모: {caseParentLabel(proCase)}</span>
+        {proCase && record.round === 2 && <>
+          <span className="whitespace-nowrap border-l border-blue-200 pl-4">원래 1차 관리 주차: {managementWeekLabel(proCase.week)}</span>
+          <span className="whitespace-nowrap border-l border-blue-200 pl-4">2차 처리 주차: {proCase.secondWeek ? managementWeekLabel(proCase.secondWeek) : "제출 대기"}</span>
+        </>}
+        {proCase?.secondDeadline && <>
+          <span className="whitespace-nowrap border-l border-blue-200 pl-4">2차 제출 기한 {secondSubmissionDeadline}</span>
+          <span className="whitespace-nowrap border-l border-blue-200 pl-4">실제 제출 {record.round === 2 ? dateLabel(record.submittedAt) : "-"}</span>
+        </>}
+      </div>}
+      {role === "admin" && proCase && record.round === 2 && <p>원래 1차 관리 주차: {managementWeekLabel(proCase.week)} · 2차 처리 주차: {proCase.secondWeek ? managementWeekLabel(proCase.secondWeek) : "제출 대기"}</p>}
+      {!proCase?.selectedAt && <p>{canDesignate ? "피드백 대상으로 지정한 뒤 AI 생성 또는 저장할 수 있습니다. 상세 화면 열람만으로는 선정되지 않습니다." : designationIssue}</p>}
+      {role === "admin" && proCase?.secondDeadline && <p>2차 제출 기한 {secondSubmissionDeadline} · 실제 제출 {record.round === 2 ? dateLabel(record.submittedAt) : "-"}</p>}
+      {secondRejectExpired && !proCase?.closedAt && <p>기한 안에 제출한 글입니다. 피드백을 작성해 주세요.</p>}
+      {proCase?.closedAt && proCase.parent.status !== "sent" && role === "agency" && <Button variant="outline" size="sm" disabled={busy || !record.parentContact} onClick={async () => { setBusy(true); try { await commandPro({ type: "retry-parent", reviewId: common.id }); await hook.refresh() } catch (e) { setNotice(String(e)) } finally { setBusy(false) } }}>자동 발송 재시도</Button>}
+    </section>}
     {(hook.error || notice) && <p role="status" className="mx-4 mt-6 rounded bg-blue-50 p-3">{hook.error || notice}</p>}
     <div className="my-6 grid items-stretch gap-4 px-0 lg:grid-cols-2 lg:px-6">
       <TeacherStudentWriting common={common} record={record} />
       <section className="min-w-0 space-y-4 rounded-lg border border-[#e3e3e3] bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="flex items-center gap-2 text-lg font-semibold"><PencilLine className="size-4" />피드백 작성</h2><div className="flex flex-wrap items-center justify-end gap-2">
           {record.round === 2 && <Button variant="outline" size="sm" aria-expanded={firstReferenceOpen} aria-controls="first-round-reference-panel" className="h-8 rounded border-[#1890ff] px-3 text-xs font-semibold text-[#1890ff] shadow-none hover:bg-[#e6f7ff] hover:text-[#1890ff]" onClick={() => setFirstReferenceOpen(true)}><BookOpen className="size-4" />1차 작성글·피드백 참고</Button>}
-          <Button disabled={locked || busy} size="sm" className="h-8 rounded bg-[#722ed1] px-3 text-xs font-semibold text-white hover:bg-[#9254de]" onClick={requestAi}><Bot className="size-4" />AI 피드백 생성 (사용 {record.aiUsed}/2회)</Button></div></div>
+          <Button disabled={locked || busy || record.aiHistory.some(h => h.status === "running")} size="sm" className="h-8 rounded bg-[#722ed1] px-3 text-xs font-semibold text-white hover:bg-[#9254de]" onClick={requestAi}><Bot className="size-4" />AI 피드백 생성 (사용 {record.aiUsed}/2회)</Button></div></div>
         <section aria-label="피드백 작성 안내" className="rounded-lg border border-[#bae7ff] bg-[#e6f7ff] px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2 font-semibold text-[#1890ff]"><Bot className="size-4" />AI 피드백 생성 안내</div><div className="flex items-center gap-2"><div aria-hidden className="h-1.5 w-16 overflow-hidden rounded-full bg-[#d6eaff]"><span className="block h-full bg-[#1890ff]" style={{ width: `${Math.min(record.aiUsed, 2) * 50}%` }} /></div><span className="text-xs font-semibold text-[#1890ff]">사용 {record.aiUsed}/2회</span></div></div>
           <div className="mt-2 space-y-1 text-sm leading-5 text-[#5f6872]"><p>{includeItemFeedback ? "항목별보기 독후감은 [학생용] 총평과 학생 표시가 켜진 항목별 피드백을 생성합니다." : "이어보기 독후감은 [학생용] 총평만 생성하며, 항목별 피드백은 제공하지 않습니다."} [AI 피드백 생성]을 눌러 주세요.</p>{common.reportEnabled && <p>평가 점수와 [보고서용] 총평도 함께 생성합니다. 선생님 평가 점수는 직접 입력해 주세요.</p>}<p>생성된 내용은 확인·수정한 후 저장해 주세요. {includeItemFeedback ? "각 총평과 학생 표시가 켜진 항목별 피드백은 각각 10자 이상 입력해야 합니다." : "각 총평은 10자 이상 입력해야 합니다."}</p><p>차수별 최대 2회 생성할 수 있으며, 생성 성공 시 1회 차감됩니다. 최초 생성 확인 후에는 학생에게 반려할 수 없습니다.</p></div>
@@ -239,7 +297,7 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
       <div className="flex flex-wrap items-center gap-2"><Button variant="outline" className={controlClass} onClick={leave}>목록</Button>{role !== "admin" && canRejectReview(record) && <Button variant="outline" disabled={busy || secondRejectExpired} className={controlClass + " border-[#ff3860] text-[#ff3860] hover:bg-[#fff1f3] hover:text-[#ff3860]"} onClick={() => setModal("reject")}>반려</Button>}</div>
       {role !== "admin" ? <div className="flex flex-wrap items-center gap-2">
         <Button disabled={!canAwardReview(record) || busy} className={controlClass + " border-[#faad14] bg-[#faad14] text-white hover:bg-[#ffc53d]"} onClick={() => { setAmount(null); setModal("flower") }}>섬초롱꽃 지급</Button>
-        <Button disabled={locked || !valid || !dirty || busy} className={controlClass + " bg-[#1890ff] text-white hover:bg-[#40a9ff]"} onClick={() => void save()}>저장</Button>
+        <Button disabled={locked || !valid || !dirty || busy || record.aiHistory.some(h => h.status === "running")} className={controlClass + " bg-[#1890ff] text-white hover:bg-[#40a9ff]"} onClick={() => void save()}>저장</Button>
         <Button disabled={locked || dirty || !canSendReview(common, record) || busy} className={controlClass + " bg-[#1890ff] text-white hover:bg-[#40a9ff]"} onClick={() => setModal("send")}>학생에게 전송</Button>
         <div className="flex items-center gap-2">
           {!isPro && <Button disabled={record.feedbackStatus !== "전송완료" || !record.parentContact || !!record.parentSentAt || busy} className={controlClass + " border-[#faad14] bg-[#faad14] text-white hover:bg-[#ffc53d]"} onClick={() => setModal("parent")}>학부모 발송</Button>}
@@ -248,9 +306,9 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
       </div> : <div className="flex flex-wrap items-center gap-2">{parentPreview}</div>}
     </footer>
     {record.round === 2 && firstReferenceOpen && <TeacherReferencePanel onClose={closeFirstReference}><FirstRoundReference common={common} record={first} role={role} /></TeacherReferencePanel>}
-    {designateAction && <ReviewDialog title="피드백 대상 지정" confirmLabel="대상으로 지정하고 계속" disabled={busy || !canDesignate} onClose={() => setDesignateAction(null)} onConfirm={() => { const action = designateAction; setDesignateAction(null); if (action === "ai") void generate(true); else void save(true) }}><p>이 글을 피드백 대상으로 지정합니다. 이용 권수는 1차 피드백을 학생에게 전송할 때 1권 차감됩니다.</p>{!canDesignate && <p className="mt-3 text-red-600">현재 관리 주차의 제출글과 남은 신청 권수를 확인해 주세요.</p>}</ReviewDialog>}
-    {aiDialogOpen && <ReviewDialog title={aiDialog.title} onClose={() => setAiDialogOpen(false)} onConfirm={aiDialog.confirmable ? () => void generate() : undefined} disabled={busy}><div className="space-y-2">{aiDialog.lines.map((line, index) => <p key={line} className={aiDialog.kind === "first" && index === 4 ? "border-t border-[#e8ecef] pt-3" : undefined}>{line}</p>)}</div></ReviewDialog>}
-    {modal && <ReviewDialog title={({ send: "학생 전송", parent: "학부모 발송", flower: "섬초롱꽃을 지급할까요?", reject: "학생 반려", leave: "이동 확인" })[modal]} onClose={() => setModal(null)} onConfirm={() => void confirm()} confirmLabel={modal === "reject" ? "반려하기" : modal === "send" && isPro && record.round === 1 && common.secondDecision === "complete" ? "전송하기" : "확인"} disabled={busy || (modal === "flower" && !amount)}>{modal === "flower" ? <><p>지급된 섬초롱꽃은 되돌릴 수 없습니다. 지급 개수를 확인해 주세요.</p><div className="my-4 flex gap-2">{[5, 10, 15, 20].map(n => <Button key={n} variant={amount === n ? "default" : "outline"} onClick={() => setAmount(n)}>🌻 {n}개</Button>)}</div><div className="space-y-2 rounded-xl bg-blue-50 p-4"><strong>권장 기준 안내</strong><p>🥉 5개: 작성 내용이 단순하고, 구체적인 감상 표현이 부족한 글</p><p>🥈 10개: 독서록 양식에 따라 충실히 작성했으나, 의견이나 생각이 부족한 글</p><p>🥇 15개: 인상 깊은 내용을 구체적으로 쓰고, 경험이나 생각과 연결해 감상을 풍부하게 적은 글</p><p>🏆 20개: 주제에 대한 깊이 있는 분석, 창의적 해석과 독창적인 표현이 돋보이는 글</p></div></> : modal === "parent" ? `${common.studentName} 학부모에게 발송하시겠습니까?` : modal === "reject" ? "반려 처리하면 해당 온라인 독후감이 기관관리자 목록에서 사라집니다. 학생이 작성한 내용은 유지되며, 학생은 내용을 수정하여 다시 제출할 수 있습니다. 계속 진행하시겠어요?" : modal === "leave" ? "저장하지 않은 변경 내용을 버리고 목록으로 이동할까요?" : isPro && record.round === 1 && common.secondDecision === "complete" ? PRO_SEND_CONFIRM : "학생에게 피드백을 전송할까요? 전송 후 수정하거나 반려할 수 없습니다."}</ReviewDialog>}
+    {designation && <ReviewDialog title={designation.issue ? reviewDesignationCopy.blockedTitle : reviewDesignationCopy.title} confirmLabel="대상으로 지정하고 계속" closeLabel={designation.issue ? "확인" : "취소"} busy={busy} onClose={() => setDesignation(null)} onConfirm={designation.issue ? undefined : () => { const action = designation.action; setDesignation(null); if (action === "ai") void generate(true); else void save(true) }}><ReviewDesignationDetails preview={designation} /></ReviewDialog>}
+    {aiDialogOpen && <ReviewDialog title={aiDialog.title} onClose={() => setAiDialogOpen(false)} onConfirm={aiDialog.confirmable ? () => void generate() : undefined} disabled={busy}><div>{aiDialog.lines.map(line => <p key={line}>{line}</p>)}</div></ReviewDialog>}
+    {modal && <ReviewDialog variant={modal === "flower" ? "form" : "confirmation"} busy={busy} title={({ send: "학생 전송", parent: "학부모 발송", flower: "섬초롱꽃을 지급할까요?", reject: "학생 반려", leave: "이동 확인" })[modal]} onClose={() => setModal(null)} onConfirm={() => void confirm()} confirmLabel={modal === "reject" ? "반려하기" : modal === "send" && isPro && record.round === 1 && common.secondDecision === "complete" ? "전송하기" : "확인"} disabled={busy || (modal === "flower" && !amount)}>{modal === "flower" ? <><p>지급된 섬초롱꽃은 되돌릴 수 없습니다. 지급 개수를 확인해 주세요.</p><div className="my-4 flex gap-2">{[5, 10, 15, 20].map(n => <Button key={n} variant={amount === n ? "default" : "outline"} onClick={() => setAmount(n)}>🌻 {n}개</Button>)}</div><div className="space-y-2 rounded-xl bg-blue-50 p-4"><strong>권장 기준 안내</strong><p>🥉 5개: 작성 내용이 단순하고, 구체적인 감상 표현이 부족한 글</p><p>🥈 10개: 독서록 양식에 따라 충실히 작성했으나, 의견이나 생각이 부족한 글</p><p>🥇 15개: 인상 깊은 내용을 구체적으로 쓰고, 경험이나 생각과 연결해 감상을 풍부하게 적은 글</p><p>🏆 20개: 주제에 대한 깊이 있는 분석, 창의적 해석과 독창적인 표현이 돋보이는 글</p></div></> : modal === "parent" ? `${common.studentName} 학부모에게 발송하시겠습니까?` : modal === "reject" ? "반려 처리하면 해당 온라인 독후감이 기관관리자 목록에서 사라집니다. 학생이 작성한 내용은 유지되며, 학생은 내용을 수정하여 다시 제출할 수 있습니다. 계속 진행하시겠어요?" : modal === "leave" ? "저장하지 않은 변경 내용을 버리고 목록으로 이동할까요?" : isPro && record.round === 1 && common.secondDecision === "complete" ? PRO_SEND_CONFIRM : "학생에게 피드백을 전송할까요? 전송 후 수정하거나 반려할 수 없습니다."}</ReviewDialog>}
   </div>
 }
 

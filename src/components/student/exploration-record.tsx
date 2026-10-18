@@ -155,7 +155,7 @@ export function ExplorationRecord() {
   return (
     <div className={ui.page}>
       <StudentHeader now={reviewHook.db.currentTime} />
-      {secondStart && <SecondReviewStartModal {...secondStart} deadline={reviewHook.db.studentPro?.cases.find(c => `${c.reviewId}-r1` === secondStart.recordId)?.secondDeadline} run={reviewHook.run} onClose={() => setSecondStart(null)} />}
+      {secondStart && <SecondReviewStartModal {...secondStart} deadline={reviewHook.db.studentPro?.cases.find(c => `${c.reviewId}-r1` === secondStart.recordId)?.secondDeadline} reference={reviewHook.db.studentPro?.now} run={reviewHook.run} onClose={() => setSecondStart(null)} />}
       <section className={ui.top}>
         <div className="mx-auto flex max-w-[920px] items-center justify-center gap-2">
           <button aria-label="이전 월" onClick={() => moveMonth(-1)} className="grid size-8 place-items-center rounded-full bg-[#2ca4e6] text-white transition hover:bg-[#168fd1]"><ChevronLeft className="size-5" /></button>

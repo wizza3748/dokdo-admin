@@ -12,6 +12,7 @@ import {
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { AgencyConfirmDialog } from "@/components/ui/agency-confirm-dialog"
 import { Card } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
@@ -74,17 +75,7 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
 }
 
 function AiAlertModal({ title, children, onClose, onConfirm, cancelable = false }: { title: string; children: React.ReactNode; onClose: () => void; onConfirm: () => void; cancelable?: boolean }) {
-  return (
-    <div className="fixed inset-0 z-[110] grid place-items-center bg-slate-950/45 p-4">
-      <div role="alertdialog" aria-modal="true" aria-label={title} className="w-full max-w-[520px] rounded-2xl bg-white px-7 py-6 shadow-2xl">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-amber-400 text-sm font-black text-white">!</span>
-          <div className="min-w-0 flex-1"><h2 className="text-xl font-bold text-slate-700">{title}</h2><div className="mt-4 text-[15px] leading-7 text-slate-600">{children}</div></div>
-        </div>
-        <div className="mt-5 flex justify-end gap-2">{cancelable && <Button variant="outline" onClick={onClose}>취소</Button>}<Button onClick={onConfirm} className="bg-blue-600 hover:bg-blue-700">확인</Button></div>
-      </div>
-    </div>
-  )
+  return <AgencyConfirmDialog title={title} onClose={onClose} onConfirm={onConfirm} hideCancel={!cancelable}>{children}</AgencyConfirmDialog>
 }
 
 type FeedbackQuestion = { title: string; description?: string; answer: string }
@@ -285,7 +276,7 @@ function LegacyWorkbookDetail({ id }: { id: string }) {
 
       {modal === "aiUnavailable" && <AiAlertModal title="AI 자동 작성 불가" onClose={() => setModal(null)} onConfirm={() => setModal(null)}><p>AI 자동 작성 기능은 차수별 최대 2회까지만 이용할 수 있습니다.</p><p>AI 자동 작성은 생성만으로 횟수가 차감되며, 저장하지 않고 나가면 기록이 남지 않습니다.</p></AiAlertModal>}
 
-      {modal === "reject" && <Modal title="학생 온라인 독후감 반려" onClose={() => setModal(null)}><p className="text-sm leading-6 text-slate-600">반려 처리 시 제출 내용이 사라집니다. 학생이 제출한 온라인 독후감은 목록에서 사라지고, 학생은 다시 작성 가능한 상태로 돌아갑니다. 계속 진행하시겠어요?</p><div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={() => setModal(null)}>취소</Button><Button variant="destructive" onClick={confirmReject}>반려하기</Button></div></Modal>}
+      {modal === "reject" && <AgencyConfirmDialog title="학생 온라인 독후감 반려" onClose={() => setModal(null)} onConfirm={confirmReject} confirmLabel="반려하기"><p>반려 처리 시 제출 내용이 사라집니다. 학생이 제출한 온라인 독후감은 목록에서 사라지고, 학생은 다시 작성 가능한 상태로 돌아갑니다. 계속 진행하시겠어요?</p></AgencyConfirmDialog>}
 
       {modal === "flower" && <Modal title="섬초롱꽃을 지급할까요?" onClose={() => setModal(null)}><p className="text-sm text-slate-600">지급된 섬초롱꽃은 되돌릴 수 없습니다. 지급 개수를 확인해 주세요.</p><p className="mt-5 text-sm font-black text-slate-800">지급 개수</p><div className="mt-3 grid grid-cols-2 gap-2">{flowerCriteria.map((item) => <button key={item.amount} type="button" role="radio" aria-checked={selectedFlower === item.amount} onClick={() => setSelectedFlower(item.amount)} className={cn("rounded-lg border px-4 py-3 text-center transition-colors", selectedFlower === item.amount ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 bg-white text-slate-600 hover:border-blue-300")}><span className="font-semibold">🌻　{item.amount}개</span></button>)}</div><div className="mt-5 space-y-2 rounded-xl bg-[#eef6ff] p-4"><p className="text-sm font-black text-slate-800">권장 기준 안내</p>{flowerCriteria.map((item) => <p key={item.amount} className="text-xs leading-5 text-slate-600">{item.medal} <strong>{item.amount}개:</strong> {item.description}</p>)}</div><div className="mt-6 flex justify-end gap-2"><Button variant="outline" onClick={() => setModal(null)}>취소</Button><Button disabled={!selectedFlower} onClick={confirmFlower} className="bg-blue-600 hover:bg-blue-700">확인</Button></div></Modal>}
 

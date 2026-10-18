@@ -1,6 +1,9 @@
-import { getWorkbookTemplateCopy } from "@/lib/workbook-template-copy-data"
-import { getWorkbookTemplateLiveDetail } from "@/lib/workbook-template-live-data"
-import { WORKBOOK_TEMPLATE_LIST_ROWS } from "@/lib/workbook-template-list-data"
+// @ts-expect-error Node fixture tests load TypeScript sources directly.
+import { getWorkbookTemplateCopy } from "./workbook-template-copy-data.ts"
+// @ts-expect-error Node fixture tests load TypeScript sources directly.
+import { getWorkbookTemplateLiveDetail } from "./workbook-template-live-data.ts"
+// @ts-expect-error Node fixture tests load TypeScript sources directly.
+import { WORKBOOK_TEMPLATE_LIST_ROWS } from "./workbook-template-list-data.ts"
 
 export type WorkbookQuestion = {
   id: number

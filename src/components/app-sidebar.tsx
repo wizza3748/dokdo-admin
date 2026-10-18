@@ -25,10 +25,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                                 <div className="flex aspect-square size-9 items-center justify-center overflow-hidden rounded-lg bg-blue-50 transition-transform group-hover:scale-105">
                                     <Image unoptimized src="https://admin.dokdo.app/assets/dokdo_256.b304d946.png" alt="Dokdo Admin" width={36} height={36} className="size-full object-contain" />
                                 </div>
-                                <div className="flex flex-col gap-0.5 leading-none group-data-[collapsible=icon]:hidden">
-                                    <span className="text-lg font-bold tracking-tight">Dokdo Admin</span>
-                                    <span className="text-[11px] text-slate-500">Management System</span>
-                                </div>
+                                <span className="text-lg font-bold tracking-tight group-data-[collapsible=icon]:hidden">Prototype</span>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>

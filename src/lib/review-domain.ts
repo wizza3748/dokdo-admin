@@ -390,7 +390,9 @@ export function hydrateLegacyReviewFeedback(db: ReviewDatabase): ReviewDatabase 
     return { ...record, reportFeedback: updateSaved ? reportFeedback : record.reportFeedback, aiDraft: updateDraft && record.aiDraft ? { ...record.aiDraft, reportFeedback } : record.aiDraft }
   }) }
 }
-export function canAccessReview(review: ReviewCommon, actor: ReviewActor) {
+export function canAccessReview(review: ReviewCommon, actor: ReviewActor, pro?: import("./pro-types").ProState) {
+  const member = pro?.members.find(m => m.id === review.studentId && (m.product === "pro" || pro.cases.some(c => c.reviewId === review.id)))
+  if (member && (actor.role === "agency" || actor.role === "class")) return actor.role === "agency" && !!member.institutionId && actor.institutionId === member.institutionId
   return actor.role === "admin" || (actor.role === "student" && actor.studentId === review.studentId) ||
     (actor.role === "agency" && actor.institutionId === review.institutionId) ||
     (actor.role === "class" && actor.institutionId === review.institutionId && actor.classId === review.classId)
@@ -461,7 +463,7 @@ function applyReviewCommandInternal(database: ReviewDatabase, command: ReviewCom
   const record = db.records.find(r => r.id === command.recordId)
   requireCondition(record, "독후감 레코드를 찾을 수 없습니다.")
   const review = db.reviews.find(r => r.id === record.reviewId)!
-  requireCondition(canAccessReview(review, actor), "조회·처리 권한이 없습니다.")
+  requireCondition(canAccessReview(review, actor, db.pro), "조회·처리 권한이 없습니다.")
   const studentAction = ["switch-template", "start-second", "save-writing", "enter-rewrite", "submit", "seen"].includes(command.type)
   requireCondition(studentAction ? actor.role === "student" : actor.role === "agency" || actor.role === "class", "이 작업을 처리할 권한이 없습니다.")
   const first = db.records.find(r => r.reviewId === review.id && r.round === 1)!

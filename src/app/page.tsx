@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
+import { STUDENT_FRONT_TEST_PATH } from "@/lib/pro-demo-navigation";
 
 export default function Home() {
   return (
@@ -154,7 +155,7 @@ export default function Home() {
                   <span className="shrink-0 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-black leading-none text-white">NEW</span>
                 </div>
                 <div className="border-l border-amber-200 p-4 text-[14px] font-bold text-amber-700 transition-colors group-hover:text-amber-900">
-                  <Link href="/student/exploration-record?tab=workbook&demoStudent=pro-demo-1" className="hover:underline">[B2C 프로] 온라인 독후감 주간 관리 기능 개발</Link>
+                  <Link href={STUDENT_FRONT_TEST_PATH} className="hover:underline">[B2C 프로] 온라인 독후감 주간 관리 기능 개발</Link>
                 </div>
               </div>
               <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group">

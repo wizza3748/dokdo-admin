@@ -39,3 +39,24 @@ test("오류는 30초부터 최대 5분까지 재시도 간격 확대, 성공하
   now = 90_000
   assert.equal(await cache.read("student", async () => "recovered"), "recovered")
 })
+
+test("지정 확인의 최신 조회는 유효한 캐시도 갱신하고 다른 조회는 유지", async () => {
+  const cache = new ReviewReadCache()
+  assert.equal(await cache.read("agency", async () => 3), 3)
+  assert.equal(await cache.read("student", async () => 9), 9)
+  assert.equal(await cache.read("agency", async () => 2, { fresh: true }), 2)
+  assert.equal(await cache.read("agency", async () => 1), 2)
+  assert.equal(await cache.read("student", async () => 8), 9)
+})
+
+test("최신 조회는 이전 진행 중인 응답과 오류 재시도 대기를 재사용하지 않음", async () => {
+  const cache = new ReviewReadCache()
+  let finish!: (value: number) => void
+  const old = cache.read("agency", () => new Promise<number>(resolve => { finish = resolve }))
+  assert.equal(await cache.read("agency", async () => 2, { fresh: true }), 2)
+  finish(3)
+  assert.equal(await old, 3)
+  assert.equal(await cache.read("agency", async () => 4), 2)
+  await assert.rejects(cache.read("failed", async () => { throw new Error("offline") }))
+  assert.equal(await cache.read("failed", async () => 1, { fresh: true }), 1)
+})

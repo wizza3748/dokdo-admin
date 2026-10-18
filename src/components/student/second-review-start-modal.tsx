@@ -1,14 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { dateLabel } from "@/lib/pro-calendar"
+import { proSecondDeadlineText, studentProCopy } from "@/lib/student-pro-presentation"
 import { useRouter } from "next/navigation"
 import type { useReviews } from "@/lib/review-client"
 import { ConfirmModal } from "./student-workbook-ui"
 
 /** Both entry points create the second draft only after the student confirms. */
-export function SecondReviewStartModal({ recordId, sourceWorkbookId, run, onClose, onStarted, deadline }: {
+export function SecondReviewStartModal({ recordId, sourceWorkbookId, run, onClose, onStarted, deadline, reference }: {
   deadline?: string
+  reference?: string
   recordId: string
   sourceWorkbookId: string
   run: ReturnType<typeof useReviews>["run"]
@@ -40,5 +41,5 @@ export function SecondReviewStartModal({ recordId, sourceWorkbookId, run, onClos
       setBusy(false)
     }
   }
-  return <ConfirmModal title="2차 작성 시작" description={<>선생님의 1차 피드백을 참고해서<br />2차 글을 작성해 볼까요?{deadline && <span className="mt-3 block text-base">제출 기한: {dateLabel(deadline)} · 추가 권수 차감 없음</span>}{error && <span role="alert" className="mt-3 block text-sm text-red-600">{error}</span>}</>} confirmLabel={busy ? "시작하는 중…" : "작성하기"} busy={busy} onClose={() => { if (!pending.current) onClose() }} onConfirm={() => void confirm()} />
+  return <ConfirmModal title="2차 작성 시작" description={<>선생님의 피드백을 반영해 2차 작성을 시작할까요?<br />작성 중에는 저장하고 이어서 쓸 수 있어요.{deadline && <span className="mt-3 block text-base"><span className="block">{proSecondDeadlineText(deadline, reference ?? new Date().toISOString())}</span><span className="block">{studentProCopy.secondUsage}</span></span>}{error && <span role="alert" className="mt-3 block text-sm text-red-600">{error}</span>}</>} confirmLabel={busy ? "시작하는 중…" : "2차 작성하기"} busy={busy} onClose={() => { if (!pending.current) onClose() }} onConfirm={() => void confirm()} />
 }

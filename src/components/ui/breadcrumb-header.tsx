@@ -9,6 +9,7 @@ export function BreadcrumbHeader() {
     const pathname = usePathname()
 
     const getBreadcrumbs = () => {
+        if (pathname === "/agency/pro-management/student-front-test") return [{ label: "일감보드", href: "/" }, { label: "학생프론트 테스트", href: "#" }]
         // [본사관리자] 그룹
         if (pathname.startsWith("/admin")) {
             const crumbs = [{ label: "[본사관리자]", href: "#" }]

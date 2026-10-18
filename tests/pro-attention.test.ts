@@ -38,6 +38,7 @@ test("실제 오늘에 2주·3주 미제출 예시, 초안은 배지를 해제�
   const db = fixture()
   for (const example of PRO_ATTENTION_EXAMPLES) {
     assert.equal(row(db, example.id).missed, example.weeks)
+    assert.deepEqual(row(db, example.id).missedWeeks, Array.from({ length: example.weeks }, (_, i) => addDays(weekStart(now), (i - example.weeks) * 7)))
     assert.equal(row(db, example.id).submissions.length, 0)
     assert.equal(db.records.find(r => r.reviewId === `review-${example.id}`)!.writingStatus, "writing")
   }
@@ -50,6 +51,7 @@ for (const example of PRO_ATTENTION_EXAMPLES) test(`${example.weeks}주 미제�
   const actor = { role: "student" as const, studentId: example.id, name: example.name }
   db = applyManagedReviewCommand(db, { type: "submit", recordId: `review-${example.id}-r1` }, actor, `submit-${example.id}`, now)
   assert.equal(row(db, example.id).missed, 0)
+  assert.deepEqual(row(db, example.id).missedWeeks, [])
   assert.equal(row(db, example.id).submissions.length, 1)
   assert.equal(row(db, example.id, midnight("2026-09-28")).missed, example.weeks - 1)
   const refreshed = reconcilePro(atReviewTime(ensureProAttentionExamples(db, addDays(now, 1)), addDays(now, 1)))
@@ -69,20 +71,33 @@ test("관리 시작 전과 월 한도 소진 주는 미제출 횟수에서 제�
   const db = fixture(), id = "pro-demo-hq-check", member = db.pro!.members.find(m => m.id === id)!
   member.limits["2026-09"] = 0
   assert.equal(row(db, id).missed, 1)
+  assert.deepEqual(row(db, id).missedWeeks, [midnight("2026-09-28")])
   member.limits["2026-10"] = 0
   assert.equal(row(db, id).missed, 0)
   member.limits = {}; member.assignedAt = weekStart(now)
   assert.equal(row(db, id).missed, 0)
 })
 
-test("2차 제출과 미래 제출은 1차 미제출 횟수를 해제하지 않음", () => {
+test("2차 제출도 즉시 경고를 해제하고 다음 주 연속 미제출에서 제외", () => {
   const db = fixture(), id = "pro-demo-hq-check", record = db.records.find(r => r.reviewId === `review-${id}`)!
   const reference = db.pro!.cases[0]
-  db.pro!.cases.push({ ...reference, reviewId: record.reviewId, studentId: id, week: midnight("2026-09-28"), selectedAt: undefined, firstSentAt: undefined, closedAt: undefined })
+  db.pro!.cases.push({ ...reference, reviewId: record.reviewId, studentId: id, week: midnight("2026-09-28"), secondWeek: weekStart(now), secondDue: addDays(now, 3), selectedAt: undefined, firstSentAt: undefined, closedAt: undefined })
   db.records.push({ ...record, id: `${record.id}-second-test`, round: 2, writingStatus: "submitted", submittedAt: now })
-  assert.equal(row(db, id).missed, 3)
-  record.writingStatus = "submitted"; record.submittedAt = addDays(now, 1)
-  assert.equal(row(db, id).missed, 3)
+  assert.equal(row(db, id).missed, 0)
+  assert.equal(row(db, id).submissions.length, 0, "1차 제출 독려 기준은 별도 유지")
+  assert.equal(row(db, id, midnight("2026-09-28")).missed, 2, "이전 주 경고 기록은 유지")
+  db.pro!.clock = addDays(now, 7)
+  assert.equal(row(db, id).missed, 0)
+})
+
+for (const round of [1, 2] as const) test(`${round}차 초안·미래 제출은 경고를 해제하지 않음`, () => {
+  for (const state of ["writing", "future"] as const) {
+    const db = fixture(), id = "pro-demo-hq-check", record = db.records.find(r => r.reviewId === `review-${id}`)!
+    db.pro!.cases.push({ ...db.pro!.cases[0], reviewId: record.reviewId, studentId: id, week: weekStart(now), secondWeek: weekStart(now), secondDue: addDays(now, 3), selectedAt: undefined, firstSentAt: undefined, closedAt: undefined })
+    const entry = { ...record, id: `${record.id}-test-${round}`, round, writingStatus: state === "future" ? "submitted" as const : state, submittedAt: state === "future" ? addDays(now, 1) : now }
+    db.records.push(entry)
+    assert.equal(row(db, id).missed, 3, state)
+  }
 })
 
 test("월 변경에도 예시 기준일은 고정되고 월 귀속·횟수는 현재 주로 계산", () => {

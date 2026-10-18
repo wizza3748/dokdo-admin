@@ -16,6 +16,12 @@ export function demoIdentityQuery(role: ReviewRole) {
   }
   return params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""
 }
+export async function reviewSharePath(recordId: string, role: ReviewRole = "student") {
+  const response = await fetch(`/api/mock/review-share?role=${role}${demoIdentityQuery(role)}`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({recordId})})
+  const value = await response.json()
+  if (!response.ok) throw new Error(value.message || "공유 링크를 만들지 못했어요.")
+  return value.path as string
+}
 export function notifyReviewChange() { reviewReads.invalidate(); window.dispatchEvent(new Event(eventName)); window.dispatchEvent(new Event("dokdo-workbook-change")) }
 function preserveLegacyProgress(db: ReviewDatabase): ReviewDatabase {
   if (typeof window === "undefined") return db
@@ -26,13 +32,14 @@ function preserveLegacyProgress(db: ReviewDatabase): ReviewDatabase {
     return { ...db, reviews, records: db.records.filter(r => reviews.some(c => c.id === r.reviewId)) }
   } catch { return db }
 }
-export async function readReviews(role: ReviewRole = "student", recordId?: string): Promise<ReviewDatabase> {
-  const url = `/api/mock/online-reviews?role=${role}${demoIdentityQuery(role)}${recordId ? `&recordId=${encodeURIComponent(recordId)}` : ""}`
+export async function readReviews(role: ReviewRole = "student", recordId?: string, options: { fresh?: boolean } = {}): Promise<ReviewDatabase> {
+  const sharedToken = role === "external" ? new URLSearchParams(window.location.search).get("share") || recordId : undefined
+  const url = role === "external" ? `/api/mock/review-share?token=${encodeURIComponent(sharedToken ?? "")}` : `/api/mock/online-reviews?role=${role}${demoIdentityQuery(role)}${recordId ? `&recordId=${encodeURIComponent(recordId)}` : ""}`
   const db = await reviewReads.read<ReviewDatabase>(url, async () => {
     const response = await fetch(url, { cache: "no-store" })
     if (!response.ok) throw new Error("온라인 독후감을 불러오지 못했습니다.")
     return response.json()
-  })
+  }, options)
   return preserveLegacyProgress(db)
 }
 export async function commandReview(command: ReviewCommand, role: ReviewRole = "student", requestId = crypto.randomUUID()): Promise<ReviewDatabase> {

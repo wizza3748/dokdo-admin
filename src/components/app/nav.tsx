@@ -164,8 +164,7 @@ export function AppNav() {
     <SidebarContent className="bg-white">
       <SidebarGroup className="px-3 py-4">
         <SidebarMenu className="gap-1">
-          {navConfig.filter(item => item.id !== "agency-pro" || proVisible).map((original) => {
-            const item = original.id === "agency-pro" && proBadge ? { ...original, title: `${original.title} (${proBadge})` } : original
+          {navConfig.filter(item => item.id !== "agency-pro" || proVisible).map((item) => {
             if (item.type === "label") {
               return (
                 <SidebarGroupLabel key={item.id} className="mt-4 h-8 px-2 text-xs font-semibold tracking-wide text-slate-400 first:mt-0">
@@ -206,6 +205,7 @@ export function AppNav() {
                     <SidebarMenuButton isActive={isGroupActive} tooltip={item.title} className="h-11 rounded-xl px-3 text-[15px] font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 data-[active=true]:bg-blue-50 data-[active=true]:text-blue-600">
                       {Icon && <Icon className="h-4 w-4" />}
                       <span>{item.title}</span>
+                      {item.id === "agency-pro" && proBadge > 0 && <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-semibold tabular-nums leading-none text-white group-data-[collapsible=icon]:hidden"><span className="sr-only">남은 할 일 </span>{proBadge}<span className="sr-only">건</span></span>}
                       <ChevronRight className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>

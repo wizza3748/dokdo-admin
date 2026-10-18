@@ -8,7 +8,8 @@ export type FeedbackStatus = "작성전" | "작성완료" | "전송완료"
 export interface OnlineWorkbook {
   studentId?: string
   external?: boolean
-  pro?: { selected: boolean; period: string; selection: string; due?: string; parentLabel: string }
+  pro?: { selected: boolean; period: string; selection: string; due?: string; overdue?: boolean; parentLabel: string }
+  actionEligibility?: Record<"ai" | "send" | "parent" | "flower", boolean>
   displayNumber?: string
   reviewId?: string
   writingRound?: 1 | 2
@@ -350,7 +351,7 @@ export async function getAgencyWorkbookListAsync(role: "agency" | "class" | "adm
   const { readReviews } = await import("@/lib/review-client")
   const { reviewListRows } = await import("@/lib/review-list-adapter")
   const db = await readReviews(role)
-  const newRecords = reviewListRows(db)
+  const newRecords = reviewListRows(db, role)
   const overrides = await getMergedStudentSubmittedAgencyWorkbooks()
   const overrideById = new Map(overrides.map((record) => [record.id, record]))
   const seedIds = new Set(AGENCY_ONLINE_WORKBOOKS.map((record) => record.id))

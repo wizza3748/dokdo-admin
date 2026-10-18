@@ -2,27 +2,139 @@
 .page [data-slot="button"][data-variant="default"] { background: #2563eb; color: white; }
 .page [data-slot="button"][data-variant="default"]:hover { background: #1d4ed8; }
 .tableWrap { max-width: 100%; overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; background: white; }
-.table { width: 100%; min-width: 1280px; border-collapse: collapse; table-layout: fixed; font-size: 13px; line-height: 1.6; }
+.table { width: 100%; min-width: 1530px; border-collapse: collapse; table-layout: fixed; font-size: 14px; line-height: 1.6; }
 .table th { padding: 12px; background: #f1f5f9; color: #64748b; font-weight: 600; text-align: left; }
 .table td { padding: 16px 12px; vertical-align: top; border-top: 1px solid #e2e8f0; overflow-wrap: anywhere; }
 .table tr:hover td { background-color: #f8fafc; }
-.table .group th { padding: 9px 12px; background: #edf2f7; border-top: 1px solid #e2e8f0; }
-.table .overdueGroup th { background: #fff1f2; color: #be123c; }
+.actionSummary { min-height: 104px; }
+.page .feedbackReviewButton { border-color: #93c5fd; background: #eff6ff; color: #1d4ed8; }
+.page .feedbackReviewButton:hover { background: #dbeafe; }
+.table .priorOverdue td { background: #fff7f8; }
+.table .priorOverdue:hover td { background: #fff1f2; }
+.table .priorOverdue td:first-child { box-shadow: inset 3px 0 #fda4af; }
+.feedbackStatus { display: inline-flex; align-items: center; gap: 6px; border: 1px solid; border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 700; line-height: 18px; white-space: nowrap; }
+.feedbackStatus::before { content: ""; width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: currentColor; }
+.feedbackStatus[data-status="지연"] { background: #be123c; border-color: #9f1239; color: white; }
+.feedbackStatus[data-status="피드백 필요"] { background: #fffbeb; border-color: #d97706; color: #92400e; }
+.feedbackStatus[data-status="미제출"] { background: #fff; border-color: #fda4af; color: #be123c; }
+.feedbackStatus[data-status="2차 대기"] { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+.feedbackStatus[data-status="자동 선정 대기"] { background: #f5f3ff; border-color: #c4b5fd; color: #6d28d9; }
+.feedbackStatus[data-status="관리 완료"] { background: #ecfdf5; border-color: #6ee7b7; color: #047857; }
+.feedbackStatus[data-status="한도 사용"] { background: #f1f5f9; border-color: #cbd5e1; color: #475569; }
+.usage { display: grid; gap: 5px; }
+.usagePrimary { display: flex; align-items: center; gap: 8px; color: #334155; white-space: nowrap; }
+.usageAmount { display: inline-flex; align-items: baseline; gap: 4px; font-variant-numeric: tabular-nums; }
+.usageAmount strong { color: #0f172a; font-size: 26px; line-height: 1.15; font-weight: 750; }
+.usageAmount span { color: #475569; font-size: 15px; font-weight: 500; }
+.usageAvailable { color: #1d4ed8; font-size: 14px; font-weight: 500; }
+.usageAvailable strong { margin-left: 4px; font-size: 16px; font-weight: 700; }
+.usageRollover { color: #64748b; font-size: 12px; }
+/* Keep compact typography local to the weekly list, not student detail. */
+.weeklyUsage .usageAmount strong { color: #334155; font-size: 14px; line-height: 1.6; font-weight: 600; }
+.weeklyUsage .usageAmount span { font-size: 14px; font-weight: 400; }
+.weeklyUsage .usageAvailable { color: #64748b; font-weight: 400; white-space: nowrap; }
+.weeklyUsage .usageAvailable strong { color: #334155; font-size: 14px; font-weight: 600; }
+.managementActions { display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+.managementActions [data-slot="button"] { min-width: 88px; }
+.cellActions { display: flex; align-items: center; justify-content: flex-start; gap: 8px; margin-top: 10px; }
+.cellActions [data-slot="button"] { min-width: 88px; }
+.taskGrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.taskCard { --task-bg: #fff1f2; --task-border: #fda4af; --task-ink: #9f1239; --task-active: #be123c; position: relative; min-width: 0; border: 1px solid var(--task-border); border-radius: 8px; background: var(--task-bg); color: var(--task-ink); }
+.taskCard[data-tone="blue"] { --task-bg: #eff6ff; --task-border: #93c5fd; --task-ink: #1e40af; --task-active: #1d4ed8; }
+.taskCard[data-tone="amber"] { --task-bg: #fffbeb; --task-border: #fcd34d; --task-ink: #92400e; --task-active: #92400e; }
+.taskCard[data-tone="cyan"] { --task-bg: #ecfeff; --task-border: #67e8f9; --task-ink: #155e75; --task-active: #0e7490; }
+.taskCard[data-tone="green"] { --task-bg: #ecfdf5; --task-border: #6ee7b7; --task-ink: #065f46; --task-active: #047857; }
+.taskCard[data-tone="violet"] { --task-bg: #f5f3ff; --task-border: #c4b5fd; --task-ink: #5b21b6; --task-active: #6d28d9; }
+.taskCard[data-tone="orange"] { --task-bg: #fff7ed; --task-border: #fdba74; --task-ink: #9a3412; --task-active: #c2410c; }
+.taskCard[data-selected="true"] { background: var(--task-active); border-color: var(--task-active); color: white; box-shadow: 0 0 0 2px white, 0 0 0 4px var(--task-active); }
+.taskHelp { position: absolute; top: 10px; right: 8px; }
+.taskHelp button { color: inherit; }
+.taskHelp button:hover { color: inherit; background: rgb(127 127 127 / 15%); }
+.taskButton { width: 100%; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; border-radius: 7px; padding: 10px 12px; color: inherit; text-align: left; cursor: pointer; }
+.taskButton:hover { background: rgb(127 127 127 / 8%); }
+.taskButton:focus-visible { outline: 2px solid var(--task-active); outline-offset: 4px; }
+.taskTitle { padding-right: 16px; font-size: 13px; font-weight: 600; word-break: keep-all; }
+.taskValue { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.taskValue strong { font-size: 24px; font-weight: 750; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.taskValue small { margin-left: 4px; font-size: 12px; font-weight: 500; }
 .detailGrid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(340px, 1fr); align-items: start; gap: 20px; }
 .detailTable { width: 100%; min-width: 640px; table-layout: fixed; font-size: 13px; text-align: left; overflow-wrap: anywhere; }
 .detailTable th { background: #f1f5f9; color: #64748b; padding: 12px; font-weight: 600; }
 .detailTable td { border-top: 1px solid #e2e8f0; padding: 14px 12px; vertical-align: top; }
+.studentFeedbackTable { min-width: 560px; font-size: 14px; }
+.studentFeedbackTable th { white-space: nowrap; }
+.studentPage { container: student-detail / inline-size; }
+.studentDetailLayout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 20px; }
+.studentDetailLayout > section { min-height: 400px; }
+.studentDetailRight { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.studentConsultationSection { flex: 1; }
+.managementMemoBody { padding: 16px 24px 20px; }
+@container student-detail (max-width: 1100px) {
+  .studentDetailLayout { grid-template-columns: minmax(0, 1fr); }
+  .studentDetailLayout > section { min-height: 0; }
+}
+.studentSection { min-width: 0; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 10px; background: white; }
+.studentSectionHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px 0; }
+.studentSectionHeader h2 { font-size: 16px; font-weight: 700; color: #0f172a; }
+.detailUsageRow { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 14px 24px 20px; }
+.studentFeedbackTable th, .studentFeedbackTable td { padding: 14px 24px; }
+.studentFeedbackTable td { vertical-align: middle; }
+.detailEditor { padding: 20px 24px; background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
+.detailEditor input, .detailEditor textarea { min-width: 0; }
+.limitForm { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 16px; }
+.studentFeedbackTable .debitEditorRow > td { padding: 0; border: 0; }
+.detailHistoryNav { display: flex; gap: 24px; padding: 12px 24px; border-top: 1px solid #e2e8f0; }
+.detailHistoryNav button { padding: 4px 0; font-size: 13px; color: #64748b; }
+.detailHistoryNav button[aria-expanded="true"] { color: #1d4ed8; font-weight: 600; }
+.detailHistoryNav button:hover, .detailTextButton:hover { text-decoration: underline; text-underline-offset: 4px; }
+.detailHistoryNav span { margin-left: 4px; font-variant-numeric: tabular-nums; }
+.detailHistory { padding: 8px 24px 16px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
+.detailHistoryRow { display: grid; grid-template-columns: minmax(180px, .3fr) minmax(0, 1fr); gap: 12px 24px; padding: 14px 0; border-bottom: 1px solid #e2e8f0; }
+.detailHistoryRow:last-child { border-bottom: 0; }
+.detailTextButton { padding: 4px 0; color: #2563eb; font-size: 13px; font-weight: 500; }
+.consultSchedule { display: flex; flex-wrap: wrap; gap: 10px 48px; padding: 18px 24px; border-bottom: 1px solid #e2e8f0; }
+.consultSchedule > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.consultSchedule strong { font-weight: 500; color: #0f172a; }
+.consultRecords { padding: 0 24px; }
+.consultRecord { padding: 20px 0; border-bottom: 1px solid #e2e8f0; }
+.consultRecord:last-child { border-bottom: 0; }
+.consultRecords .detailEditor { margin: 0 -24px; border-top: 0; border-bottom: 0; }
+.consultFormTop { display: flex; flex-wrap: wrap; align-items: start; gap: 20px; }
+.consultFormTop fieldset { flex: 1 1 300px; }
+.consultFormTop > label { width: 240px; max-width: 100%; }
+@media (max-width: 1200px) { .taskGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .detailGrid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 767px) {
+  .studentSectionHeader { padding: 16px 16px 0; }
+  .managementMemoBody { padding: 16px; }
+  .detailUsageRow { padding: 12px 16px 16px; gap: 8px 16px; }
+  .detailEditor { padding: 16px; }
+  .limitForm, .consultFormTop, .detailHistoryRow { grid-template-columns: minmax(0, 1fr); }
+  .detailHistoryNav { padding: 10px 16px; }
+  .detailHistory { padding: 4px 16px 12px; }
+  .consultSchedule { padding: 16px; gap: 12px; }
+  .consultSchedule > div { width: 100%; gap: 4px 10px; }
+  .consultRecords { padding: 0 16px; }
+  .consultRecords .detailEditor { margin: 0 -16px; }
+  .studentFeedbackTable, .studentFeedbackTable tbody { display: block; width: 100%; min-width: 0; }
+  .studentFeedbackTable thead, .studentFeedbackTable colgroup { display: none; }
+  .studentFeedbackTable tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 8px; border-top: 1px solid #e2e8f0; }
+  .studentFeedbackTable tr:first-child { border-top: 0; }
+  .studentFeedbackTable td { padding: 8px; border: 0; }
+  .studentFeedbackTable td::before { content: attr(data-label); display: block; margin-bottom: 6px; font-size: 12px; color: #64748b; }
+  .studentFeedbackTable td[colspan] { grid-column: 1 / -1; }
+  .studentFeedbackTable .debitEditorRow { display: block; padding: 0; border: 0; }
+  .studentFeedbackTable .debitEditorRow > td { display: block; }
+  .studentFeedbackTable .debitEditorRow > td::before { display: none; }
   .page { padding: 16px; }
   .tableWrap { overflow: visible; border: 0; background: transparent; }
   .table, .table tbody { display: block; min-width: 0; width: 100%; }
   .table thead, .table colgroup { display: none; }
   .table tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); margin-bottom: 12px; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; background: white; }
   .table td { display: block; min-width: 0; padding: 12px; }
-  .table td:first-child, .table td:nth-child(4), .table td:nth-child(9) { grid-column: 1 / -1; }
+  .table td { grid-column: 1 / -1; }
+  .actionSummary { min-height: 0; }
+  .taskGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .table td::before { content: attr(data-label); display: block; margin-bottom: 6px; color: #64748b; font-size: 12px; font-weight: 600; }
-  .table .group { display: block; border: 0; background: transparent; }
-  .table .group th { display: block; border: 0; border-radius: 8px; }
   .table .empty { display: block; }
 }

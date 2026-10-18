@@ -8,7 +8,8 @@ export class ReviewReadCache {
 
   invalidate() { this.entries.clear() }
 
-  async read<T>(key: string, load: () => Promise<T>): Promise<T> {
+  async read<T>(key: string, load: () => Promise<T>, options: { fresh?: boolean } = {}): Promise<T> {
+    if (options.fresh) this.entries.delete(key)
     let entry = this.entries.get(key)
     if (!entry) { entry = { failures: 0 }; this.entries.set(key, entry) }
     if (entry.pending) return entry.pending as Promise<T>
