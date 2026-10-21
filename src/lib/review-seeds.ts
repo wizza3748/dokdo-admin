@@ -6,6 +6,19 @@ import { WORKBOOK_TEMPLATE_LIVE_DETAILS } from "@/lib/workbook-template-live-dat
 import { createSeededReviewDatabase, type ReviewSeed, type ReviewTemplate } from "@/lib/review-domain"
 import { READING_BOOKS } from "@/lib/reading-books"
 
+// Keep the installed historical cohort stable. Fixing a connection must not
+// import extra rows from the admin list or change demo notification/task counts.
+const HISTORICAL_REVIEW_IDS = new Set([
+  "review-seed-student-room901-0825",
+  "review-seed-student-asia-table-0824",
+  "review-seed-student-gamunjang-0824",
+  "review-seed-student-no-first-0721",
+  "review-seed-student-galileo-0715",
+  "review-seed-student-korean-noun-0708",
+  ...[42784, 37335, 16447, 14894, 14868, 12433, 9031, 2693, 2620, 2496, 14, 10, 8].map(id => `review-seed-agency-${id}`),
+  "review-seed-hq-42741",
+])
+
 /** Stable base fixtures shared by all roles. User-created progress is never built from these. */
 export function getDefaultReviewDatabase() {
   // Historical demo snapshots include report-enabled examples even if HQ later disables
@@ -18,14 +31,19 @@ export function getDefaultReviewDatabase() {
     "처음에는 아저씨가 무섭다고 생각했습니다. 하지만 아래층에서 쿵쿵 소리가 계속 들리면 쉬기 힘들 것 같습니다. 나도 이웃의 마음을 생각해야겠습니다.",
     "앞으로 집에서는 뛰지 않고 걸어 다니겠습니다. 뛰고 싶을 때는 놀이터에 가고, 저녁에는 동생과 그림을 그리겠습니다.",
   ]
+  const readingBook = (bookTitle: string, level: number) => READING_BOOKS.find(book => book.title === bookTitle && book.level === level)
   const connectedTemplate = (bookTitle: string, level: number, preferredTitle?: string) => {
-    const ids = WORKBOOK_TEMPLATE_LIVE_DETAILS.filter(t => t.connectedBooks.some(([, title, bookLevel, round]) => title === bookTitle && bookLevel === level && round === 1)).map(t => t.id)
-    const connected = templates.filter(t => ids.includes(t.id) && !t.name.includes("자유형"))
+    // These examples start after the book's final reading round. Reading rounds
+    // are independent of the review's first/second writing round.
+    const book = readingBook(bookTitle, level)
+    if (!book) return undefined
+    const ids = WORKBOOK_TEMPLATE_LIVE_DETAILS.filter(t => t.connectedBooks.some(([, title, bookLevel, round]) => title === book.title && bookLevel === book.level && round === book.rounds)).map(t => t.id)
+    const connected = templates.filter(t => ids.includes(t.id) && t.levels.includes(book.level) && !t.name.includes("자유형"))
     return connected.find(t => t.name.includes("통합형 독서록")) ?? connected.find(t => t.studentTitle === preferredTitle) ?? connected[0]
   }
-  const readingLink = (bookTitle: string, sourceWorkbookId: string) => {
-    const book = READING_BOOKS.find(item => item.title === bookTitle)
-    if (!book) return {}
+  const readingLink = (bookTitle: string, level: number, sourceWorkbookId: string) => {
+    const book = readingBook(bookTitle, level)
+    if (!book) throw new Error(`예시 도서를 찾을 수 없습니다: ${bookTitle} (${level}레벨)`)
     return {
       sourceBookId: book.id,
       sourceReadingRecordId: `reading-complete-${sourceWorkbookId}`,
@@ -42,19 +60,20 @@ export function getDefaultReviewDatabase() {
   }
   for (const workbook of studentWorkbooks) {
     // A not-yet-started workbook must remain a list fixture, not become a writing review record.
-    if (workbook.status === "before") continue
+    if (workbook.status === "before" || !HISTORICAL_REVIEW_IDS.has(`review-seed-student-${workbook.id}`)) continue
     const template = workbook.templates.find(t => t.id === workbook.selectedTemplateId) ?? workbook.templates[0]
     const integrated = connectedTemplate(workbook.bookTitle, workbook.level, template.title)
     if (!integrated) continue
     const month = `${workbook.year}-${String(workbook.month).padStart(2, "0")}`
     seeds.push({
-      common: { id: `review-seed-student-${workbook.id}`, sourceWorkbookId: workbook.id, ...readingLink(workbook.bookTitle, workbook.id), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: workbook.bookTitle, bookAuthor: workbook.author, bookCoverSrc: workbook.coverSrc, level: workbook.level, month, template: integrated ? mapTemplate(integrated.studentTitle, workbook.level, integrated.questions, String(integrated.id)) : mapTemplate(template.title, workbook.level, template.questions, template.id) },
+      common: { id: `review-seed-student-${workbook.id}`, sourceWorkbookId: workbook.id, ...readingLink(workbook.bookTitle, workbook.level, workbook.id), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: workbook.bookTitle, bookAuthor: workbook.author, bookCoverSrc: workbook.coverSrc, level: workbook.level, month, template: mapTemplate(integrated.studentTitle, workbook.level, integrated.questions, String(integrated.id)) },
       at: `${month}-${String(workbook.day).padStart(2, "0")}T00:00:00Z`,
       status: workbook.status === "feedback" ? "전송완료" : workbook.status === "completed" ? "작성전" : "writing",
       answers: workbook.bookTitle === "901호 띵똥 아저씨" ? roomAnswers : workbook.answers, feedback: workbook.feedback?.content, seen: workbook.id !== "gamunjang-0824", flowers: workbook.feedback?.reward,
     })
   }
   for (const row of AGENCY_ONLINE_WORKBOOKS) {
+    if (!HISTORICAL_REVIEW_IDS.has(`review-seed-agency-${row.id}`)) continue
     const template = connectedTemplate(row.bookTitle, row.level, row.templateName)
     if (!template) continue
     const original = row.questions?.map(q => q.answer) ?? []
@@ -67,11 +86,12 @@ export function getDefaultReviewDatabase() {
       : template.id === 69 ? ["친구, 교실, 연필, 운동장", "친구가 교실에서 연필로 그림을 그립니다. 우리는 쉬는 시간에 운동장에서 놉니다.", "친구가 교실에서 연필을 찾고 있었습니다. 나는 책상 아래에 떨어진 연필을 주워 주었습니다. 우리는 함께 운동장으로 나가 웃으며 놀았습니다."]
       : original
     seeds.push({
-      common: { id: `review-seed-agency-${row.id}`, legacyRecordId: row.id, sourceWorkbookId: `seed-agency-${row.id}`, ...readingLink(row.bookTitle, `seed-agency-${row.id}`), studentId: row.studentName === "진독도" ? "26142" : `seed-${row.studentName}`, studentName: row.studentName, institutionId: "dokdo", institution: row.institution, classId: "class-1", bookTitle: row.bookTitle, level: row.level, month: row.submittedAt.slice(0, 7), template: mapTemplate(template.studentTitle, row.level, row.questions ?? template.questions, String(template.id)) },
+      common: { id: `review-seed-agency-${row.id}`, legacyRecordId: row.id, sourceWorkbookId: `seed-agency-${row.id}`, ...readingLink(row.bookTitle, row.level, `seed-agency-${row.id}`), studentId: row.studentName === "진독도" ? "26142" : `seed-${row.studentName}`, studentName: row.studentName, institutionId: "dokdo", institution: row.institution, classId: "class-1", bookTitle: row.bookTitle, level: row.level, month: row.submittedAt.slice(0, 7), template: mapTemplate(template.studentTitle, row.level, row.questions ?? template.questions, String(template.id)) },
       at: `${row.submittedAt}T00:00:00Z`, status: row.status, answers, feedback: row.feedbackText, seen: true, flowers: row.status === "작성전" ? 0 : row.flowers, parentContact: row.parentContactRegistered, parentSent: row.parentSent,
     })
   }
   for (const row of ADMIN_WORKBOOK_SEEDS.filter(r => !AGENCY_ONLINE_WORKBOOKS.some(a => a.id === r.id))) {
+    if (!HISTORICAL_REVIEW_IDS.has(`review-seed-hq-${row.id}`)) continue
     const template = connectedTemplate(row.book, row.level)
     if (!template) continue
     const answers = row.book === "거울 속 도플갱어" ? [
@@ -85,11 +105,11 @@ export function getDefaultReviewDatabase() {
       "여행은 목적지에 빨리 도착하는 것뿐 아니라 가는 길에서 다른 사람들의 생활을 배우는 일이라고 생각했다.",
       "책에 나온 경로를 지도에 표시하고 나라별로 달라지는 자연환경을 더 찾아보고 싶다.",
     ]
-    seeds.push({ common: { id: `review-seed-hq-${row.id}`, legacyRecordId: row.id, sourceWorkbookId: `seed-hq-${row.id}`, ...readingLink(row.book, `seed-hq-${row.id}`), studentId: `seed-hq-${row.student}`, studentName: row.student, institutionId: `seed-${row.institution}`, institution: row.institution, classId: "class-1", bookTitle: row.book, level: row.level, month: row.submittedAt.slice(0,7), template: mapTemplate(template.studentTitle, row.level, template.questions, String(template.id)) }, at: `${row.submittedAt}T00:00:00Z`, status: row.status, answers, flowers: row.status === "작성전" ? 0 : row.flowers })
+    seeds.push({ common: { id: `review-seed-hq-${row.id}`, legacyRecordId: row.id, sourceWorkbookId: `seed-hq-${row.id}`, ...readingLink(row.book, row.level, `seed-hq-${row.id}`), studentId: `seed-hq-${row.student}`, studentName: row.student, institutionId: `seed-${row.institution}`, institution: row.institution, classId: "class-1", bookTitle: row.book, level: row.level, month: row.submittedAt.slice(0,7), template: mapTemplate(template.studentTitle, row.level, template.questions, String(template.id)) }, at: `${row.submittedAt}T00:00:00Z`, status: row.status, answers, flowers: row.status === "작성전" ? 0 : row.flowers })
   }
-  const template = connectedTemplate("901호 띵똥 아저씨", 2)!
   const templateFor = (bookTitle: string, level: number) => {
-    const connected = connectedTemplate(bookTitle, level) ?? template
+    const connected = connectedTemplate(bookTitle, level)
+    if (!connected) throw new Error(`예시 도서의 레벨·독서 회차에 연결된 양식이 없습니다: ${bookTitle} (${level}레벨)`)
     return mapTemplate(connected.studentTitle, level, connected.questions, String(connected.id))
   }
   const answersFor = (bookTitle: string, reviewTemplate: ReviewTemplate) => {
@@ -109,16 +129,16 @@ export function getDefaultReviewDatabase() {
   const secondAvailableAnswers = answersFor("미술관으로 간 백곰", secondAvailableTemplate)
   const secondWritingTemplate = templateFor("괴물을 사랑한 아이 윌로딘", 6)
   const secondWritingAnswers = [
-    "괴물처럼 보이는 존재를 사랑하는 아이라는 제목이 신기해서 이 책을 골랐습니다.",
     "마을 사람들이 싫어하는 괴물과 벌새곰이 사라지는 일을 윌로딘이 살펴보는 이야기입니다.",
-    "윌로딘이 다른 사람들의 시선과 상관없이 괴물을 지켜 주려는 모습이 용감하다고 생각했습니다.",
-    "책에서 배운 점을 생활 속에서 실천하고 비슷한 주제의 책도 더 찾아 읽고 싶습니다.",
+    "윌로딘이 다른 사람들의 시선과 상관없이 괴물을 지켜 주려는 장면이 기억에 남았습니다.",
+    "겉모습이 낯선 생명도 자연 안에서 소중한 역할을 한다는 생각을 전하는 이야기라고 느꼈습니다.",
+    "윌로딘의 용기를 보며 나도 겉모습만으로 다른 존재를 판단하지 않아야겠다고 생각했습니다.",
   ]
   const secondWritingDraftAnswers = [
-    "처음에는 ‘괴물을 사랑한다’는 제목이 낯설어서 책을 골랐습니다. 읽고 나니 겉모습 때문에 미움받는 존재도 소중할 수 있다는 뜻이 궁금해졌고, 내가 생명을 바라보는 태도도 돌아보게 되었습니다.",
     "마을 사람들은 냄새가 나고 보기 싫다는 이유로 괴물을 없애려 합니다. 하지만 벌새곰이 사라지자 윌로딘은 두 생물이 이어져 있을지 모른다고 생각하고 원인을 찾아 나섭니다. 이 과정에서 자연의 모든 생명은 서로 영향을 주고받는다는 사실이 드러납니다.",
-    "윌로딘이 사람들의 편견보다 자신이 관찰한 사실을 믿고 괴물을 지키려 한 점이 인상 깊었습니다. 나도 학교 화단에서 징그럽다는 이유로 작은 벌레를 피한 적이 있는데, 그 벌레에게도 자연 속 역할이 있을 수 있다는 생각이 들었습니다.",
-    "이번 주말에는 집 근처 공원에서 볼 수 있는 곤충과 식물을 관찰해 기록하겠습니다. 생김새만 보고 해롭다고 판단하지 않고 어떤 역할을 하는지 찾아본 뒤, 비슷한 주제의 생태 책도 한 권 더 읽어 보겠습니다.",
+    "윌로딘이 사람들의 편견보다 자신이 관찰한 사실을 믿고 괴물을 지키려 한 장면이 인상 깊었습니다. 모두가 싫어하는 존재를 혼자 지키는 일은 두렵지만, 윌로딘은 생명을 소중히 여기며 용기를 냈습니다.",
+    "작가는 괴물과 벌새곰의 관계를 통해 자연의 생명들이 서로 연결되어 있다는 생각을 전한다고 느꼈습니다. 사람에게 보기 싫다는 이유만으로 한 생명을 없애면 다른 생명에게도 영향을 줄 수 있습니다.",
+    "나도 학교 화단에서 징그럽다는 이유로 작은 벌레를 피한 적이 있는데, 그 벌레에게도 자연 속 역할이 있을 수 있다는 생각이 들었습니다. 앞으로는 생김새만 보고 판단하지 않고 어떤 역할을 하는지 관찰해 보고 싶습니다.",
   ]
   const secondSubmittedTemplate = templateFor("쥐와 다람쥐의 이야기", 3)
   const secondSubmittedAnswers = [
@@ -136,37 +156,39 @@ export function getDefaultReviewDatabase() {
   const twoRoundsTemplate = templateFor("푸른 눈의 독립운동가 [개정본]", 5)
   const twoRoundsAnswers = answersFor("푸른 눈의 독립운동가 [개정본]", twoRoundsTemplate)
   seeds.push({
-    common: { id: "review-seed-new-writing", sourceWorkbookId: "new-review-writing-room901", ...readingLink("남몰래 거울", "new-review-writing-room901"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "남몰래 거울", bookAuthor: "노란돼지", level: 2, month: "2026-09", template: newWritingTemplate },
+    common: { id: "review-seed-new-writing", sourceWorkbookId: "new-review-writing-room901", ...readingLink("남몰래 거울", 2, "new-review-writing-room901"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "남몰래 거울", bookAuthor: "노란돼지", level: 2, month: "2026-09", template: newWritingTemplate },
     at: "2026-09-07T00:00:00Z", status: "writing", answers: newWritingAnswers,
   })
   seeds.push({
-    common: { id: "review-seed-new-submitted", sourceWorkbookId: "new-review-submitted-gamunjang", ...readingLink("우리 곧 사라져요", "new-review-submitted-gamunjang"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "우리 곧 사라져요", bookAuthor: "노란상상", level: 1, month: "2026-09", template: newSubmittedTemplate },
+    common: { id: "review-seed-new-submitted", sourceWorkbookId: "new-review-submitted-gamunjang", ...readingLink("우리 곧 사라져요", 1, "new-review-submitted-gamunjang"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "우리 곧 사라져요", bookAuthor: "노란상상", level: 1, month: "2026-09", template: newSubmittedTemplate },
     at: "2026-09-07T01:00:00Z", status: "작성전", answers: newSubmittedAnswers,
   })
   seeds.push({
-    common: { id: "review-seed-second-available", sourceWorkbookId: "review-second-available-room901", ...readingLink("미술관으로 간 백곰", "review-second-available-room901"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "미술관으로 간 백곰", bookAuthor: "노란상상", level: 2, month: "2026-09", template: secondAvailableTemplate },
+    common: { id: "review-seed-second-available", sourceWorkbookId: "review-second-available-room901", ...readingLink("미술관으로 간 백곰", 2, "review-second-available-room901"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "미술관으로 간 백곰", bookAuthor: "노란상상", level: 2, month: "2026-09", template: secondAvailableTemplate },
     at: "2026-09-06T00:00:00Z", status: "전송완료", seen: true, secondState: "available", answers: secondAvailableAnswers,
     feedback: "책의 내용을 자신의 생각과 연결한 점이 좋습니다. 선생님의 질문을 참고해 행동 계획을 조금 더 구체적으로 고쳐 써 보세요.",
   })
   seeds.push({
-    common: { id: "review-seed-second-writing", sourceWorkbookId: "review-second-writing-room901", ...readingLink("괴물을 사랑한 아이 윌로딘", "review-second-writing-room901"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "괴물을 사랑한 아이 윌로딘", bookAuthor: "가람어린이", level: 6, month: "2026-09", template: secondWritingTemplate },
+    common: { id: "review-seed-second-writing", sourceWorkbookId: "review-second-writing-room901", ...readingLink("괴물을 사랑한 아이 윌로딘", 6, "review-second-writing-room901"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "괴물을 사랑한 아이 윌로딘", bookAuthor: "가람어린이", level: 6, month: "2026-09", template: secondWritingTemplate },
     at: "2026-09-05T00:00:00Z", status: "전송완료", seen: true, secondState: "writing", answers: secondWritingAnswers,
     secondDraftAnswers: secondWritingDraftAnswers,
     feedback: "책 속 인물의 마음을 잘 살펴보았어요. 이번에는 인물의 선택을 자신의 경험과 더 구체적으로 연결해 보세요.",
   })
   seeds.push({
-    common: { id: "review-seed-second-submitted", sourceWorkbookId: "review-second-submitted-squirrel", ...readingLink("쥐와 다람쥐의 이야기", "review-second-submitted-squirrel"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "쥐와 다람쥐의 이야기", bookAuthor: "책빛", level: 3, month: "2026-09", template: secondSubmittedTemplate },
+    common: { id: "review-seed-second-submitted", sourceWorkbookId: "review-second-submitted-squirrel", ...readingLink("쥐와 다람쥐의 이야기", 3, "review-second-submitted-squirrel"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "쥐와 다람쥐의 이야기", bookAuthor: "책빛", level: 3, month: "2026-09", template: secondSubmittedTemplate },
     at: "2026-09-03T00:00:00Z", status: "전송완료", seen: true, secondState: "submitted", answers: secondSubmittedAnswers,
     secondDraftAnswers: secondSubmittedDraftAnswers,
     feedback: "두 동물의 차이를 잘 살펴보았어요. 친구와 생각이 달랐던 경험을 떠올리고 서로를 이해할 방법을 더 구체적으로 써 보세요.",
   })
   seeds.push({
-    common: { id: "review-seed-two-rounds", sourceWorkbookId: "review-two-round-sample", ...readingLink("푸른 눈의 독립운동가 [개정본]", "review-two-round-sample"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "푸른 눈의 독립운동가 [개정본]", bookAuthor: "풀빛", level: 5, month: "2026-09", template: twoRoundsTemplate },
+    common: { id: "review-seed-two-rounds", sourceWorkbookId: "review-two-round-sample", ...readingLink("푸른 눈의 독립운동가 [개정본]", 5, "review-two-round-sample"), studentId: "26142", studentName: "진독도", institutionId: "dokdo", institution: "독도학원", classId: "class-1", bookTitle: "푸른 눈의 독립운동가 [개정본]", bookAuthor: "풀빛", level: 5, month: "2026-09", template: twoRoundsTemplate },
     at: "2026-09-02T00:00:00Z", status: "전송완료", seen: true, secondSeen: false, flowers: 15, parentSent: true,
     answers: twoRoundsAnswers,
     feedback: "책의 내용을 자신의 생각과 연결했어요. 독립운동가의 선택이 어떤 의미인지 한 가지 근거를 더 들어 구체적으로 써 볼까요?",
     secondAnswers: twoRoundsAnswers.map((answer, index) => index === 0 ? `${answer} 선생님의 질문을 읽고 인물의 선택을 더 자세히 살펴보았습니다.` : `${answer} 책에서 찾은 근거를 덧붙여 생각을 발전시켰습니다.`),
     secondFeedback: "첫 번째 글에서 더 나아가 인물의 선택과 의미를 구체적인 근거로 설명했어요. 책의 내용을 자신의 생각과 연결하며 글을 발전시킨 점이 돋보입니다.",
   })
+  // Keep the installation version: correct fresh fixtures without migrating saved
+  // template snapshots, writing, feedback, reports or histories in existing stores.
   return { ...createSeededReviewDatabase(seeds), seedVersion: 14 }
 }
