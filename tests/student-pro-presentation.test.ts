@@ -71,17 +71,17 @@ test("자동 선정 후보도 학생에게는 신청 가능으로 표시하며 �
 test("신청 완료와 선생님 작성 중 구분, 학생 신청만 마감 전 취소 버튼", () => {
   const view = fixture(), c = book(view)
   c.selected = true; c.selection = "학생 신청"; c.canCancel = true
-  assert.equal(proBookPresentation(view, c.reviewId)?.status, "피드백 기다리는 중")
-  assert.equal(proBookPresentation(view, c.reviewId)?.listStatus, "피드백 기다리는 중")
+  assert.equal(proBookPresentation(view, c.reviewId)?.status, "피드백 대기")
+  assert.equal(proBookPresentation(view, c.reviewId)?.listStatus, "피드백 대기")
   assert.equal(proBookPresentation(view, c.reviewId)?.action, "cancel")
   c.locked = true
   assert.equal(proBookPresentation(view, c.reviewId)?.status, "피드백 작성 중")
   assert.equal(proBookPresentation(view, c.reviewId)?.action, undefined)
   c.locked = false; c.selection = "선생님 지정"
-  assert.equal(proBookPresentation(view, c.reviewId)?.status, "피드백 기다리는 중")
+  assert.equal(proBookPresentation(view, c.reviewId)?.status, "피드백 대기")
   assert.equal(proBookPresentation(view, c.reviewId)?.action, undefined)
   c.selection = "학생 신청"; view.now = c.cutoff
-  assert.equal(proBookPresentation(view, c.reviewId)?.status, "피드백 기다리는 중")
+  assert.equal(proBookPresentation(view, c.reviewId)?.status, "피드백 대기")
 })
 test("권수 부족은 목록 상태를 추가하지 않고 상세에서 신청 비활성 사유 유지", () => {
   const view = fixture(), c = book(view)
@@ -92,7 +92,10 @@ test("권수 부족은 목록 상태를 추가하지 않고 상세에서 신청 
   assert.equal(state.listStatus, null)
   assert.equal(state.action, "apply")
   assert.equal(state.enabled, false)
-  assert.equal(state.guide, "다른 독후감으로 바꾸려면, 신청한 독후감을 열어 [신청 취소]를 눌러 주세요.")
+  assert.equal(state.guide, "다음 주에 신청 가능한 권수를 다시 확인해 주세요.")
+  c.changeCandidates = ["review-pro-apply-a"]
+  assert.equal(proBookPresentation(view, c.reviewId)?.action, "change")
+  assert.equal(proBookPresentation(view, c.reviewId)?.guide, "신청한 독후감 대신 이 글로 바꿀 수 있어요.")
   view.usage.used = view.usage.limit
   assert.equal(proBookPresentation(view, c.reviewId)?.listStatus, null)
   assert.equal(proBookPresentation(view, c.reviewId)?.guide, "이번 달 피드백 이용 권수를 모두 썼어요.")
@@ -150,26 +153,32 @@ test("이월 안내는 현재 남은 신청 권수에 포함된 이월분만 괄
 
 test("상세와 공통 신청 모달도 같은 잔여 이월 문구를 권수 옆 한 줄에 표시", () => {
   const source = readFileSync(new URL("../src/components/student/pro-feedback-status.tsx", import.meta.url), "utf8")
-  const modal = source.slice(source.indexOf("function ProFeedbackModal"), source.indexOf("export function ProFeedbackAction"))
+  const modal = readFileSync(new URL("../src/components/student/pro-feedback-modal.tsx", import.meta.url), "utf8")
   const detail = source.slice(source.indexOf("export function ProFeedbackAction"))
   for (const section of [modal, detail]) {
     assert.match(section, /const rollover = proRolloverText\(view\.usage\)/)
-    assert.match(section, /className="[^"\n]*whitespace-nowrap[^"\n]*">\{proRemainingText\(view\.usage\.available\)\}\{rollover && <span[^>]*>\{rollover\}<\/span>\}/)
+    assert.match(section, /className=\{ui.remaining\}>\{proRemainingText\(view\.usage\.available\)\}\{rollover && <span[^>]*>\{rollover\}<\/span>\}/)
   }
-  assert.match(modal, /action === "apply" && <span/)
+  assert.match(modal, /action === "apply" && <p/)
+  const css = readFileSync(new URL("../src/components/student/pro-feedback.module.css", import.meta.url), "utf8")
+  assert.match(css, /\.remaining\{[^}]*white-space:nowrap/)
 })
 
-test("월 이용 표시에서 대기 숫자만 제거하고 사용 권수·월 한도와 펼침 동작 유지", () => {
+test("월 이용은 안내 모달에서 사용 권수·한도를 표시하며 아코디언은 제거", () => {
   const source = readFileSync(new URL("../src/components/student/pro-feedback-status.tsx", import.meta.url), "utf8")
-  const usage = source.slice(source.indexOf("export function ProFeedbackUsage"), source.indexOf("export function ProFeedbackStatus"))
+  const modal = readFileSync(new URL("../src/components/student/pro-feedback-modal.tsx", import.meta.url), "utf8")
+  const usage = modal.slice(modal.indexOf("export function ProFeedbackHelpModal"), modal.indexOf("export function ProFeedbackModal"))
   assert.doesNotMatch(usage, /u\.pending|첫 피드백|대기 권수/)
   assert.match(usage, /월 피드백 이용/)
   assert.match(usage, /\{u\.used\}/)
   assert.match(usage, /\{u\.limit\}/)
-  assert.match(usage, /\/ \{u\.limit\}권 사용<\/span>/)
-  assert.match(usage, /React\.useState\(false\)/)
-  assert.match(usage, /aria-expanded=\{expanded\}/)
-  assert.match(usage, /aria-controls=\{detailsId\}/)
+  assert.match(usage, /\/ \{u\.limit\}권 사용<\/p>/)
+  assert.match(source, /aria-haspopup="dialog"/)
+  assert.match(source, /helpOpen && <ProFeedbackHelpModal/)
+  assert.doesNotMatch(source, /aria-expanded|setExpanded/)
+  assert.match(usage, /<button type="button" onClick=\{onClose\}>확인<\/button>/)
+  for (const icon of ["send", "calendarCheck", "rotate", "edit"]) assert.ok(usage.includes(`icon: "${icon}"`))
+  assert.match(usage, /<ReviewIcon name=\{icon\} size=\{18\}/)
   const view = fixture(), before = structuredClone(view)
   view.usage.pending = 2
   proSummaryText(view)

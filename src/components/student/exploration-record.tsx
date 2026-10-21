@@ -69,6 +69,7 @@ export function ExplorationRecord() {
   const [selectedMonth, setSelectedMonth] = React.useState<string>()
   const { year, month, currentYear, currentMonth, currentDay } = studentCalendar(reviewHook.db.currentTime ?? "1970-01-01T00:00:00.000Z", selectedMonth)
   const [tab, setTab] = React.useState<TabName>("전체")
+  const [calendarExpanded, setCalendarExpanded] = React.useState(false)
   const [readingLevel, setReadingLevel] = React.useState("")
   const [readingAttempt, setReadingAttempt] = React.useState("")
   const tabListRef = React.useRef<HTMLDivElement>(null)
@@ -153,8 +154,8 @@ export function ExplorationRecord() {
   if (!reviewHook.db.currentTime) return <div className={ui.page}><StudentHeader /><p role="status" className="p-6 text-center">{reviewHook.error || "탐험 기록을 불러오고 있어요."}</p></div>
 
   return (
-    <div className={ui.page}>
-      <StudentHeader now={reviewHook.db.currentTime} />
+    <div className={`${ui.page} ${tab === "온라인 독후감" ? ui.workbookDesign : ""}`} data-review-design={tab === "온라인 독후감"}>
+      <StudentHeader now={reviewHook.db.currentTime} reviewDesign={tab === "온라인 독후감"} />
       {secondStart && <SecondReviewStartModal {...secondStart} deadline={reviewHook.db.studentPro?.cases.find(c => `${c.reviewId}-r1` === secondStart.recordId)?.secondDeadline} reference={reviewHook.db.studentPro?.now} run={reviewHook.run} onClose={() => setSecondStart(null)} />}
       <section className={ui.top}>
         <div className="mx-auto flex max-w-[920px] items-center justify-center gap-2">
@@ -167,15 +168,23 @@ export function ExplorationRecord() {
         </div>
       </section>
 
+      {tab === "온라인 독후감" && <ProFeedbackUsage db={reviewHook.db} loaded={reviewHook.loaded} error={reviewHook.error}/>}
       <main className={ui.layout}>
-<aside className={ui.calendar}><h2>{month}월의 탐험</h2><p className={ui.stats}><strong>{rows.length}</strong> 회 학습 <span><Image className="inline-block" src="/student-assets/flower-reward.svg" alt="섬초롱꽃" width={20} height={20} /> <b>{flowers}</b>개</span></p><div className={ui.days}>{["일","월","화","수","목","금","토"].map((d,i)=><span className={ui.weekday} key={d} data-sunday={i===0}>{d}</span>)}{Array.from({length:monthStart},(_,i)=><span key={`blank-${i}`} />)}{Array.from({length:monthDays},(_,i)=><span key={i} data-active={Boolean(grouped[i+1])} data-today={year===currentYear && month===currentMonth && i+1===currentDay}>{i+1}</span>)}</div><footer><p><i />책 + 글　<i />책 또는 글　<i />그 외</p><p>이번 달 <strong>{days.length}일</strong> 탐험했어요</p></footer></aside>
-        <div className={ui.timeline}>{tab === "온라인 독후감" && <ProFeedbackUsage db={reviewHook.db} loaded={reviewHook.loaded} error={reviewHook.error}/>}{tab === "책 읽기 탐험" && <div className={ui.readingFilters}><label>레벨 <select aria-label="레벨" value={readingLevel} onChange={e=>setReadingLevel(e.target.value)}><option value="">선택</option>{[1,2,3,4,5,6].map(level=><option key={level} value={level}>{level}레벨</option>)}</select></label><label>탐험 구분 <select aria-label="탐험 구분" value={readingAttempt} onChange={e=>setReadingAttempt(e.target.value)}><option value="">선택</option><option>첫 탐험</option><option>재탐험</option></select></label></div>}{tab === "온라인 독후감" && <p className={ui.notice}>보고서는 제공되는 독후감에만 표시돼요.</p>}
+        <aside className={ui.calendar} data-expanded={calendarExpanded}>
+          <h2>{month}월의 탐험</h2>
+          <p className={ui.stats}><strong>{rows.length}</strong> 회 학습 <span><Image className="inline-block" src="/student-assets/flower-reward.svg" alt="섬초롱꽃" width={20} height={20} /> <b>{flowers}</b>개</span>{tab === "온라인 독후감" && <button type="button" className={ui.calendarToggle} aria-expanded={calendarExpanded} aria-controls="workbook-calendar-body" onClick={() => setCalendarExpanded(value => !value)}>{calendarExpanded ? "달력 접기" : "달력 펼치기"}</button>}</p>
+          <div id="workbook-calendar-body" className={ui.calendarBody}>
+            <div className={ui.days}>{["일","월","화","수","목","금","토"].map((d,i)=><span className={ui.weekday} key={d} data-sunday={i===0}>{d}</span>)}{Array.from({length:monthStart},(_,i)=><span key={`blank-${i}`} />)}{Array.from({length:monthDays},(_,i)=><span key={i} data-active={Boolean(grouped[i+1])} data-today={year===currentYear && month===currentMonth && i+1===currentDay}>{i+1}</span>)}</div>
+            <footer><p><i />책 + 글　<i />책 또는 글　<i />그 외</p><p>이번 달 <strong>{days.length}일</strong> 탐험했어요</p></footer>
+          </div>
+        </aside>
+        <div className={ui.timeline}>{tab === "책 읽기 탐험" && <div className={ui.readingFilters}><label>레벨 <select aria-label="레벨" value={readingLevel} onChange={e=>setReadingLevel(e.target.value)}><option value="">선택</option>{[1,2,3,4,5,6].map(level=><option key={level} value={level}>{level}레벨</option>)}</select></label><label>탐험 구분 <select aria-label="탐험 구분" value={readingAttempt} onChange={e=>setReadingAttempt(e.target.value)}><option value="">선택</option><option>첫 탐험</option><option>재탐험</option></select></label></div>}{tab === "온라인 독후감" && <p className={ui.notice}>보고서는 제공되는 독후감에만 표시돼요.</p>}
         {days.length === 0 ? <div className="grid min-h-[390px] place-items-center rounded-[22px] bg-white text-[#999] shadow-[0_4px_18px_rgba(45,62,72,.08)]"><p>탐험 기록이 없는 달이에요</p></div> : (
           <div className="space-y-8">
             {days.map(day => {
               const dayRows = sortExplorationTimelineItems(grouped[day] ?? [])
               const weekday = new Intl.DateTimeFormat("ko-KR", { weekday: "short" }).format(new Date(year, month - 1, day))
-              return <section key={day} className={ui.dayGroup}><h2 className="mb-4 flex items-center gap-2 text-base font-black"><CalendarDays className="size-5 text-[#60baf0]" />{String(month).padStart(2, "0")}월 {String(day).padStart(2, "0")}일 ({weekday})</h2><ul className={ui.cards}>{dayRows.map((row) => row.kind === "review" ? <StudentReviewRecordCard key={row.item.id} db={reviewHook.db} record={row.item} onStartSecond={(record, sourceWorkbookId) => startSecondReview(record.id, sourceWorkbookId)} /> : row.kind === "workbook" ? <WorkbookRow key={row.item.id} workbook={row.item} mounted={mounted} onClick={() => router.push(`/student/online-workbook/${row.item.id}?from=records`)} /> : <BasicRow key={row.item.id} item={row.item} onClick={row.item.type === "책 읽기 탐험" ? () => setSelectedReadingRecord(row.item) : undefined} />)}</ul></section>
+              return <section key={day} className={ui.dayGroup}><h2 className="mb-4 flex items-center gap-2 text-base font-black"><CalendarDays className="size-5 text-[#60baf0]" />{String(month).padStart(2, "0")}월 {String(day).padStart(2, "0")}일 ({weekday})</h2><ul className={ui.cards}>{dayRows.map((row) => row.kind === "review" ? <StudentReviewRecordCard key={row.item.id} db={reviewHook.db} record={row.item} referenceDesign={tab === "온라인 독후감"} onStartSecond={(record, sourceWorkbookId) => startSecondReview(record.id, sourceWorkbookId)} /> : row.kind === "workbook" ? <WorkbookRow key={row.item.id} workbook={row.item} mounted={mounted} onClick={() => router.push(`/student/online-workbook/${row.item.id}?from=records`)} /> : <BasicRow key={row.item.id} item={row.item} onClick={row.item.type === "책 읽기 탐험" ? () => setSelectedReadingRecord(row.item) : undefined} />)}</ul></section>
             })}
           </div>
         )}

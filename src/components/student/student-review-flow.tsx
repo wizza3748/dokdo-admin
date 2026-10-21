@@ -1,6 +1,7 @@
 "use client"
 import * as React from "react"
 import { ProSecondDeadline, ProFeedbackAction } from "./pro-feedback-status"
+import { useStudentToast } from "./student-toast"
 import Link from "next/link"
 import Image from "next/image"
 import ui from "./review-test-server.module.css"
@@ -9,6 +10,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, BookOpen, File
 import { BookPanel, StartConfirmModal, ConfirmModal, OutlineModal, PreviewModal, SelectionScreen, SelectionTitle } from "./student-workbook-ui"
 import { getWorkbookForReview, type WorkbookTemplate } from "@/lib/student-workbooks"
 import { StudentHeader } from "@/components/student/student-header"
+import { ReviewIcon } from "./review-design-icons"
 import { useReviews, reviewSharePath } from "@/lib/review-client"
 import { getConfiguredTemplates, subscribeTemplateSettings } from "@/lib/workbook-template-settings"
 import { cn } from "@/lib/utils"
@@ -107,7 +109,7 @@ export function StudentReviewFlow({ workbook }: { workbook: StudentWorkbook }) {
     setBusy(false)
   }
   const listHref = `/student/exploration-record?tab=workbook&month=${common ? reviewActivityDate(common).monthKey : `${workbook.year}-${String(workbook.month).padStart(2, "0")}`}`
-  return <div className={ui.root}><StudentHeader section="온라인 독후감" />
+  return <div className={ui.root}><StudentHeader section="온라인 독후감" reviewDesign={!selecting && record?.writingStatus === "submitted"} />
     {selecting && <SelectionTitle title={workbook.bookTitle} />}
     {hook.error && <p role="alert" className="mx-auto max-w-[930px] py-3 text-red-600">{hook.error}</p>}
     {selecting ? <><div className="mx-auto max-w-[930px] px-4 pt-6">{fromRecords && <Link className="inline-flex items-center gap-2 text-sm font-bold text-[#147fbd] hover:underline" href={listHref}><ArrowLeft className="size-4" />온라인 독후감 목록</Link>}</div><SelectionScreen workbook={displayWorkbook} template={displayTemplate} selectedId={selected} onSelect={setSelected} onPreview={() => setPreview(true)} onStart={() => setStarting(true)} showReportGuide compactTop={fromRecords} /></> : record && (expiredDraft ? <main className="mx-auto max-w-4xl p-8"><h1 className="text-xl font-bold">기한이 끝난 2차 글</h1><p className="my-4">저장한 글은 읽기만 할 수 있어요.</p><StudentResultContent common={record.stage === "items" ? { ...common, template: { ...common.template, rewriteMode: "items" } } : common} record={{ ...record, finalBody: record.body }}/><Link className="mt-5 block text-blue-600" href={listHref}>온라인 독후감 목록</Link></main> : record.writingStatus === "writing" ? <ReviewWriting key={`${record.id}:${record.stage}`} common={common} record={record} first={records.find(r => r.round === 1)!} hook={hook} /> : <ReviewResult common={common} record={record} records={records} hook={hook} setRound={setRound} />)}
@@ -119,6 +121,7 @@ export function StudentReviewFlow({ workbook }: { workbook: StudentWorkbook }) {
 }
 
 function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; record: ReviewRecord; first: ReviewRecord; hook: ReviewHook }) {
+  const showToast = useStudentToast()
   const rewrite = record.stage === "rewrite"
   const itemRewrite = rewrite && reviewWritingMode(common.template) === "items"
   const guide = parseRewriteGuide(common.template.rewriteGuide)
@@ -241,6 +244,7 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
       if (hook.db.studentPro && record.round === 1) sessionStorage.setItem(`pro-submit-prompt:${common.id}`, "1")
       const submitted = await hook.run({ type: "submit", recordId: record.id })
       if (!submitted) sessionStorage.removeItem(`pro-submit-prompt:${common.id}`)
+      if (submitted && record.round === 2 && hook.db.studentPro) showToast("2차 글을 제출했어요. 선생님의 피드백을 기다려 주세요.")
     }
     setModal(null)
     setBusy(false)
@@ -358,17 +362,17 @@ export function ReviewResult({ common, record, records, hook, setRound, external
   }
   const resultFooter = showListNavigation && <footer className={ui.resultFooter}><Link href={`/student/exploration-record?tab=workbook&month=${reviewActivityDate(common).monthKey}`}><ArrowLeft size={18} />온라인 독후감 목록</Link><div><button type="button" disabled={shareBusy} onClick={() => void copyReviewLink()}><FileText size={18} />{shareBusy ? "링크 복사 중…" : "독후감 링크 복사"}</button><button type="button" onClick={() => void copyWriting()}><FileText size={18} />글 복사</button><a href="https://read365.edunet.net/Search" target="_blank" rel="noopener noreferrer"><BookOpen size={20} />독서로 이동</a></div></footer>
   return <>
-    <main className={ui.result}>
+    <main className={`${ui.result} ${!external ? ui.referenceResult : ""}`}>
       <header className={ui.resultHeader}>
-        {!external && <ol><li><Check size={14} />차례대로 쓰기<span>›</span></li><li><Check size={14} />고쳐쓰기<span>›</span></li><li data-active="true"><b>3</b>나의 글 완성</li></ol>}
-        <div><h1>{common.bookTitle}<span><Pencil size={14} />{common.template.title}</span></h1><div className={ui.resultActions}>{firstReport && first && <a className={reportClass} target="_blank" rel="noopener noreferrer" href={`/online-review/report/${first.id}?role=${external ? "external" : "student"}${shareQuery}`}><FileText size={14} />1차 보고서</a>}{secondReport && second && <a className={reportClass} target="_blank" rel="noopener noreferrer" href={`/online-review/report/${second.id}?role=${external ? "external" : "student"}${shareQuery}`}><FileText size={14} />2차 보고서</a>}</div></div>
+        {!external && <ol><li><Check size={14} strokeWidth={1.5}/>차례대로 쓰기<span>›</span></li><li><Check size={14} strokeWidth={1.5}/>고쳐쓰기<span>›</span></li><li data-active="true"><Check size={14} strokeWidth={1.5}/>나의 글 완성</li></ol>}
+        <div><h1>{common.bookTitle}<span><Pencil size={14} />{common.template.title}</span></h1><div className={ui.resultActions}>{firstReport && first && <a className={reportClass} target="_blank" rel="noopener noreferrer" href={`/online-review/report/${first.id}?role=${external ? "external" : "student"}${shareQuery}`}>{external ? <FileText size={14}/> : <ReviewIcon name="report" size={14}/>}1차 보고서</a>}{secondReport && second && <a className={reportClass} target="_blank" rel="noopener noreferrer" href={`/online-review/report/${second.id}?role=${external ? "external" : "student"}${shareQuery}`}>{external ? <FileText size={14}/> : <ReviewIcon name="report" size={14}/>}2차 보고서</a>}</div></div>
       </header>
+      {!external && !compareOpen && <><ProFeedbackAction db={hook.db} reviewId={common.id} round={record.round} submitted={record.writingStatus === "submitted"}/><ProSecondDeadline db={hook.db} reviewId={common.id}/></>}
       {secondSubmitted && (!hook.db.studentPro || compareOpen || external) && writingTabs}
       {canStartSecond && <div className={ui.secondRequest}><p>선생님의 피드백을 참고해 2차 글을 작성해 보세요.</p><button type="button" onClick={() => setSecondStart(true)}>2차 글 시작하기 →</button></div>}
       {compareOpen ? <div className="min-w-0 space-y-4"><section className={ui.resultCard} aria-label="작성 글 비교"><header><h2>{common.template.title}<small>1차 · 2차 나란히</small></h2><FeedbackToggle checked={compareFeedback} onChange={()=>setCompareFeedback(v=>!v)} /></header><div className={ui.compare}>{submitted.map(r => <article key={r.id}><h3>{r.round}차 작성 글</h3><InlineReviewContent common={common} record={r} showFeedback={compareFeedback} /><StudentResultContent common={common} record={r} showFeedback={compareFeedback} /></article>)}</div></section>{resultFooter}</div> : <div className={ui.resultGrid}>
         <aside><BookPanel workbook={workbook} /><p className={ui.progress} aria-label={`독후감 상태: ${progressLabel}`}>{progressLabel}</p></aside>
         <div className="min-w-0 space-y-4">
-          {!external && <><ProFeedbackAction db={hook.db} reviewId={common.id} round={record.round} submitted={record.writingStatus === "submitted"}/><ProSecondDeadline db={hook.db} reviewId={common.id}/></>}
           {secondSubmitted && hook.db.studentPro && !external && writingTabs}
           <article className={ui.resultCard}><header><h2>{common.template.title}</h2>{record.feedbackStatus === "전송완료" && <FeedbackToggle checked={feedbackRound === record.round} onChange={() => toggleFeedback(record)} />}</header><div className={ui.resultBody}><InlineReviewContent common={common} record={record} showFeedback={feedbackRound === record.round} /><StudentResultContent common={common} record={record} showFeedback={feedbackRound === record.round} /></div></article>
           {resultFooter}

@@ -23,7 +23,8 @@ export const studentProCopy = {
   usageTitle: "2차 독후감은",
   usage: "선생님이 요청한 2차 독후감은 따로 신청하지 않아도 돼요. 이용 권수도 추가로 쓰지 않아요.",
   secondUsage: "피드백 이용 권수는 추가로 줄어들지 않아요.",
-  waiting: "피드백 기다리는 중",
+  waiting: "피드백 대기",
+  selected: "이번 주 피드백 받을 독후감이 정해졌어요.",
   noReviews: "피드백을 신청할 독후감이 없어요.",
   noReviewsGuide: "책을 끝까지 읽고 독후감을 제출해 주세요. 작성 중인 독후감이 있다면 이어서 완성해 주세요.",
 } as const
@@ -57,6 +58,7 @@ export function consumeProSubmissionPrompt(storage: Pick<Storage, "getItem" | "r
 export function proListGuidance(db: ReviewDatabase) {
   const view = db.studentPro
   if (!view?.active || !view.assigned || view.usage.available <= 0 || view.now >= view.cutoff || view.usage.used >= view.usage.limit) return null
+  if (proSelectedCases(view).length) return null
   const records = db.records.flatMap(record => {
     const review = db.reviews.find(item => item.id === record.reviewId && item.studentId === view.studentId)
     return review ? [{ record, review }] : []
@@ -90,22 +92,43 @@ export function proSecondDeadlineText(at: string, reference: string) {
   return `2차 글은 ${proStudentDeadline(at, reference)}까지 제출해 주세요.`
 }
 
+export function proSecondDeadlineDay(at: string, reference: string) {
+  const days = Math.max(0, Math.round((Date.parse(kstDate(at)) - Date.parse(kstDate(reference))) / 86_400_000))
+  return days === 0 ? "D-day" : `D-${days}`
+}
+
 export function proSummaryText(view: StudentProView, loaded = true, error = "") {
   if (!loaded) return studentProCopy.loading
   if (error) return studentProCopy.error
   if (!view.assigned) return studentProCopy.unassigned
   if (!view.active) return "프로 이용이 종료되었어요."
+  if (proSelectedCases(view).length) return studentProCopy.selected
   if (view.usage.used >= view.usage.limit) return studentProCopy.monthUsed
   if (view.now >= view.cutoff) return studentProCopy.closed
   if (view.usage.available <= 0) return studentProCopy.noSlots
   return studentProCopy.available
 }
 
+export function proSelectedCases(view: StudentProView) {
+  return view.cases.filter(c => c.week === weekStart(view.now) && c.selected && !c.firstSent && !c.closed)
+}
+
+export function proSummaryRemainingText(view: StudentProView) {
+  return proSelectedCases(view).length && view.now < view.cutoff && view.usage.available > 0
+    ? `${view.usage.available}권 더 신청할 수 있어요.` : proRemainingText(view.usage.available)
+}
+
 type BookPresentation = {
   status: string; listStatus: string | null; tone: "blue" | "teal" | "gray";
-  action?: "apply" | "cancel"; enabled: boolean; guide?: string;
+  action?: "apply" | "cancel" | "change"; enabled: boolean; guide?: string;
 }
-export function proRequestFailure(view: StudentProView | undefined, reviewId: string, action: "apply" | "cancel", fallback: string) {
+export function proRequestFailure(view: StudentProView | undefined, reviewId: string, action: "apply" | "cancel" | "change", fallback: string, previousReviewId?: string) {
+  if (action === "change" && view) {
+    const old = view.cases.find(c => c.reviewId === previousReviewId)
+    const target = view.cases.find(c => c.reviewId === reviewId)
+    if (old?.locked) return "선생님이 피드백 작성을 시작했어요. 신청을 바꿀 수 없어요."
+    if ((old && view.now >= old.cutoff) || (target && view.now >= target.cutoff)) return "신청 마감이 지나 바꿀 수 없어요."
+  }
   const c = view?.cases.find(c => c.reviewId === reviewId)
   if (action === "cancel" && c && view) {
     if (c.locked) return "선생님이 피드백 작성을 시작했어요. 신청을 취소할 수 없어요."
@@ -127,11 +150,12 @@ export function proBookPresentation(view: StudentProView, reviewId: string): Boo
   if (c.week > weekStart(view.now)) return { status: "다음 주 신청", listStatus: "다음 주 신청", tone: "gray", action: "apply", enabled: false, guide: `이 글은 ${c.period}에 관리해요. 해당 주가 시작되면 피드백을 신청할 수 있어요.` }
   if (c.week < weekStart(view.now) || view.now >= c.cutoff || c.closed) return { status: "신청 마감", listStatus: "신청 마감", tone: "gray", enabled: false, guide: studentProCopy.expired }
   if (view.usage.available <= 0) {
+    const canChange = view.usage.used < view.usage.limit && !!c.changeCandidates?.length
     const guide = view.usage.used >= view.usage.limit ? studentProCopy.monthUsed
-      : view.cases.some(item => item.canCancel) ? "다른 독후감으로 바꾸려면, 신청한 독후감을 열어 [신청 취소]를 눌러 주세요."
+      : canChange ? "신청한 독후감 대신 이 글로 바꿀 수 있어요."
       : view.cases.some(item => item.selected && !item.firstSent && !item.closed) ? "신청한 글의 피드백을 기다려 주세요."
       : "다음 주에 신청 가능한 권수를 다시 확인해 주세요."
-    return { status: studentProCopy.noSlots, listStatus: null, tone: "gray", action: "apply", enabled: false, guide }
+    return { status: studentProCopy.noSlots, listStatus: null, tone: "gray", action: canChange ? "change" : "apply", enabled: canChange, guide }
   }
   return { status: "피드백 신청 가능", listStatus: "피드백 신청 가능", tone: "blue", action: "apply", enabled: c.canApply, guide: "이 독후감으로 선생님 피드백을 신청할 수 있어요." }
 }

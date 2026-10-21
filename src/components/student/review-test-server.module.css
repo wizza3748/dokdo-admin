@@ -63,3 +63,9 @@
 .firstRecord .inlineFeedback{margin-bottom:16px}
 @media(max-width:1100px){.writingWorkspace,.writingWorkspace[data-reference=true]{margin:0 auto;padding:0 20px}.reference{position:static;width:auto;grid-column:1/-1;max-height:450px}.writingWorkspace .writing{grid-template-columns:230px minmax(0,1fr)}}
 @media(max-width:700px){.writingWorkspace,.writingWorkspace[data-reference=true]{padding:0 16px}.writingWorkspace .writing{grid-template-columns:1fr}.writingTitle{flex-wrap:wrap;gap:12px}.writingTitle h1{font-size:23px}.stageHeader ol{flex-wrap:wrap}.openChecklist{margin-left:auto}.firstRecordHeading{flex-wrap:wrap}}
+
+/* Student result only: do not restyle writing screens or external shared results. */
+.referenceResult .resultHeader li[data-active=true]>svg{background:#0077cb}
+.referenceResult .resultHeader h1{line-height:36px}
+.referenceResult .resultCard>header{padding:0 16px 16px}
+@media(max-width:700px){.referenceResult .resultCard>header{padding-inline:0}}

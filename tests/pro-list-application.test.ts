@@ -67,13 +67,24 @@ test("상단 현황에는 조회 월과 월 변경 동작을 전달하지 않음
   assert.match(usage, /guidance\.description/)
 })
 
+test("상단 미선정 표지는 디자이너의 빈 점선으로 표시하고 선정된 실제 표지는 유지", () => {
+  const source = readFileSync(new URL("../src/components/student/pro-feedback-status.tsx", import.meta.url), "utf8")
+  const usage = source.slice(source.indexOf("export function ProFeedbackUsage"), source.indexOf("export function ProFeedbackStatus"))
+  const css = readFileSync(new URL("../src/components/student/pro-feedback.module.css", import.meta.url), "utf8")
+  assert.match(usage, /selected\.length \? <div className=\{ui\.covers\}/)
+  assert.match(usage, /src=\{getWorkbookForReview\(r\)\.coverSrc\}/)
+  assert.match(usage, /<span className=\{ui\.emptyCover\} aria-hidden="true"\/>/)
+  assert.doesNotMatch(usage, /BookOpen/)
+  assert.match(css, /\.emptyCover\{[^}]*border:2px dashed #9b9b9b/)
+})
+
 test("남은 신청 권수는 0권도 버튼과 독립 표시, 조회 중·실패·배정 전에는 숨김", () => {
   const actions = readFileSync(new URL("../src/components/student/pro-feedback-status.tsx", import.meta.url), "utf8")
   const usage = actions.slice(actions.indexOf("export function ProFeedbackUsage"), actions.indexOf("export function ProFeedbackStatus"))
   assert.match(usage, /ready = loaded && !error && view\.assigned/)
-  assert.match(usage, /\{ready && <div[^>]*>\s*<p[^>]*>\{proRemainingText\(u\.available\)\}/)
+  assert.match(usage, /\{ready && <div[^>]*>\s*<p[^>]*>\{proSummaryRemainingText\(view\)\}/)
   assert.match(usage, /const rollover = proRolloverText\(u\)/)
-  assert.match(usage, /<p className="whitespace-nowrap font-semibold">[^\n]+\{rollover && <span[^>]*>\{rollover\}<\/span>\}<\/p>/)
+  assert.match(usage, /<p className=\{ui.remaining\}>[^\n]+\{rollover && <span[^>]*>\{rollover\}<\/span>\}<\/p>/)
   assert.match(usage, /\{guidance && <Link/)
   assert.equal(proRemainingText(0), "이번 주 남은 신청 권수 0권")
   assert.equal(proRemainingText(2), "이번 주 남은 신청 권수 2권")
@@ -157,7 +168,7 @@ test("남은 권수가 0이어도 신청·선정된 글의 피드백 대기와 �
   for (const selection of ["학생 신청", "자동 선정", "선생님 지정"]) {
     c.selection = selection
     c.locked = false
-    assert.equal(proBookPresentation(view, c.reviewId)?.listStatus, "피드백 기다리는 중", selection)
+    assert.equal(proBookPresentation(view, c.reviewId)?.listStatus, "피드백 대기", selection)
     c.locked = true
     assert.equal(proBookPresentation(view, c.reviewId)?.listStatus, "피드백 작성 중", selection)
   }
@@ -199,9 +210,9 @@ test("목록과 상세는 같은 확인창과 처리 로직, 성공은 페이지
   const list = readFileSync(new URL("../src/components/student/student-review-records.tsx", import.meta.url), "utf8")
   const toast = readFileSync(new URL("../src/components/student/student-toast.tsx", import.meta.url), "utf8")
   assert.match(list, /ProFeedbackAction[^\n]+variant="list"/)
-  assert.match(actions, /showToast\(confirm === "apply"/)
+  assert.match(actions, /showToast\(confirm === "change"/)
   assert.doesNotMatch(actions, /setSuccess|\{success &&/)
-  assert.match(actions, /readReviews\("student", undefined, \{ fresh: true \}\)/)
+  assert.match(actions, /readReviews\("student", undefined, \{\s*fresh:\s*true\s*\}\)/)
   assert.match(toast, /createPortal/)
   assert.match(toast, /fixed bottom-24 left-1\/2/)
   assert.match(toast, /2000/)

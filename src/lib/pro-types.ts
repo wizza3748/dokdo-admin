@@ -31,6 +31,7 @@ export type ProState = {
 }
 export type ProCommand =
   | { type: "apply" | "cancel" | "designate" | "retry-parent"; reviewId: string }
+  | { type: "change"; reviewId: string; previousReviewId: string }
   | { type: "clock"; at: string }
   | { type: "clock-real" }
   | { type: "schedule"; weekday: number; teacherId?: string }

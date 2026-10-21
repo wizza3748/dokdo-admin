@@ -1,10 +1,13 @@
 "use client"
 import Image from "next/image"
 import { ProFeedbackAction, ProFeedbackStatus } from "./pro-feedback-status"
-import { canRequestProFeedback, proBookPresentation, proSecondDeadlineText } from "@/lib/student-pro-presentation"
+import { canRequestProFeedback, proBookPresentation, proSecondDeadlineText, proSecondDeadlineDay } from "@/lib/student-pro-presentation"
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { ArrowRight, CalendarDays, FileText } from "lucide-react"
+import { ArrowRight, CalendarDays, Clock3, FileText } from "lucide-react"
+import ui from "./exploration-test-server.module.css"
+import feedbackUi from "./pro-feedback.module.css"
+import { ReviewIcon } from "./review-design-icons"
 import { reviewActivityDate, sortStudentReviewRecords, studentReviewListAction, type ReviewDatabase, type ReviewRecord } from "@/lib/review-domain"
 
 export function StudentReviewRecords({ db, month, day, embedded = false, onStartSecond }: { db: ReviewDatabase; month: string; day?: number; embedded?: boolean; onStartSecond?: (record: ReviewRecord, sourceWorkbookId: string) => Promise<void> | void }) {
@@ -17,19 +20,20 @@ export function StudentReviewRecords({ db, month, day, embedded = false, onStart
   return <div className={embedded ? "mb-2" : "mb-8 space-y-8"}>{[...groups].sort(([a],[b]) => b-a).map(([day, rows]) => <section key={day} className={embedded ? undefined : "rounded-[22px] bg-white px-4 py-8 sm:px-8 shadow-[0_4px_18px_rgba(45,62,72,.08)]"}>{!embedded && <h2 className="mb-4 flex items-center gap-2 text-base font-black"><CalendarDays className="size-5 text-[#60baf0]" />{month.slice(5)}월 {String(day).padStart(2,"0")}일</h2>}<ul className="space-y-2">{sortStudentReviewRecords(rows).map(r => <StudentReviewRecordCard key={r.id} db={db} record={r} onStartSecond={onStartSecond} />)}</ul></section>)}</div>
 }
 
-export function StudentReviewRecordCard({ db, record: r, onStartSecond }: { db: ReviewDatabase; record: ReviewRecord; onStartSecond?: (record: ReviewRecord, sourceWorkbookId: string) => Promise<void> | void }) {
+export function StudentReviewRecordCard({ db, record: r, onStartSecond, referenceDesign = false }: { db: ReviewDatabase; record: ReviewRecord; referenceDesign?: boolean; onStartSecond?: (record: ReviewRecord, sourceWorkbookId: string) => Promise<void> | void }) {
     const [highlighted, setHighlighted] = useState(false)
     const [startingSecond, setStartingSecond] = useState(false)
     const c = db.reviews.find(c => c.id === r.reviewId)!
     const sent = r.feedbackStatus === "전송완료"
     const proCase = db.studentPro?.cases.find(p => p.reviewId === c.id)
     const proStatus = r.round === 1 && r.writingStatus === "submitted" && !sent && db.studentPro ? proBookPresentation(db.studentPro, c.id) : null
+    const proSecondWaiting = Boolean(db.studentPro && r.round === 2 && r.writingStatus === "submitted" && !sent)
     const canApply = canRequestProFeedback(db.studentPro, r)
     const secondAvailable = r.round === 1 && c.progress === "second-available" && !proCase?.expired
-    const secondDeadline = db.studentPro && proCase?.secondDeadline && (secondAvailable || (r.round === 2 && r.writingStatus === "writing" && !proCase.expired)) ? proSecondDeadlineText(proCase.secondDeadline, db.studentPro.now) : null
+    const secondDeadline = db.studentPro && proCase?.secondDeadline && (secondAvailable || (r.round === 2 && r.writingStatus === "writing" && !proCase.expired)) ? `${proSecondDeadlineText(proCase.secondDeadline, db.studentPro.now)} (${proSecondDeadlineDay(proCase.secondDeadline, db.studentPro.now)})` : null
     const unreadFeedback = sent && !r.seenAt
     const href = `/student/online-workbook/${c.sourceWorkbookId}?round=${r.round}${unreadFeedback ? `&feedback=${r.round}` : ""}`
-    const actionLabel = proStatus ? "작성 글 보기" : studentReviewListAction(c, r)
+    const actionLabel = proStatus || proSecondWaiting ? "작성 글 보기" : studentReviewListAction(c, r)
     const reportAvailable = c.reportEnabled && r.report && sent
     const highlightClass = highlighted ? (unreadFeedback ? "review-card-glow-feedback" : "review-card-glow-writing") : ""
 
@@ -74,14 +78,16 @@ export function StudentReviewRecordCard({ db, record: r, onStartSecond }: { db: 
     const finished = sent && !unreadFeedback && !secondAvailable
     const label = proCase?.expired && r.round === 2 ? "작성한 글 보기" : finished ? "피드백 다시 보기" : actionLabel
     const buttonStyle = `relative z-20 inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md border px-3 text-sm font-bold ${unreadFeedback ? "border-[#ff6597] bg-[#ff6597] text-white" : secondAvailable || r.writingStatus === "writing" ? "border-[#0077cb] bg-[#0077cb] text-white" : "border-[#eee] bg-white text-[#555]"}`
-    return <li id={r.id} className={`relative isolate flex min-h-[74px] w-full scroll-mt-24 items-center gap-2 border-b border-[#f0f0f0] bg-white px-4 py-3 text-left ${highlightClass}`}>
+    return <li id={r.id} className={`relative isolate flex min-h-[74px] w-full scroll-mt-24 items-center gap-2 border-b border-[#f0f0f0] bg-white px-4 py-3 text-left ${ui.reviewRow} ${highlightClass}`}>
       <Link href={href} aria-label={`${c.bookTitle} ${r.round}차 ${label}`} className="review-card-link absolute inset-0 z-10 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#239cde]" />
-      <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#777]"><span><span className="mr-1 text-[#ff6597]">●</span>온라인 독후감</span><span>{r.round}차</span><span>{c.level}레벨</span>{finished && <span className="font-bold text-[#127a6a]">활동 완료</span>}{r.writingStatus === "submitted" && !sent && !proStatus && <span>{db.studentPro && !proCase?.selected ? "제출 완료" : "선생님 확인 중"}</span>}</div><p className="mt-1 text-sm font-bold leading-5">{c.bookTitle}</p>{r.flowers > 0 && <p className="mt-2 text-[11px]"><Image className="mr-1 inline-block" src="/student-assets/flower-reward.svg" alt="섬초롱꽃" width={16} height={16} />{r.flowers}개</p>}{secondDeadline && <p className="mt-2 text-xs leading-5 text-[#147fbd]">{secondDeadline}</p>}</div>
+      <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#777]"><span><span className="mr-1 text-[#ff6597]">●</span>온라인 독후감</span><span>{r.round}차</span><span>{c.level}레벨</span>{finished && <span className="font-bold text-[#127a6a]">활동 완료</span>}{r.writingStatus === "submitted" && !sent && !proStatus && !db.studentPro && <span>선생님 확인 중</span>}</div><p className="mt-1 text-sm font-bold leading-5">{c.bookTitle}</p>{r.flowers > 0 && <p className="mt-2 text-[11px]"><Image className="mr-1 inline-block" src="/student-assets/flower-reward.svg" alt="섬초롱꽃" width={16} height={16} />{r.flowers}개</p>}{secondDeadline && <p className="mt-2 text-xs leading-5 text-[#147fbd]">{secondDeadline}</p>}</div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {proStatus && !canApply && <ProFeedbackStatus db={db} reviewId={c.id}/>}
+        {proSecondWaiting && <span className={feedbackUi.badge}>{referenceDesign ? <ReviewIcon name="clock" size={16}/> : <Clock3 size={16}/>}피드백 대기</span>}
         {proStatus && <ProFeedbackAction db={db} reviewId={c.id} round={r.round} submitted={r.writingStatus === "submitted"} variant="list"/>}
-        {reportAvailable && <Link className="relative z-20 inline-flex h-9 items-center gap-1 rounded-md border border-[#eee] bg-white px-2 text-xs font-semibold text-[#666]" target="_blank" rel="noopener noreferrer" href={`/online-review/report/${r.id}?role=student`}><FileText size={13}/>{r.round}차 보고서</Link>}
-        {r.writingStatus === "submitted" && !sent ? <ArrowRight className="size-4 text-[#aaa]" /> : secondAvailable && onStartSecond ? <button type="button" disabled={startingSecond} onClick={() => void openRecord()} className={buttonStyle}>2차 글 시작하기<span className="absolute -right-1 -top-2 rounded bg-[#0077cb] px-1 text-[9px] leading-3 text-white">NEW</span></button> : <Link href={href} className={buttonStyle}>{label}{unreadFeedback && <span className="absolute -right-1 -top-2 rounded bg-[#ff6597] px-1 text-[9px] leading-3 text-white">NEW</span>}</Link>}
+        {reportAvailable && <Link className="relative z-20 inline-flex h-9 items-center gap-1 rounded-md border border-[#eee] bg-white px-2 text-xs font-semibold text-[#666]" target="_blank" rel="noopener noreferrer" href={`/online-review/report/${r.id}?role=student`}>{referenceDesign ? <ReviewIcon name="report" size={14}/> : <FileText size={13}/>} {r.round}차 보고서</Link>}
+        {r.writingStatus === "submitted" && !sent ? (referenceDesign ? null : <ArrowRight className="size-4 text-[#aaa]" />) : secondAvailable && onStartSecond ? <button type="button" disabled={startingSecond} onClick={() => void openRecord()} className={buttonStyle}>2차 글 시작하기<span className="absolute -right-1 -top-2 rounded bg-[#0077cb] px-1 text-[9px] leading-3 text-white">NEW</span></button> : <Link href={href} className={buttonStyle}>{label}{unreadFeedback && <span className="absolute -right-1 -top-2 rounded bg-[#ff6597] px-1 text-[9px] leading-3 text-white">NEW</span>}</Link>}
+        {referenceDesign && <ReviewIcon name="chevron" size={20} className={ui.reviewChevron}/>}
       </div>
     </li>
 }

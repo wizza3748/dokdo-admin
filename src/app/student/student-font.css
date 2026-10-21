@@ -1,0 +1,20 @@
+/* Same typeface as DD-1723, self-hosted and limited to the student route.
+   body scope also covers dialogs/toasts rendered through a portal. */
+@font-face {
+  font-family: "Dokdo Student Noto";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/student-assets/fonts/noto-sans-kr-400.ttf") format("truetype");
+}
+@font-face {
+  font-family: "Dokdo Student Noto";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/student-assets/fonts/noto-sans-kr-700.ttf") format("truetype");
+}
+body:has([data-student-front]), [data-student-front] {
+  font-family: "Dokdo Student Noto", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
+[data-student-front] { display: contents; }

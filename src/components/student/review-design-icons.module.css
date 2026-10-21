@@ -1,0 +1,5 @@
+@font-face{font-family:"Dokdo Review Regular";font-style:normal;font-weight:400;font-display:block;src:url("/student-assets/fonts/review-icons-regular.woff2") format("woff2")}
+@font-face{font-family:"Dokdo Review Solid";font-style:normal;font-weight:900;font-display:block;src:url("/student-assets/fonts/review-icons-solid.woff2") format("woff2")}
+.icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;vertical-align:-.125em;line-height:1;font-style:normal;text-rendering:auto;-webkit-font-smoothing:antialiased}
+.regular{font-family:"Dokdo Review Regular";font-weight:400}
+.solid{font-family:"Dokdo Review Solid";font-weight:900}

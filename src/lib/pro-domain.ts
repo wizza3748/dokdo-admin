@@ -34,6 +34,20 @@ export function proUsage(pro: ProState, member: ProMember, at: string, month = m
   return { month, week, used, pending, elapsed, limit, available, selected, total: selected + available, rollover, rolloverAvailable }
 }
 function firstRecord(db: ReviewDatabase, id: string) { return db.records.find(r => r.reviewId === id && r.round === 1)! }
+/** Read-only candidate calculation, reused by the projection and atomic write. */
+export function proChangeCandidates(db: ReviewDatabase, reviewId: string): ProCase[] {
+  const pro = db.pro, target = pro?.cases.find(c => c.reviewId === reviewId)
+  const member = pro?.members.find(m => m.id === target?.studentId)
+  if (!pro || !target || !member || !isActivePro(member, pro.clock) || !member.assignedAt || !member.institutionId) return []
+  if (target.selectedAt || target.closedAt || target.firstSentAt || target.week !== weekStart(pro.clock) || pro.clock >= target.cutoff || firstRecord(db, reviewId)?.writingStatus !== "submitted") return []
+  const before = proUsage(pro, member, pro.clock)
+  if (before.available !== 0 || before.used >= before.limit) return []
+  return pro.cases.filter(old => {
+    if (old.reviewId === reviewId || old.studentId !== member.id || old.month !== target.month || !old.selectedAt || old.selection !== "student" || old.lockedAt || old.firstSentAt || old.closedAt || pro.clock >= old.cutoff) return false
+    const released = { ...pro, cases: pro.cases.map(c => c === old ? { ...c, selectedAt: undefined, selection: undefined } : c) }
+    return proUsage(released, member, pro.clock).available === before.available + 1
+  })
+}
 /** Shared by designation entry points and the final server-side write. */
 export function proDesignationIssue(db: ReviewDatabase, reviewId: string) {
   const pro = db.pro, c = pro?.cases.find(item => item.reviewId === reviewId)
@@ -193,7 +207,7 @@ export function applyProCommand(input: ReviewDatabase, command: ProCommand, acto
   const reminder = command.type === "cancel-reminder" ? pro.reminders.find(r => r.id === command.id) : undefined
   const member = pro.members.find(m => m.id === ("studentId" in command ? command.studentId : c?.studentId ?? reminder?.studentId))
   check(member, "학생을 찾을 수 없습니다."); access(pro, actor, member)
-  if (["apply", "cancel"].includes(command.type)) check(actor.role === "student", "학생만 신청·취소할 수 있습니다.")
+  if (["apply", "cancel", "change"].includes(command.type)) check(actor.role === "student", "학생만 신청·취소·변경할 수 있습니다.")
   else check(actor.role === "agency", "기관관리자만 처리할 수 있습니다.")
   if (command.type === "management-memo") {
     check(member.product === "pro" && typeof command.text === "string", "관리 메모 입력값을 확인해 주세요.")
@@ -211,6 +225,18 @@ export function applyProCommand(input: ReviewDatabase, command: ProCommand, acto
     if (command.type === "apply" && c) check(at < c.cutoff, "제출 및 신청 마감이 지났습니다.")
     check(c && !c.selectedAt && !c.closedAt && !c.firstSentAt && c.week === weekStart(at) && firstRecord(db, c.reviewId).writingStatus === "submitted" && before.available > 0, "현재 주차의 제출글과 남은 신청 권수를 확인해 주세요.")
     select(pro, c, at, command.type === "apply" ? "student" : "teacher", actor.name)
+  } else if (command.type === "change") {
+    const previous = pro.cases.find(item => item.reviewId === command.previousReviewId)
+    check(c && previous && previous.studentId === member.id, "변경할 신청을 확인해 주세요.")
+    check(!previous.lockedAt, "선생님이 피드백 작성을 시작했어요. 신청을 바꿀 수 없어요.")
+    check(at < previous.cutoff && at < c.cutoff, "신청 마감이 지나 바꿀 수 없어요.")
+    check(proChangeCandidates(db, c.reviewId).some(item => item.reviewId === previous.reviewId), "신청 상태가 달라졌어요. 변경 가능한 독후감을 다시 확인해 주세요.")
+    // Both validations precede all writes; the store commits this aggregate once.
+    previous.selectedAt = undefined; previous.selection = undefined
+    audit(pro, `${requestId}:cancel`, "cancel", at, actor.name, member.id, { reviewId: previous.reviewId, month: previous.month, week: previous.week, before: auditBefore, after: { changedTo: c.reviewId } })
+    select(pro, c, at, "student", actor.name)
+    const after = proUsage(pro, member, at)
+    check(after.used === before.used && after.available === before.available && after.rolloverAvailable === before.rolloverAvailable, "권수 정보가 변경되었어요. 다시 확인해 주세요.")
   } else if (command.type === "cancel") {
     check(c?.selectedAt && c.selection === "student" && !c.lockedAt && !c.firstSentAt && at < c.cutoff, "본인이 신청한 글만 선생님 작성 시작 및 마감 전에 취소할 수 있습니다.")
     c.selectedAt = undefined; c.selection = undefined

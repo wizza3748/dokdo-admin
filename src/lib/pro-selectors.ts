@@ -1,7 +1,7 @@
 // @ts-expect-error Node tests use explicit TypeScript extensions.
 import { addDays, cutoffLabel, dateLabel, kstDate, managementMonth, monthWeeks, weekLabel, weekSchedule, weekStart } from "./pro-calendar.ts"
 // @ts-expect-error Node tests use explicit TypeScript extensions.
-import { autoCandidates, consultDue, currentConsultations, isActivePro, pendingFeedback, proUsage, weekdayFor } from "./pro-domain.ts"
+import { autoCandidates, consultDue, currentConsultations, isActivePro, pendingFeedback, proChangeCandidates, proUsage, weekdayFor } from "./pro-domain.ts"
 import type { ReviewDatabase, ReviewRecord } from "./review-domain"
 import type { ProCase, ProMember, ProState } from "./pro-types"
 export const selectionLabels = { student: "학생 신청", auto: "자동 선정", teacher: "선생님 지정", migration: "기존 기록 승계" }
@@ -101,7 +101,7 @@ export function reminderCopy(db: ReviewDatabase, member: ProMember, kind: "submi
 export type StudentProView = {
   studentId: string; name: string; now: string; active: boolean; assigned: boolean;
   usage: ReturnType<typeof proUsage>; period: string; cutoff: string; due: string;
-  cases: { reviewId: string; week: string; period: string; selected: boolean; selection: string; locked: boolean; firstSent: boolean; cutoff: string; due: string; secondDeadline?: string; secondSubmitted: boolean; closed: boolean; expired: boolean; autoExpected: boolean; canApply: boolean; canCancel: boolean; reason: string }[];
+  cases: { reviewId: string; week: string; period: string; selected: boolean; selection: string; locked: boolean; firstSent: boolean; cutoff: string; due: string; secondDeadline?: string; secondSubmitted: boolean; closed: boolean; expired: boolean; autoExpected: boolean; canApply: boolean; canCancel: boolean; changeCandidates?: string[]; reason: string }[];
 }
 /** Whitelist projection: never send institution identifiers, notes, audits or snapshots to students. */
 export function studentProView(db: ReviewDatabase, studentId: string): StudentProView | undefined {
@@ -111,7 +111,7 @@ export function studentProView(db: ReviewDatabase, studentId: string): StudentPr
   const expected = new Set(autoCandidates(db, member, week).slice(0, usage.available).map(c => c.reviewId))
   return { studentId, name: member.name, now, active: isActivePro(member, now), assigned: !!member.assignedAt && !!member.institutionId, usage, period: `${weekLabel(now)} (${kstDate(week)} ~ ${kstDate(addDays(week, 6))})`, cutoff: schedule.cutoff, due: schedule.due, cases: pro.cases.filter(c => c.studentId === studentId).map(c => {
     const reason = c.closedAt ? "관리가 종료되었어요." : c.selectedAt ? c.lockedAt ? "선생님이 피드백 작성을 시작했어요." : "피드백 대상으로 선정되었어요." : !isActivePro(member, now) ? "프로 이용이 종료되었어요." : c.week > week ? `${weekLabel(c.week)}에 관리해요. 해당 주가 시작되면 신청할 수 있어요.` : c.week < week || now >= c.cutoff ? "이 글은 신청 마감까지 피드백 대상으로 정해지지 않았어요." : usage.available <= 0 ? "남은 신청 권수가 없어요. 독후감은 계속 작성할 수 있어요." : ""
-    return { reviewId: c.reviewId, week: c.week, period: weekLabel(c.week), selected: !!c.selectedAt, selection: c.selection ? selectionLabels[c.selection] : "", locked: !!c.lockedAt, firstSent: !!c.firstSentAt, cutoff: c.cutoff, due: c.due, secondDeadline: c.secondDeadline, secondSubmitted: db.records.some(r => r.reviewId === c.reviewId && r.round === 2 && r.writingStatus === "submitted"), closed: !!c.closedAt, expired: c.closeReason === "2차 미제출 기한 종료", autoExpected: !c.selectedAt && expected.has(c.reviewId) && now < c.cutoff, canApply: !reason && db.records.some(r => r.reviewId === c.reviewId && r.round === 1 && r.writingStatus === "submitted"), canCancel: !!c.selectedAt && c.selection === "student" && !c.lockedAt && !c.firstSentAt && now < c.cutoff, reason }
+    return { reviewId: c.reviewId, week: c.week, period: weekLabel(c.week), selected: !!c.selectedAt, selection: c.selection ? selectionLabels[c.selection] : "", locked: !!c.lockedAt, firstSent: !!c.firstSentAt, cutoff: c.cutoff, due: c.due, secondDeadline: c.secondDeadline, secondSubmitted: db.records.some(r => r.reviewId === c.reviewId && r.round === 2 && r.writingStatus === "submitted"), closed: !!c.closedAt, expired: c.closeReason === "2차 미제출 기한 종료", autoExpected: !c.selectedAt && expected.has(c.reviewId) && now < c.cutoff, canApply: !reason && db.records.some(r => r.reviewId === c.reviewId && r.round === 1 && r.writingStatus === "submitted"), canCancel: !!c.selectedAt && c.selection === "student" && !c.lockedAt && !c.firstSentAt && now < c.cutoff, changeCandidates: proChangeCandidates(db, c.reviewId).map(item => item.reviewId), reason }
   }) }
 }
 export function scopePro(pro: ProState, institutionId: string): ProState {
