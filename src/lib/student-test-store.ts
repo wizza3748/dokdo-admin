@@ -12,7 +12,8 @@ import { connectStudentTestBooks, studentTestBookPath } from "./student-test-boo
 export type StudentTestSession = StudentTestFixture & { token: string; caseId: StudentTestCaseId; day: string; createdAt: string; changedAt?: string; initial: ReturnType<typeof studentTestSummary> }
 export type StudentTestState = { day: string; sessions: StudentTestSession[] }
 export const emptyStudentTests = (): StudentTestState => ({ day: "", sessions: [] })
-export const studentTestStore = new PrototypeStore({ env: { DOKDO_STATE_PROVIDER: "local" }, directory: path.join(process.env.DOKDO_LOCAL_STATE_DIR || path.join(process.cwd(), ".local-state"), "student-front-tests") })
+/** Read-only legacy source, copied once into a local browser workspace. Never used on Vercel. */
+export const legacyStudentTestStore = new PrototypeStore({ env: { DOKDO_STATE_PROVIDER: "local" }, directory: path.join(process.env.DOKDO_LOCAL_STATE_DIR || path.join(process.cwd(), ".local-state"), "student-front-tests") })
 
 export function newStudentTestSession(caseId: StudentTestCaseId, now: string): StudentTestSession {
   const fixture = buildStudentTest(caseId, now)

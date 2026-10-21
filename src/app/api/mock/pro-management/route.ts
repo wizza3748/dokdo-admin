@@ -5,9 +5,11 @@ import { type ReviewDatabase } from "@/lib/review-domain"
 import { type ProCommand } from "@/lib/pro-types"
 import { applyProCommand } from "@/lib/pro-domain"
 import { updateReviewState, reviewActor, visibleReviewState } from "@/lib/review-server"
+import { assertSharedReviewRequest } from "@/lib/review-request-scope"
 export const runtime = "nodejs"
 export async function POST(request: Request) {
   try {
+    assertSharedReviewRequest(request)
     const { command, requestId } = await request.json() as { command: ProCommand; requestId: string }
     if (!requestId || !command?.type) throw new Error("잘못된 요청입니다.")
     let serverNow = ""

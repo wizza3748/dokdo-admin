@@ -5,10 +5,12 @@ import { getDefaultReviewDatabase } from "@/lib/review-seeds"
 import { reviewActor } from "@/lib/review-server"
 import { createReviewShareSecrets, encryptReviewShare, decryptReviewShare } from "@/lib/review-share-token"
 import { sharedReviewState } from "@/lib/review-share-projection"
+import { assertSharedReviewRequest } from "@/lib/review-request-scope"
 export const runtime = "nodejs"
 const headers = { "Cache-Control":"private, no-store", "Referrer-Policy":"no-referrer", "X-Robots-Tag":"noindex, nofollow" }
 export async function POST(request: Request) {
   try {
+    assertSharedReviewRequest(request)
     const {recordId} = await request.json()
     const db = await prototypeStore.read<ReviewDatabase>("online-reviews",getDefaultReviewDatabase)
     const actor = reviewActor(request,db), record = db.records.find(r => r.id === recordId)

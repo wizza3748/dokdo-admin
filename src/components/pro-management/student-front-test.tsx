@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { panel } from "./pro-common"
 
 type CommonRow = { id: string; name: string; purpose: string; href: string; current?: string; books?: string[] }
-type Catalog = { local: boolean; day: string; now: string; rows: StudentTestRow[]; common: CommonRow[] }
+type Catalog = { available: boolean; day: string; now: string; rows: StudentTestRow[]; common: CommonRow[] }
 type Action = "reset" | "teacher-start" | "cutoff"
 const groups: { id: string; name: string; cases: StudentTestCaseId[] }[] = [
   { id: "before", name: "신청 전", cases: ["empty", "draft", "apply-one", "apply-many"] },
@@ -66,24 +66,33 @@ export function StudentFrontTest() {
   const [confirm, setConfirm] = React.useState<{ row: StudentTestRow; action: Action } | null>(null)
   const [controlError, setControlError] = React.useState("")
   const [screen, setScreen] = React.useState<StudentTestScreen>("normal")
+  const refreshInFlight = React.useRef<Promise<void> | null>(null)
   const refresh = React.useCallback(async () => {
-    try {
+    if (refreshInFlight.current) return refreshInFlight.current
+    const job = (async () => { try {
       const read = async (): Promise<Catalog> => {
         const response = await fetch("/api/mock/student-front-tests", { cache: "no-store" }), value = await response.json()
         if (!response.ok) throw new Error(value.message)
         return value
       }
       let value = await read()
-      if (value.local) { await call("prepare"); value = await read() }
+      if (value.available) {
+        const prepare = async () => { await call("prepare"); value = await read() }
+        // Coordinate first-time cookie creation across tabs as well as repeated focus/mount events.
+        if (navigator.locks) await navigator.locks.request("dokdo-student-test-prepare", prepare)
+        else await prepare()
+      }
       setCatalog(value); setError("")
-    } catch (e) { setError(e instanceof Error ? e.message : "목록을 불러오지 못했습니다.") }
+    } catch (e) { setError(e instanceof Error ? e.message : "목록을 불러오지 못했습니다.") } })()
+    refreshInFlight.current = job
+    try { await job } finally { if (refreshInFlight.current === job) refreshInFlight.current = null }
   }, [])
   React.useEffect(() => { void refresh(); const focus = () => { void refresh() }; window.addEventListener("focus", focus); return () => window.removeEventListener("focus", focus) }, [refresh])
   const requestControl = (row: StudentTestRow, action: Action) => { setControlError(""); setConfirm({ row, action }) }
   const control = async () => {
     if (!confirm) return
     setBusy(true)
-    try { await call(confirm.action, confirm.row.token); await refresh(); setConfirm(null) }
+    try { await call(confirm.action, confirm.row.token); await refreshInFlight.current; await refresh(); setConfirm(null) }
     catch (e) { setControlError(e instanceof Error ? e.message : "처리 실패") }
     finally { setBusy(false) }
   }
@@ -93,13 +102,13 @@ export function StudentFrontTest() {
       <div className="flex gap-2"><Button variant="outline" onClick={() => void refresh()}>현재 상태 새로고침</Button><Button asChild variant="outline"><Link href="/agency/pro-management">주간 관리 현황</Link></Button></div>
     </header>
     <div className="space-y-2 text-sm text-slate-600">
-      <p>{catalog?.local && <strong className="mr-3 text-slate-800">오늘 {catalog.day} · 한국 시간</strong>}확인할 케이스를 고르고 학생 화면을 여세요. {catalog?.local ? "같은 날 테스트 결과는 유지됩니다." : "전용 예시는 로컬 개발 환경에서 사용할 수 있습니다."}</p>
+      <p>{catalog?.available && <strong className="mr-3 text-slate-800">오늘 {catalog.day} · 한국 시간</strong>}확인할 케이스를 고르고 학생 화면을 여세요. 같은 브라우저에서 같은 날 테스트한 결과는 유지됩니다.</p>
       <details className="text-xs text-slate-500">
         <summary className="w-fit cursor-pointer">날짜·데이터 및 화면 검증 안내</summary>
         <div className="mt-2 space-y-1">
-          <p>전용 예시는 공용 데이터와 분리됩니다. 날짜가 바뀌어 목록에 재진입하면 오늘 예시를 준비하며, 전날 열린 화면은 별도로 유지합니다. 이전 결과의 장기 보관 기능은 제공하지 않습니다.</p>
+          <p>전용 예시는 공용 데이터 및 다른 브라우저의 테스트와 분리됩니다. 같은 브라우저 프로필의 탭끼리는 결과를 공유하며, 쿠키를 삭제하거나 다른 브라우저로 접속하면 별도 예시를 준비합니다. 날짜가 바뀌어 목록에 재진입하면 오늘 예시를 준비하며, 전날 열린 화면은 별도로 유지합니다. 이전 결과의 장기 보관 기능은 제공하지 않습니다.</p>
           <p>기본 기관 피드백 요일은 월요일이며 기존 주차·마감 정책을 적용합니다. 오늘 성립하지 않는 케이스는 지정일을 표시합니다.</p>
-          {catalog?.local && <label className="flex items-center gap-2">화면 상태 검증
+          {catalog?.available && <label className="flex items-center gap-2">화면 상태 검증
             <select aria-label="화면 상태 검증" value={screen} className="rounded border border-slate-300 bg-white px-2 py-1" onChange={e => setScreen(e.target.value as StudentTestScreen)}>
               <option value="normal">정상</option><option value="loading">조회 중 (화면만)</option><option value="error">조회 실패 (화면만)</option>
             </select>
@@ -109,8 +118,8 @@ export function StudentFrontTest() {
       </details>
     </div>
     {error && <div role="alert" className={panel}>{error}<Button variant="outline" className="ml-3" onClick={() => void refresh()}>다시 시도</Button></div>}
-    {!catalog ? !error && <p role="status">학생 예시를 준비하는 중…</p> : <Tabs defaultValue={catalog.local ? "before" : "common"} className={`${panel} gap-4`}>
-      <div className="overflow-x-auto overflow-y-hidden"><TabsList aria-label="테스트 케이스 분류">{catalog.local && groups.map(group => <TabsTrigger key={group.id} value={group.id}>{group.name} <span className="text-xs text-slate-500">{catalog.rows.filter(row => group.cases.includes(row.id)).length}</span></TabsTrigger>)}<TabsTrigger value="common">기존 공용 <span className="text-xs text-slate-500">{catalog.common.length}</span></TabsTrigger></TabsList></div>
+    {!catalog ? !error && <p role="status">학생 예시를 준비하는 중…</p> : <Tabs defaultValue={catalog.available ? "before" : "common"} className={`${panel} gap-4`}>
+      <div className="overflow-x-auto overflow-y-hidden"><TabsList aria-label="테스트 케이스 분류">{catalog.available && groups.map(group => <TabsTrigger key={group.id} value={group.id}>{group.name} <span className="text-xs text-slate-500">{catalog.rows.filter(row => group.cases.includes(row.id)).length}</span></TabsTrigger>)}<TabsTrigger value="common">기존 공용 <span className="text-xs text-slate-500">{catalog.common.length}</span></TabsTrigger></TabsList></div>
       {groups.map(group => <TabsContent key={group.id} value={group.id}>
         <div className="overflow-x-auto rounded-lg border border-slate-200">
           <table className={tableClass}>
