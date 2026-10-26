@@ -3,6 +3,7 @@
 import * as React from "react"
 import { ReviewTeacherDetail } from "./review-teacher-detail"
 import { readReviews } from "@/lib/review-client"
+import { agencyStudentTestToken } from "@/lib/student-test-context"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -106,11 +107,11 @@ export function WorkbookDetail({ id, role = "agency" }: { id: string; role?: "ag
   React.useEffect(() => {
     if (id.startsWith("review-")) { setReviewId(id); return }
     let active = true
-    void readReviews(role).then(db => { if (active) { const common = db.reviews.find(c => c.legacyRecordId === id); setReviewId(common ? db.records.find(r => r.reviewId === common.id && r.round === 1)?.id ?? null : null) } }).catch(() => { if (active) setReviewId(null) })
+    void readReviews(role).then(db => { if (active) { const direct = db.records.find(r => r.id === id); const common = db.reviews.find(c => c.legacyRecordId === id); setReviewId(direct?.id ?? (common ? db.records.find(r => r.reviewId === common.id && r.round === 1)?.id ?? null : null)) } }).catch(() => { if (active) setReviewId(null) })
     return () => { active = false }
   }, [id, role])
   if (reviewId === undefined) return <p className="p-6">불러오는 중…</p>
-  return reviewId ? <ReviewTeacherDetail id={reviewId} role={role} /> : role === "admin" ? <p role="alert" className="p-6">조회할 수 없는 독후감입니다.</p> : <LegacyWorkbookDetail id={id} />
+  return reviewId ? <ReviewTeacherDetail id={reviewId} role={role} /> : role === "admin" || agencyStudentTestToken() ? <p role="alert" className="p-6">조회할 수 없는 독후감입니다.</p> : <LegacyWorkbookDetail id={id} />
 }
 function LegacyWorkbookDetail({ id }: { id: string }) {
   const router = useRouter()

@@ -7,6 +7,7 @@ import { managementMonth } from "@/lib/pro-calendar"
 import { proUsage } from "@/lib/pro-domain"
 import { weeklyDate } from "@/lib/pro-weekly-presentation"
 import { safeAgencyReturn } from "@/lib/review-navigation"
+import { agencyStudentTestToken } from "@/lib/student-test-context"
 import { adjustmentValues, consultationResultLabel, consultationResults, dayNames, detailDateTime, localDateTime, nthNames, regularConsultationLabel, studentConsultation, studentFeedbackRows } from "@/lib/pro-student-detail"
 import type { ProAudit, ProCommand, ProConsultation } from "@/lib/pro-types"
 import { ExternalBadge, field, ProBadge, ProNotice, useProManagement } from "./pro-common"
@@ -53,6 +54,8 @@ export function StudentManagementDetail({ id }: { id: string }) {
   const member = pro?.members.find(m => m.id === id && m.product === "pro")
   if (!pro || !member) return <p className="p-6">{hook.error || "조회 권한이 없거나 매칭된 프로 학생이 아닙니다."}</p>
   const currentMonth = managementMonth(pro.clock), selectedMonth = month || currentMonth, monthName = `${Number(selectedMonth.slice(5))}월`
+  const studentTest = agencyStudentTestToken()
+  const testQuery = studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : ""
   const usage = proUsage(pro, member, pro.clock, selectedMonth)
   const rows = studentFeedbackRows(hook.db, id, selectedMonth)
   const consultation = studentConsultation(pro, member, selectedMonth)
@@ -95,7 +98,7 @@ export function StudentManagementDetail({ id }: { id: string }) {
     {actualAt && !actualValid && <p role="alert" className="mt-2 text-xs text-rose-700">현재 시각 이전의 일시를 입력해 주세요.</p>}
   </div>
   return <div className={`${styles.page} ${styles.studentPage} space-y-5`}>
-    <header className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold text-slate-900">{member.name}</h1>{member.external && <ExternalBadge/>}{member.status === "ended" && <ProBadge>이용 종료</ProBadge>}</div><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-sm">조회 월<Input className="w-40 bg-white" type="month" value={selectedMonth} disabled={hook.busy} onChange={e => changeMonth(e.target.value)}/></label><Button asChild variant="outline"><Link href={`/agency/online-workbooks?role=${hook.role}&audience=pro&studentId=${encodeURIComponent(id)}`}>온라인 독후감 목록</Link></Button><Button asChild variant="outline"><Link href={returnTo || `/agency/pro-management?role=${hook.role}`}>주간 관리 현황</Link></Button></div></header>
+    <header className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold text-slate-900">{member.name}</h1>{member.external && <ExternalBadge/>}{member.status === "ended" && <ProBadge>이용 종료</ProBadge>}</div><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-sm">조회 월<Input className="w-40 bg-white" type="month" value={selectedMonth} disabled={hook.busy} onChange={e => changeMonth(e.target.value)}/></label><Button asChild variant="outline"><Link href={`/agency/online-workbooks?role=${hook.role}&audience=pro&studentId=${encodeURIComponent(id)}${testQuery}`}>온라인 독후감 목록</Link></Button><Button asChild variant="outline"><Link href={returnTo || `/agency/pro-management?role=${hook.role}${testQuery}`}>주간 관리 현황</Link></Button></div></header>
     {!cancelId && <ProNotice hook={hook} transient/>}
     <div className={styles.studentDetailLayout}>
     <section className={styles.studentSection} aria-label="월별 피드백 내역">

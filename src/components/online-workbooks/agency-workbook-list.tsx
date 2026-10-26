@@ -7,6 +7,7 @@ import { ExternalBadge, ProBadge } from "@/components/pro-management/pro-common"
 import { ProHelp } from "@/components/pro-management/pro-help"
 import { ReviewListTools } from "./review-list-tools"
 import { FeedbackAction } from "./review-feedback-action"
+import { FeedbackScheduleStatus } from "./review-schedule-status"
 import Link from "next/link"
 import {
   Bot,
@@ -30,13 +31,14 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  AGENCY_ONLINE_WORKBOOKS,
   getAgencyWorkbookListAsync,
   upsertStudentSubmittedAgencyWorkbook,
   type FeedbackStatus,
   type OnlineWorkbook,
 } from "@/lib/online-workbooks"
-import { eligibleReviewListAction, performReviewListAction } from "@/lib/review-list-adapter"
+import { eligibleReviewListAction, performReviewListAction, reviewListActionExclusion } from "@/lib/review-list-adapter"
+import { feedbackScheduleBlockReason, matchesReviewSchedule, reviewScheduleFilter, reviewScheduleFilterOptions, type ReviewScheduleFilter } from "@/lib/review-schedule-presentation"
+import { agencyStudentTestToken } from "@/lib/student-test-context"
 import { cn } from "@/lib/utils"
 import { safeAgencyReturn, useReviewListPosition } from "@/lib/review-navigation"
 import { workbookClassification } from "@/lib/workbook-classification"
@@ -97,10 +99,11 @@ function ReportCell({ record, role }: { record: OnlineWorkbook; role: "agency" |
   const classification = workbookClassification(record)
   if (classification.report !== "생성 완료") return <span className="text-slate-400">{reportText(record)}</span>
   const label = `${classification.writing} 보고서 보기`
+  const studentTest = role === "agency" ? agencyStudentTestToken() : ""
   return (
     <Link
       target="_blank"
-      href={`/online-review/report/${record.id}?role=${role}`}
+      href={`/online-review/report/${record.id}?role=${role}${studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : ""}`}
       aria-label={label}
       title={label}
       className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50"
@@ -197,9 +200,10 @@ function SummaryCards({ records, status, onSelect, disabled = false }: { records
 }
 
 export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "class" }) {
-  const [records, setRecords] = React.useState(AGENCY_ONLINE_WORKBOOKS)
+  const [records, setRecords] = React.useState<OnlineWorkbook[]>([])
   const [audience, setAudience] = React.useState<ReviewAudience>("all")
   const [selectionFilter, setSelectionFilter] = React.useState<ReviewSelectionFilter>("all")
+  const [scheduleFilter, setScheduleFilter] = React.useState<ReviewScheduleFilter>("all")
   const statusLocked = reviewStatusLocked(selectionFilter)
   const [studentId, setStudentId] = React.useState("")
   const showPro = audience === "pro"
@@ -232,6 +236,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     const nextAudience = reviewAudienceFromParams(p)
     const nextSelection = reviewSelectionFilter(p.get("selection"), nextAudience)
     setAudience(nextAudience); setSelectionFilter(nextSelection); setStudentId(p.get("studentId") ?? "")
+    setScheduleFilter(reviewScheduleFilter(p.get("schedule"), nextAudience, nextSelection))
     setWritingFilter(p.get("writing") ?? "all"); setReportFilter(p.get("report") ?? "all"); setLevel(p.get("level") ?? "all")
     setStatus(reviewStatusForSelection(p.get("status") ?? "all", nextSelection)); setAiRemaining(p.get("ai") ?? "all"); setFlower(p.get("flower") ?? "all")
     setKeyword(p.get("q") ?? ""); setQuery(p.get("q") ?? ""); setPage(Math.max(1, Number(p.get("page")) || 1))
@@ -247,9 +252,11 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     try { window.localStorage.setItem(filterPreferenceKey, nextOpen ? "open" : "closed") } catch { /* Keep the current view usable without storage. */ }
   }
   const listParams = new URLSearchParams({ role, audience, studentId, writing: writingFilter, report: reportFilter, level, status, ai: aiRemaining, flower, q: query, page: String(page), size: String(pageSize), sort: sort.key, direction: sort.direction, filters: filterOpen ? "open" : "closed" })
-  if (showPro) listParams.set("selection", selectionFilter)
+  if (showPro) { listParams.set("selection", selectionFilter); listParams.set("schedule", scheduleFilter) }
   if (originReturn) listParams.set("returnTo", originReturn)
   if (demoAgency) listParams.set("demoAgency", demoAgency)
+  const studentTest = agencyStudentTestToken()
+  if (studentTest) listParams.set("studentTest", studentTest)
   const listUrl = `/agency/online-workbooks?${listParams}`
   const listPosition = useReviewListPosition(loaded && restored, listUrl)
   React.useEffect(() => { if (restored) window.history.replaceState(null, "", listUrl) }, [listUrl, restored])
@@ -271,10 +278,10 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
 
   React.useEffect(() => {
     if (!restored) return
-    const value = JSON.stringify([writingFilter, reportFilter, level, status, selectionFilter, aiRemaining, flower, query, pageSize, audience, studentId])
+    const value = JSON.stringify([writingFilter, reportFilter, level, status, selectionFilter, scheduleFilter, aiRemaining, flower, query, pageSize, audience, studentId])
     if (previousFilters.current !== null && previousFilters.current !== value) { setPage(1); setSelectedIds([]) }
     previousFilters.current = value
-  }, [restored, writingFilter, reportFilter, level, status, selectionFilter, aiRemaining, flower, query, pageSize, audience, studentId])
+  }, [restored, writingFilter, reportFilter, level, status, selectionFilter, scheduleFilter, aiRemaining, flower, query, pageSize, audience, studentId])
 
   const audienceRecords = React.useMemo(() => records.filter(record => matchesReviewAudience(record, audience) && (!studentId || record.studentId === studentId)), [records, audience, studentId])
 
@@ -282,6 +289,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     const normalizedQuery = query.trim().toLowerCase()
     return audienceRecords
       .filter(record => matchesReviewSelection(record, selectionFilter))
+      .filter(record => matchesReviewSchedule(record, scheduleFilter))
       .filter((record) => {
         if (writingFilter === "all") return true
         const classification = workbookClassification(record)
@@ -311,7 +319,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
         const fallback = result || aDisplayNumber.localeCompare(bDisplayNumber, "ko", { numeric: true })
         return sort.direction === "asc" ? fallback : -fallback
       })
-  }, [audienceRecords, level, status, selectionFilter, aiRemaining, flower, query, sort, writingFilter, reportFilter])
+  }, [audienceRecords, level, status, selectionFilter, scheduleFilter, aiRemaining, flower, query, sort, writingFilter, reportFilter])
 
   const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -324,6 +332,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
   const reset = () => {
     setAudience("all"); setStudentId(""); setPage(1)
     setSelectionFilter("all")
+    setScheduleFilter("all")
     setWritingFilter("all")
     setReportFilter("all")
     setLevel("all")
@@ -374,7 +383,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     const allRecords = records.filter((record) => selectedIds.includes(record.id))
     const selectedRecords = allRecords.filter(r => !r.reviewId)
     const { action } = actionDialog
-    const outcomes: string[] = allRecords.filter(r => r.reviewId && !eligibleReviewListAction(r, action)).map(r => `${r.studentName} · ${r.bookTitle}: 제외 (${r.pro && !r.pro.selected ? "미선정" : action === "parent" && r.pro ? "프로 자동 발송 대상" : "처리 조건 미충족"})`)
+    const outcomes: string[] = allRecords.filter(r => r.reviewId && !eligibleReviewListAction(r, action)).map(r => `${r.studentName} · ${r.bookTitle}: 제외 (${reviewListActionExclusion(r, action)})`)
     for (const r of allRecords.filter(r => r.reviewId && eligibleReviewListAction(r, action))) { try { await performReviewListAction(r.id, action, selectedFlower ?? 0, role); outcomes.push(`${r.writingRound}차 ${r.studentName}: 성공`) } catch (e) { outcomes.push(`${r.writingRound}차 ${r.studentName}: 제외/실패 (${String(e)})`) } }
     if (outcomes.length) setRecords(await getAgencyWorkbookListAsync(role))
     const eligibleRecords = selectedRecords.filter((record) => {
@@ -418,12 +427,13 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             <div role="group" aria-label="조회 대상" className="flex flex-wrap items-center gap-2">
               <span className="mr-1 inline-flex items-center gap-1.5 text-[13px] font-medium text-slate-600">조회 대상<ProHelp label="조회 대상 안내" lines={reviewAudienceHelp}/></span>
-              {(Object.keys(reviewAudienceLabels) as ReviewAudience[]).map(value => <button key={value} type="button" aria-pressed={audience === value} onClick={() => { setAudience(value); setSelectionFilter(reviewSelectionFilter(selectionFilter, value)); setStudentId("") }} className={cn("h-9 cursor-pointer rounded-full border px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600", audience === value ? "border-blue-300 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600 hover:bg-slate-50")}>{reviewAudienceLabels[value]}</button>)}
+              {(Object.keys(reviewAudienceLabels) as ReviewAudience[]).map(value => <button key={value} type="button" aria-pressed={audience === value} onClick={() => { setAudience(value); setSelectionFilter(reviewSelectionFilter(selectionFilter, value)); setScheduleFilter("all"); setStudentId("") }} className={cn("h-9 cursor-pointer rounded-full border px-3 text-[13px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600", audience === value ? "border-blue-300 bg-blue-50 text-blue-700" : "border-slate-200 text-slate-600 hover:bg-slate-50")}>{reviewAudienceLabels[value]}</button>)}
               {studentId && <button type="button" onClick={() => setStudentId("")} aria-label="학생 조건 해제" className="flex h-9 items-center gap-2 rounded-full bg-slate-100 px-3 text-xs">{records.find(r => r.studentId === studentId)?.studentName ?? studentId}<X className="size-3"/></button>}
             </div>
             <FilterMenu label="피드백 상태" className="w-full sm:w-[260px]" value={status} onValueChange={setStatus} disabled={statusLocked} options={[{value:"all",label:"전체"},{value:"작성전",label:"피드백 작성 전"},{value:"작성완료",label:"피드백 작성 완료"},{value:"전송완료",label:"피드백 전송 완료"}]} />
-            {showPro && <FilterMenu label="피드백 대상" className="w-full sm:w-[280px]" value={selectionFilter} onValueChange={value => { const next = reviewSelectionFilter(value, audience); setSelectionFilter(next); setStatus(reviewStatusForSelection(status, next)) }} options={reviewSelectionFilterOptions} />}
-            {showPro && <Button asChild variant="outline" className="ml-auto h-9 border-blue-300 bg-blue-50 text-[13px] text-blue-700 shadow-none hover:bg-blue-100 hover:text-blue-700"><Link href={originReturn || "/agency/pro-management"}>주간 관리 현황</Link></Button>}
+            {showPro && <FilterMenu label="피드백 대상" className="w-full sm:w-[280px]" value={selectionFilter} onValueChange={value => { const next = reviewSelectionFilter(value, audience); setSelectionFilter(next); setStatus(reviewStatusForSelection(status, next)); setScheduleFilter(reviewScheduleFilter(scheduleFilter, audience, next)) }} options={reviewSelectionFilterOptions} />}
+            {showPro && <FilterMenu label="예약 상태" className="w-full sm:w-[260px]" value={scheduleFilter} onValueChange={value => setScheduleFilter(reviewScheduleFilter(value, audience, selectionFilter))} disabled={statusLocked} options={reviewScheduleFilterOptions} />}
+            {showPro && <Button asChild variant="outline" className="ml-auto h-9 border-blue-300 bg-blue-50 text-[13px] text-blue-700 shadow-none hover:bg-blue-100 hover:text-blue-700"><Link href={originReturn || `/agency/pro-management${studentTest ? `?studentTest=${encodeURIComponent(studentTest)}` : ""}`}>주간 관리 현황</Link></Button>}
           </div>
           {filterOpen && <div id="review-search-details" className="mt-4 grid gap-x-5 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
               <FilterMenu label="책읽기 레벨" value={level} onValueChange={setLevel} options={[{value:"all",label:"전체"},...[1,2,3,4,5,6].map(i=>({value:String(i),label:`${i}레벨`}))]} />
@@ -448,8 +458,8 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
           <h2 className="text-lg font-semibold text-slate-800">온라인 독후감 목록 <span className="text-sm font-normal">{filteredRecords.length}건</span></h2>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button variant="outline" disabled={busy || !eligibleCount("ai")} onClick={() => setActionDialog({ kind: "bulk", action: "ai" })} className={bulkClass}><Bot className="size-4" />일괄 AI 피드백 생성 ({eligibleCount("ai")})</Button>
-            <Button variant="outline" disabled={busy || !eligibleCount("send")} onClick={() => setActionDialog({ kind: "bulk", action: "send" })} className={bulkClass}><Send className="size-4" />일괄 학생 전송 ({eligibleCount("send")})</Button>
+            <Button variant="outline" disabled={busy || !eligibleCount("ai")} title={selectedRecords.some(record => record.feedbackSchedule) ? feedbackScheduleBlockReason : undefined} onClick={() => setActionDialog({ kind: "bulk", action: "ai" })} className={bulkClass}><Bot className="size-4" />일괄 AI 피드백 생성 ({eligibleCount("ai")})</Button>
+            <Button variant="outline" disabled={busy || !eligibleCount("send")} title={selectedRecords.some(record => record.feedbackSchedule) ? feedbackScheduleBlockReason : undefined} onClick={() => setActionDialog({ kind: "bulk", action: "send" })} className={bulkClass}><Send className="size-4" />일괄 학생 전송 ({eligibleCount("send")})</Button>
             <Button variant="outline" disabled={busy || !eligibleCount("parent")} onClick={() => setActionDialog({ kind: "bulk", action: "parent" })} className={bulkClass}><Mail className="size-4" />일괄 학부모 발송 ({eligibleCount("parent")})</Button>
             <Button variant="outline" disabled={busy || !selectedFlowerEligibleCount} onClick={() => { setSelectedFlower(null); setActionDialog({ kind: "bulk", action: "flower" }) }} className={bulkClass}><Flower2 className="size-4" />일괄 섬초롱꽃 지급 ({selectedFlowerEligibleCount})</Button>
             <button type="button" aria-label="목록 검색" onClick={() => setQuery(keyword)} className="grid size-9 place-items-center rounded-full bg-blue-600 text-white"><Search className="size-4" /></button>
@@ -505,9 +515,9 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
                   <TableCell className="text-center">{record.feedbackAt ?? ""}</TableCell>
                   <TableCell className="text-center font-semibold text-slate-600">{writingInfo(record)}</TableCell>
                   <TableCell className="text-center">{progressInfo(record)}</TableCell>
-                  <TableCell className="text-center">{record.pro && !record.pro.selected ? "-" : statusText[record.status]}</TableCell>
+                  <TableCell className="text-center">{record.pro && !record.pro.selected ? "-" : statusText[record.status]}<FeedbackScheduleStatus schedule={record.feedbackSchedule} showScheduledAt={false} className="mt-1 justify-center"/></TableCell>
                   <TableCell className="text-center">{record.pro ? record.pro.selected ? record.pro.parentLabel : "-" : record.parentSent ? "발송완료" : "미발송"}</TableCell>
-                  <TableCell className="text-center">{record.pro && !record.pro.selected ? "-" : record.status === "전송완료" ? <Check className="mx-auto size-4 text-emerald-500" aria-label="학생 전송 완료" /> : <button type="button" aria-label={`${record.studentName} 학생에게 전송`} disabled={record.status !== "작성완료"} onClick={() => setActionDialog({ kind: "single-send", record })} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300"><Send className="size-4" /></button>}</TableCell>
+                  <TableCell className="text-center">{record.pro && !record.pro.selected ? "-" : record.status === "전송완료" ? <Check className="mx-auto size-4 text-emerald-500" aria-label="학생 전송 완료" /> : <button type="button" aria-label={`${record.studentName} 학생에게 전송`} title={record.feedbackSchedule ? feedbackScheduleBlockReason : undefined} disabled={!eligibleReviewListAction(record, "send")} onClick={() => setActionDialog({ kind: "single-send", record })} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300"><Send className="size-4" /></button>}</TableCell>
                   <TableCell className="text-center">{record.pro ? record.pro.selected ? "자동 발송" : "-" : record.parentSent ? <Check className="mx-auto size-4 text-emerald-500" aria-label="학부모 발송 완료" /> : <button type="button" aria-label={`${record.studentName} 학부모 발송`} title={record.parentContactRegistered === false ? "학부모 연락처가 등록되어 있지 않습니다." : undefined} disabled={record.status !== "전송완료" || record.parentContactRegistered === false} onClick={() => setActionDialog({ kind: "parent", record })} className="inline-grid size-7 place-items-center rounded text-blue-600 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-300"><Mail className="size-4" /></button>}</TableCell>
                   <TableCell className="text-center"><ReportCell record={record} role={role} /></TableCell>
                   <TableCell className="text-center">{record.flowers ? <span>🌻&nbsp; {record.flowers}개</span> : "-"}</TableCell>

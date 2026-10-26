@@ -8,7 +8,7 @@ export function sharedReviewState(db: ReviewDatabase, recordId: string): ReviewD
   return {version:1,sharedRecordId:selected.id,
     reviews:[{...common,institutionId:"",institution:"",classId:"",decidedBy:undefined}],
     records:db.records.filter(r => r.reviewId === common.id && r.writingStatus === "submitted").map(r => {
-      const publicRecord = {...r,legacyAiScores:undefined,aiDraft:undefined,aiHistory:[],history:[],parentContact:false,parentSentAt:undefined,itemFeedback:r.itemFeedback.filter(i => i.visible)}
+      const publicRecord = {...r,feedbackSchedules:undefined,legacyAiScores:undefined,aiDraft:undefined,aiHistory:[],history:[],parentContact:false,parentSentAt:undefined,itemFeedback:r.itemFeedback.filter(i => i.visible)}
       return r.feedbackStatus === "전송완료" ? publicRecord : {...publicRecord,feedback:"",reportFeedback:"",itemFeedback:[],aiScores:undefined,teacherScores:undefined,report:undefined,savedAt:undefined,feedbackStatus:"작성전" as const}
     })}
 }

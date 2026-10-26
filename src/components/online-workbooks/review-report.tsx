@@ -3,6 +3,7 @@ import Image from "next/image"
 import { Fragment, type ReactNode } from "react"
 import { ArrowRight, BookOpen, MessageCircle, Printer, TrendingUp } from "lucide-react"
 import { useReviews, type ReviewRole } from "@/lib/review-client"
+import { agencyStudentTestToken } from "@/lib/student-test-context"
 import { assessmentCriteria, reviewFeedbackItems, plainReviewText, scoreLabel, type ReviewCommon, type ReviewRecord } from "@/lib/review-domain"
 import { reportAreaScores, reportDate, type ReportArea } from "@/lib/review-report-model"
 import { reviewCriterionLabel } from "@/lib/review-assessment-config"
@@ -84,7 +85,8 @@ function RoundWriting({ common, record, rounds }: { common: ReviewCommon; record
 }
 export function ReviewReportView({ id, role, shareToken }: { id: string; role: ReviewRole; shareToken?: string }) {
   const { db, loaded, error } = useReviews(role, role === "external" ? id : undefined)
-  const shareQuery = role === "external" && shareToken ? `&share=${encodeURIComponent(shareToken)}` : ""
+  const studentTest = role === "agency" ? agencyStudentTestToken() : ""
+  const shareQuery = role === "external" && shareToken ? `&share=${encodeURIComponent(shareToken)}` : studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : ""
   const record = db.records.find(r => r.id === id)
   const common = db.reviews.find(r => r.id === record?.reviewId)
   if (!loaded) return <p className={styles.empty} role="status">평가 보고서를 불러오고 있습니다.</p>

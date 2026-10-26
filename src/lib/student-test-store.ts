@@ -43,7 +43,11 @@ export function prepareStudentTests(state: StudentTestState, now: string): Stude
   const day = kstDate(now)
   const sessions = state.sessions.map(connectSessionMetadata)
   if (sessions.some((session, index) => session !== state.sessions[index])) state = { ...state, sessions }
-  if (state.day === day) return state
+  // Add newly implemented examples without resetting any same-day result.
+  if (state.day === day) {
+    const missing = studentTestCases.filter(c => !state.sessions.some(s => s.day === day && s.caseId === c.id))
+    return missing.length ? { ...state, sessions: [...state.sessions, ...missing.map(c => newStudentTestSession(c.id, now))] } : state
+  }
   const previousDay = kstDate(addDays(now, -1))
   return { day, sessions: [...state.sessions.filter(s => s.day === previousDay), ...studentTestCases.map(c => newStudentTestSession(c.id, now))] }
 }
@@ -97,6 +101,9 @@ export function studentTestRow(session: StudentTestSession, now: string) {
   const targetRound = Math.max(1, ...db.records.filter(record => record.reviewId === session.targetId).map(record => record.round))
   return { ...c, path: studentTestBookPath(c.path), token: session.token, student: db.pro!.members[0].name, initial: session.initial, current: studentTestSummary(db, at), changed: !!session.changedAt, baseAt: session.baseAt, now: at, day: session.day, designated: db.pro!.clockMode === "test", dateReason: session.dateReason,
     href: `/student/exploration-record?tab=workbook&month=${session.listMonth}&${query}`,
-    detailHref: session.targetId ? `/student/online-workbook/${session.targetId}?round=${targetRound}&${query}` : undefined }
+    detailHref: session.targetId ? `/student/online-workbook/${session.targetId}?round=${targetRound}&${query}` : undefined,
+    teacherHref: session.caseId.startsWith("schedule-") && session.targetId ? `/agency/online-workbooks/${session.targetId}-r${targetRound}?role=agency&studentTest=${session.token}&returnTo=${encodeURIComponent(`/agency/pro-management?studentTest=${session.token}`)}` : undefined,
+    weeklyHref: session.caseId.startsWith("schedule-") ? `/agency/pro-management?studentTest=${session.token}` : undefined,
+    reviewListHref: session.caseId.startsWith("schedule-") ? `/agency/online-workbooks?role=agency&studentTest=${session.token}` : undefined }
 }
 export type StudentTestRow = ReturnType<typeof studentTestRow>

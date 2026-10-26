@@ -1,4 +1,6 @@
 export type ProMember = {
+  /** Response-only: a previous institution can finish its selected books, not manage this student. */
+  caseOnly?: boolean;
   id: string; name: string; account: string; level: number; age: number;
   product: "pro" | "normal"; status: "active" | "ended"; external: boolean;
   institutionId?: string; teacherId: string; assignedAt?: string; endedAt?: string;
@@ -23,6 +25,8 @@ export type ProAudit = { id: string; studentId: string; kind: string; at: string
 export type ProReminder = { id: string; studentId: string; week: string; kind: "submission" | "revision"; sequence: 1 | 2; at: string; actor: string; cancelledAt?: string }
 export type ProConsultation = { id: string; studentId: string; month: string; result: "유선 상담 완료" | "부재 후 카톡 상담으로 대체" | "미진행"; actualAt: string; memo: string; actor: string; at: string; previousId?: string }
 export type ProState = {
+  /** Response-only institution context; full stored/admin state has no scope marker. */
+  scopeInstitutionId?: string;
   version: 1; clock: string; clockMode?: "real" | "test"; effectiveAt: string; effectiveMonth: string;
   members: ProMember[]; cases: ProCase[];
   schedules: { institutionId: string; teacherId: string; weekday: number; from: string }[];

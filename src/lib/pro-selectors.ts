@@ -36,30 +36,32 @@ export function proSnapshotAt(db: ReviewDatabase, at: string): ReviewDatabase {
   return snapshot
 }
 export function weeklyStudent(db: ReviewDatabase, member: ProMember, week: string) {
+  const caseOnly = !!member.caseOnly
   const consultationAsOf = db.pro!.clock
-  const consultation = currentConsultations(db.pro!, member.id, managementMonth(week))
-  const due = consultDue(member, managementMonth(week))
+  const consultation = caseOnly ? [] : currentConsultations(db.pro!, member.id, managementMonth(week))
+  const due = caseOnly ? undefined : consultDue(member, managementMonth(week))
   if (db.pro && week < weekStart(db.pro.clock)) { db = proSnapshotAt(db, new Date(Date.parse(addDays(week, 7)) - 1).toISOString()); member = db.pro!.members.find(m => m.id === member.id)! }
   const pro = db.pro!, now = pro.clock, month = managementMonth(week), at = week === weekStart(now) ? now : new Date(Date.parse(addDays(week, 7)) - 1).toISOString()
   const usage = proUsage(pro, member, at, month)
   const cases = pro.cases.filter(c => c.studentId === member.id)
-  const feedback = cases.flatMap(c => pendingFeedback(db, c).map(f => ({ ...f, c })))
+  const ownCase = (c: ProCase) => !pro.scopeInstitutionId || c.institutionId === pro.scopeInstitutionId
+  const feedback = cases.filter(ownCase).flatMap(c => pendingFeedback(db, c).map(f => ({ ...f, c })))
   const relevant = feedback.filter(f => f.week <= week)
   const submissions = cases.filter(c => c.week === week && db.records.some(r => r.reviewId === c.reviewId && r.round === 1 && r.writingStatus === "submitted"))
-  const waiting = cases.filter(c => c.secondDeadline && !c.closedAt && !c.secondWeek)
+  const waiting = cases.filter(c => ownCase(c) && c.secondDeadline && !c.closedAt && !c.secondWeek)
   const overdue = relevant.filter(f => f.due < now)
   const remainingReminders = pro.reminderSnapshots.filter(s => s.studentId === member.id && s.week === week && !pro.reminders.some(r => r.studentId === member.id && r.week === week && r.kind === s.kind && r.sequence === s.sequence && !r.cancelledAt))
   const consulted = consultation.some(c => c.result !== "미진행")
   const consultationDue = !consulted && !!due && kstDate(due) <= kstDate(consultationAsOf)
   const lastWeek = monthWeeks(month).at(-1) === week
-  const tasks = [overdue.length, relevant.filter(f => weekStart(f.due) === week && f.due >= now).length, !submissions.length && remainingReminders.some(r => r.kind === "submission") ? 1 : 0, waiting.length && remainingReminders.some(r => r.kind === "revision") ? 1 : 0, consultationDue ? 1 : 0, !consulted && lastWeek ? 1 : 0, lastWeek && usage.available > 0 ? 1 : 0]
-  const status = overdue.length ? "지연" : relevant.length ? "피드백 필요" : !submissions.length && usage.available > 0 ? "미제출" : waiting.length ? "2차 대기" : submissions.some(c => !c.selectedAt) && usage.available > 0 && now < weekSchedule(week, weekdayFor(pro, member, week)).cutoff ? "자동 선정 대기" : cases.some(c => c.week === week && c.closedAt) ? "관리 완료" : usage.used >= usage.limit ? "한도 사용" : submissions.length ? "관리 완료" : "미제출"
+  const tasks = [overdue.length, relevant.filter(f => weekStart(f.due) === week && f.due >= now).length, !caseOnly && !submissions.length && remainingReminders.some(r => r.kind === "submission") ? 1 : 0, !caseOnly && waiting.length && remainingReminders.some(r => r.kind === "revision") ? 1 : 0, consultationDue ? 1 : 0, !caseOnly && !consulted && lastWeek ? 1 : 0, !caseOnly && lastWeek && usage.available > 0 ? 1 : 0]
+  const status = overdue.length ? "지연" : relevant.length ? "피드백 필요" : caseOnly ? waiting.length ? "2차 대기" : "관리 완료" : !submissions.length && usage.available > 0 ? "미제출" : waiting.length ? "2차 대기" : submissions.some(c => !c.selectedAt) && usage.available > 0 && now < weekSchedule(week, weekdayFor(pro, member, week)).cutoff ? "자동 선정 대기" : cases.some(c => c.week === week && c.closedAt) ? "관리 완료" : usage.used >= usage.limit ? "한도 사용" : submissions.length ? "관리 완료" : "미제출"
   const missedWeeks: string[] = []
   const submittedRecords = cases.flatMap(c => db.records.filter(r => r.reviewId === c.reviewId && r.writingStatus === "submitted" && r.submittedAt && r.submittedAt <= at).map(r => ({ week: r.round === 1 ? c.week : c.secondWeek, at: r.submittedAt! })))
   // Submission clears the warning immediately, including a post-cutoff submission
   // assigned to next week's feedback. Both rounds count; drafts do not.
   const submittedNow = submittedRecords.some(r => r.week === week || r.at >= week)
-  for (let previous = addDays(week, -7); !submittedNow && member.assignedAt && previous >= weekStart(member.assignedAt) && previous >= weekStart(member.effectiveAt); previous = addDays(previous, -7)) {
+  for (let previous = addDays(week, -7); !caseOnly && !submittedNow && member.assignedAt && previous >= weekStart(member.assignedAt) && previous >= weekStart(member.effectiveAt); previous = addDays(previous, -7)) {
     if (submittedRecords.some(r => r.week === previous)) break
     if (proUsage(pro, member, new Date(Date.parse(addDays(previous, 7)) - 1).toISOString()).available > 0) missedWeeks.unshift(previous)
   }
@@ -79,7 +81,8 @@ export function feedbackActionLabel(record: Pick<ReviewRecord, "savedAt" | "feed
 }
 export function proTasks(db: ReviewDatabase, institutionId = "dokdo") {
   if (!db.pro) return { counts: taskLabels.map(() => 0), badge: 0 }
-  const rows = db.pro.members.filter(m => m.institutionId === institutionId && isActivePro(m, db.pro!.clock)).map(m => weeklyStudent(db, m, weekStart(db.pro!.clock)))
+  db = { ...db, pro: scopePro(db.pro, institutionId) }
+  const rows = db.pro!.members.filter(m => isActivePro(m, db.pro!.clock)).map(m => weeklyStudent(db, m, weekStart(db.pro!.clock)))
   const counts = taskLabels.map((_, i) => rows.reduce((sum, r) => sum + r.tasks[i], 0))
   const badge = rows.reduce((sum, r) => sum + r.tasks.slice(0, 4).reduce((a, b) => a + b, 0) + (r.tasks[4] || r.tasks[5] ? 1 : 0), 0)
   return { counts, badge }
@@ -115,10 +118,24 @@ export function studentProView(db: ReviewDatabase, studentId: string): StudentPr
   }) }
 }
 export function scopePro(pro: ProState, institutionId: string): ProState {
-  const members = pro.members.filter(m => m.institutionId === institutionId), ids = new Set(members.map(m => m.id))
-  return { ...pro, members, cases: pro.cases.filter(c => ids.has(c.studentId)), schedules: pro.schedules.filter(s => s.institutionId === institutionId || members.some(m => m.matchingHistory?.some(h => h.institutionId === s.institutionId))), audit: pro.audit.filter(a => ids.has(a.studentId) || a.institutionId === institutionId), reminders: pro.reminders.filter(r => ids.has(r.studentId)), consultations: pro.consultations.filter(c => ids.has(c.studentId)), processed: [], reminderSnapshots: pro.reminderSnapshots.filter(s => ids.has(s.studentId)) }
+  const assignedMembers = pro.members.filter(m => m.institutionId === institutionId), assignedIds = new Set(assignedMembers.map(m => m.id))
+  // Current institutions can read the student's prior feedback; previous institutions
+  // retain only their own selected books. Mutation authority is checked separately.
+  const cases = pro.cases.filter(c => assignedIds.has(c.studentId) || (c.selectedAt || c.firstSentAt) && c.institutionId === institutionId)
+  const caseIds = new Set(cases.map(c => c.reviewId)), caseStudentIds = new Set(cases.map(c => c.studentId))
+  const members = pro.members.flatMap(member => {
+    if (assignedIds.has(member.id)) return [member.caseOnly ? { ...member, caseOnly: undefined } : member]
+    if (!caseStudentIds.has(member.id)) return []
+    // Include only the information needed to render an already-owned book. Never expose
+    // the newly assigned institution's memo, consultations, teacher or matching history.
+    return [{ ...member, caseOnly: true, teacherId: "", managementMemo: undefined, consultation: undefined, overrides: {}, matchingHistory: undefined }]
+  })
+  return { ...pro, scopeInstitutionId: institutionId, members, cases,
+    schedules: pro.schedules.filter(s => s.institutionId === institutionId || assignedMembers.some(m => m.matchingHistory?.some(h => h.institutionId === s.institutionId))),
+    audit: pro.audit.filter(a => a.reviewId ? caseIds.has(a.reviewId) : a.institutionId ? a.institutionId === institutionId : assignedIds.has(a.studentId)),
+    reminders: pro.reminders.filter(r => assignedIds.has(r.studentId)), consultations: pro.consultations.filter(c => assignedIds.has(c.studentId)), processed: [], reminderSnapshots: pro.reminderSnapshots.filter(s => assignedIds.has(s.studentId)) }
 }
-export function caseParentLabel(c?: ProCase) { return !c?.selectedAt && !c?.firstSentAt ? "-" : c.parent.status === "sent" ? `발송 완료 ${dateLabel(c.parent.at)}` : c.parent.status === "missing" ? "연락처 미등록" : c.parent.status === "failed" ? "발송 실패" : "관리 종료 후 자동 발송" }
+export function caseParentLabel(c?: ProCase, includeSentAt = true) { return !c?.selectedAt && !c?.firstSentAt ? "-" : c.parent.status === "sent" ? includeSentAt ? `발송 완료 ${dateLabel(c.parent.at)}` : "발송 완료" : c.parent.status === "missing" ? "연락처 미등록" : c.parent.status === "failed" ? "발송 실패" : "관리 종료 후 자동 발송" }
 export function proCaseStatus(db: ReviewDatabase, c: ProCase) {
   if (c.closedAt) {
     if (c.closeReason === "2차 미제출 기한 종료") return "2차 제출 기한 종료"

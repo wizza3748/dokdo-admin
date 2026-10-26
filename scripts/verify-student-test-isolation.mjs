@@ -36,11 +36,11 @@ const a = client(), b = client(), stranger = client()
 const commonBefore = (await a()).common
 await a(root, { action: "prepare" }); await b(root, { action: "prepare" })
 let catalog = await a()
-assert.equal(catalog.rows.length, 19)
+assert.equal(catalog.rows.length, 22)
 const bBefore = (await b()).rows
 const signature = rows => hash(JSON.stringify(rows.map(({ token, initial, current, changed }) => ({ token, initial, current, changed }))))
 const commonHash = hash(JSON.stringify(commonBefore))
-results.push("19 cases available in separate browser workspaces")
+results.push("22 cases available in separate browser workspaces")
 const row = id => catalog.rows.find(r => r.id === id)
 const refresh = async () => { catalog = await a() }
 const reset = async id => { await a(root, { action: "reset", token: row(id).token }); await refresh(); return row(id) }

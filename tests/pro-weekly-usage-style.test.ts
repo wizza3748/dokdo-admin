@@ -7,7 +7,9 @@ const weekly = readFileSync(new URL("../src/components/pro-management/weekly-stu
 const detail = readFileSync(new URL("../src/components/pro-management/student-management-detail.tsx", import.meta.url), "utf8")
 
 test("compact quota typography is scoped to the weekly usage cell", () => {
-  assert.ok(weekly.includes('data-label="피드백 이용 권수"><div className={`${styles.usage} ${styles.weeklyUsage}`}'))
+  const usageCell = weekly.match(/data-label="피드백 이용 권수">([\s\S]*?)<\/td>/)?.[1] ?? ""
+  assert.ok(usageCell.includes('className={`${styles.usage} ${styles.weeklyUsage}`}'))
+  assert.ok(usageCell.includes("member.caseOnly ?"))
   assert.ok(!detail.includes("styles.weeklyUsage"))
   assert.match(css, /\.weeklyUsage \.usageAmount strong \{[^}]*font-size: 14px;[^}]*font-weight: 600;/)
   assert.match(css, /\.weeklyUsage \.usageAmount span \{[^}]*font-size: 14px;/)

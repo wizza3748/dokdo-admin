@@ -8,6 +8,7 @@ import { isActivePro, weekdayFor } from "@/lib/pro-domain"
 import { proStatuses, taskLabels, weeklyStudent } from "@/lib/pro-selectors"
 import { hasPriorOverdue, weeklyColumnHelp, weeklyDate, weeklyDeadline, weeklyTaskHelp } from "@/lib/pro-weekly-presentation"
 import { useReviewListPosition } from "@/lib/review-navigation"
+import { agencyStudentTestToken } from "@/lib/student-test-context"
 import { panel, ProDemoTools, ProNotice, useProManagement } from "./pro-common"
 import { ProHelp } from "./pro-help"
 import { WeeklyStudentRow } from "./weekly-student-row"
@@ -41,7 +42,8 @@ export function WeeklyManagement() {
   const current = weekStart(pro.clock), week = selectedWeek && selectedWeek <= current ? selectedWeek : current
   const month = managementMonth(week), activeTask = week === current ? task : null
   const identity = new URLSearchParams(window.location.search).get("demoAgency")
-  const agencyQuery = identity ? `&demoAgency=${encodeURIComponent(identity)}` : ""
+  const studentTest = agencyStudentTestToken()
+  const agencyQuery = (identity ? `&demoAgency=${encodeURIComponent(identity)}` : "") + (studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : "")
   const returnUrl = `/agency/pro-management?week=${encodeURIComponent(week)}&status=${encodeURIComponent(filter)}${activeTask === null ? "" : `&task=${activeTask}`}${ended ? "&ended=1" : ""}${openedBooks.map(id => `&books=${encodeURIComponent(id)}`).join("")}${hook.readOnly ? "&role=admin" : ""}${agencyQuery}`
   const keepUrl = (w: string, status: string, t: number | null) => {
     const p = new URLSearchParams(window.location.search)
@@ -87,7 +89,7 @@ export function WeeklyManagement() {
         <thead><tr>{columns.map(h => <th key={h} scope="col"><span className="inline-flex items-center gap-1.5">{h === "월 주차별 기록" ? `${Number(month.slice(5))}월 주차별 기록` : h}{weeklyColumnHelp[h] && <ProHelp label={`${h} 안내`} lines={weeklyColumnHelp[h]}/>}</span></th>)}</tr></thead>
         <tbody>{rows.map(row => <WeeklyStudentRow key={row.member.id} hook={hook} row={row} week={week} task={activeTask} returnUrl={returnUrl} agencyQuery={agencyQuery} expanded={openedBooks.includes(row.member.id)} toggle={() => toggleBooks(row.member.id)}/>)}{!rows.length && <tr className={styles.empty}><td colSpan={7} className="text-center text-slate-500">해당 관리 대상이 없습니다.</td></tr>}</tbody>
       </table></div><p className="text-xs text-slate-500">학생 이름을 누르면 권수 조정과 상세 이력을 볼 수 있습니다.</p>
-    </section><ProDemoTools hook={hook} onClockChange={() => {
+    </section>{!studentTest && <ProDemoTools hook={hook} onClockChange={() => {
       setSelectedWeek(""); setTask(null)
       const params = new URLSearchParams(window.location.search)
       params.delete("week"); params.delete("task")
@@ -97,6 +99,6 @@ export function WeeklyManagement() {
       const params = new URLSearchParams(window.location.search)
       for (const key of ["week", "task", "status", "ended", "books"]) params.delete(key)
       window.history.replaceState(null, "", `${window.location.pathname}?${params}`)
-    }}/>
+    }}/>}
   </div>
 }

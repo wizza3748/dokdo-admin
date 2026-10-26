@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
-import { studentTestScreen, studentTestScreenHref, studentTestToken } from "../src/lib/student-test-context"
+import { agencyStudentTestToken, studentTestApi, studentTestScreen, studentTestScreenHref, studentTestToken } from "../src/lib/student-test-context"
 
 test("student layout does not render the test banner", async () => {
   const layout = await readFile("src/app/student/layout.tsx", "utf8")
@@ -20,6 +20,32 @@ test("screen options apply only to dedicated test links and preserve context", (
   }
   const common = "/student/exploration-record?demoStudent=pro-demo-1"
   assert.equal(studentTestScreenHref(common, "error"), common)
+})
+
+test("agency test scope is URL-only, preserves safe return links and never contaminates ordinary agency navigation", () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, "window")
+  const location = { search: "?studentTest=owned-example" }
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { location } })
+  try {
+    assert.equal(agencyStudentTestToken(), "owned-example")
+    assert.equal(studentTestApi("reviews", "/shared", "agency"), "/api/mock/student-front-tests/reviews")
+    location.search = "?returnTo=" + encodeURIComponent("/agency/pro-management?studentTest=owned-example")
+    assert.equal(agencyStudentTestToken(), "owned-example")
+    location.search = "?returnTo=" + encodeURIComponent("https://elsewhere.example/agency/pro-management?studentTest=foreign")
+    assert.equal(agencyStudentTestToken(), "")
+    location.search = "?role=agency"
+    assert.equal(agencyStudentTestToken(), "")
+    assert.equal(studentTestApi("reviews", "/shared", "agency"), "/shared")
+  } finally {
+    if (descriptor) Object.defineProperty(globalThis, "window", descriptor)
+    else Reflect.deleteProperty(globalThis, "window")
+  }
+})
+
+test("dedicated teacher detail resolves real record IDs without falling back to an unrelated legacy example", async () => {
+  const source = await readFile("src/components/online-workbooks/workbook-detail.tsx", "utf8")
+  assert.match(source, /db\.records\.find\(r => r\.id === id\)/)
+  assert.match(source, /role === "admin" \|\| agencyStudentTestToken\(\)/)
 })
 
 test("test-list choice survives internal navigation, normal re-entry restores display, common entry clears test scope", () => {

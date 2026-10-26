@@ -2,6 +2,7 @@ import { STUDENT_MOCK_STORAGE_KEYS } from "@/lib/student-mock-state"
 import { getWorkbookById, type WorkbookRuntimeState } from "@/lib/student-workbooks"
 import { getWorkbookRoundSetting, type WorkbookRoundDisplayMode } from "@/lib/workbook-round-settings"
 import { withWorkbookDisplayNumbers } from "@/lib/workbook-display-numbers"
+import type { FeedbackScheduleDisplay } from "@/lib/review-schedule-presentation"
 
 export type FeedbackStatus = "작성전" | "작성완료" | "전송완료"
 
@@ -10,6 +11,7 @@ export interface OnlineWorkbook {
   external?: boolean
   pro?: { selected: boolean; period: string; selection: string; due?: string; overdue?: boolean; parentLabel: string }
   actionEligibility?: Record<"ai" | "send" | "parent" | "flower", boolean>
+  feedbackSchedule?: FeedbackScheduleDisplay
   displayNumber?: string
   reviewId?: string
   writingRound?: 1 | 2
@@ -25,6 +27,7 @@ export interface OnlineWorkbook {
   submittedAt: string
   submittedAtTime?: string
   feedbackAt: string | null
+  sentAt?: string
   status: FeedbackStatus
   aiUsed: number
   flowers: number
@@ -352,6 +355,9 @@ export async function getAgencyWorkbookListAsync(role: "agency" | "class" | "adm
   const { reviewListRows } = await import("@/lib/review-list-adapter")
   const db = await readReviews(role)
   const newRecords = reviewListRows(db, role)
+  const { agencyStudentTestToken } = await import("@/lib/student-test-context")
+  // Dedicated examples never merge browser/shared legacy submissions into their list.
+  if (role === "agency" && agencyStudentTestToken()) return withWorkbookDisplayNumbers(newRecords, [])
   const overrides = await getMergedStudentSubmittedAgencyWorkbooks()
   const overrideById = new Map(overrides.map((record) => [record.id, record]))
   const seedIds = new Set(AGENCY_ONLINE_WORKBOOKS.map((record) => record.id))

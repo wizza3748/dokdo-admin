@@ -8,6 +8,7 @@ import { assertSharedReviewRequest } from "../src/lib/review-request-scope"
 import { PrototypeStore } from "../src/lib/prototype-store"
 import { emptyStudentTests, prepareStudentTests, getStudentTest, runStudentTest, resetStudentTest, controlStudentTest, currentStudentTest } from "../src/lib/student-test-store"
 import { proUsage } from "../src/lib/pro-domain"
+import { studentTestCases } from "../src/lib/student-test-scenarios"
 
 const today = "2026-10-21T04:00:00.000Z"
 const origin = "https://dokdo-admin.vercel.app"
@@ -52,7 +53,8 @@ test("production browser ownership is secure, stable, opaque, and not inferred f
 
 test("foreign origins, missing write origins, invalid cookies and unsafe cloud configuration fail closed", () => {
   const a = owner()
-  for (const headers of [{ origin: "https://other.example" }, { "sec-fetch-site": "cross-site" }, { "sec-fetch-site": "same-site" }]) {
+  const invalidHeaders: Record<string, string>[] = [{ origin: "https://other.example" }, { "sec-fetch-site": "cross-site" }, { "sec-fetch-site": "same-site" }]
+  for (const headers of invalidHeaders) {
     assert.throws(() => studentTestWorkspace(request(a.cookie, "POST", headers), false, env))
   }
   assert.throws(() => studentTestWorkspace(new Request(`${origin}/api/mock/student-front-tests`, { method: "POST" }), true, env))
@@ -102,7 +104,7 @@ test("Neon concurrent prepare and updates do not lose results across instances",
   const stores = [createStudentTestWorkspaceStore(env, { sql: f.sql }), createStudentTestWorkspaceStore(env, { sql: f.sql })]
   await Promise.all(stores.map(store => store.update(a.scope.key, emptyStudentTests, s => prepareStudentTests(s, today))))
   const initial = await stores[0].read(a.scope.key, emptyStudentTests)
-  assert.equal(initial.sessions.length, 19)
+  assert.equal(initial.sessions.length, studentTestCases.length)
   await Promise.all(stores.map((store, i) => store.update(a.scope.key, emptyStudentTests, s => ({ ...s, sessions: s.sessions.map(c => c.caseId === (i ? "apply-many" : "apply-one") ? runStudentTest(c, "pro", { type: "apply", reviewId: c.targetId! }, `parallel-${i}`, today) : c) }))))
   const result = await stores[0].read(a.scope.key, emptyStudentTests)
   for (const id of ["apply-one", "apply-many"]) assert.ok(result.sessions.find(s => s.caseId === id)!.changedAt)
@@ -116,7 +118,7 @@ test("next KST day prepares only that browser; old tabs and designated dates rem
   const bBefore = structuredClone(f.values.get(store.key(b.scope.key)))
   const next = await store.update(a.scope.key, emptyStudentTests, s => prepareStudentTests(s, nextDay))
   assert.equal(next.day, "2026-10-22")
-  assert.equal(next.sessions.filter(s => s.day === next.day).length, 19)
+  assert.equal(next.sessions.filter(s => s.day === next.day).length, studentTestCases.length)
   for (const old of initial.sessions) assert.equal(JSON.stringify(getStudentTest(next, old.token)), JSON.stringify(old))
   const boundary = next.sessions.find(s => s.day === next.day && s.caseId === "month-boundary")!
   assert.equal(currentStudentTest(boundary, nextDay).pro!.clock, boundary.baseAt)

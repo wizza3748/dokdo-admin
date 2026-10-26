@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { emptyStudentTests, getStudentTest, runStudentTest, currentStudentTest } from "./student-test-store"
 import { requireStudentTestWorkspace, studentTestResponseHeaders, studentTestWorkspaceStore } from "./student-test-workspace"
 import { visibleReviewState } from "./review-server"
-import { testStudent } from "./student-test-scenarios"
+import { runAgencyStudentTest, studentTestRequestActor } from "./student-test-agency"
 import type { ReviewCommand } from "./review-domain"
 import type { ProCommand } from "./pro-types"
 
@@ -10,15 +10,19 @@ export async function studentTestReviewResponse(request: Request, kind: "review"
   try {
     const workspace = requireStudentTestWorkspace(request)
     const params = new URL(request.url).searchParams, token = params.get("studentTest") || ""
+    const role = params.get("role")
     let now = new Date().toISOString()
     const payload = request.method === "POST" ? await request.json() as { command: ReviewCommand | ProCommand; requestId: string } : undefined
     if (payload && (!payload.command?.type || typeof payload.requestId !== "string" || !payload.requestId)) throw new Error("잘못된 요청입니다.")
     const state = payload ? await studentTestWorkspaceStore.update(workspace.key, emptyStudentTests, state => {
       now = new Date().toISOString()
-      getStudentTest(state, token)
-      return { ...state, sessions: state.sessions.map(s => s.token === token ? runStudentTest(s, kind, payload.command, payload.requestId, now) : s) }
+      const session = getStudentTest(state, token)
+      studentTestRequestActor(session, role)
+      return { ...state, sessions: state.sessions.map(s => s.token === token ? (role === "agency" ? runAgencyStudentTest : runStudentTest)(s, kind, payload.command, payload.requestId, now) : s) }
     }) : await studentTestWorkspaceStore.read(workspace.key, emptyStudentTests)
-    const db = currentStudentTest(getStudentTest(state, token), now)
-    return NextResponse.json(visibleReviewState(db, testStudent(db), params.get("recordId"), now), { headers: studentTestResponseHeaders })
+    const session = getStudentTest(state, token)
+    const actor = studentTestRequestActor(session, role)
+    const db = currentStudentTest(session, now)
+    return NextResponse.json(visibleReviewState(db, actor, params.get("recordId"), now), { headers: studentTestResponseHeaders })
   } catch (e) { return NextResponse.json({ message: e instanceof Error ? e.message : "전용 예시 처리 실패" }, { status: 400, headers: studentTestResponseHeaders }) }
 }

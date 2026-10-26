@@ -4,6 +4,8 @@ import { legacyAssessmentCriteria, snapshotReviewAssessment, reviewAreaLabel, ty
 import { REVIEW_FEEDBACK_SAMPLES } from "./review-feedback-samples.ts"
 // @ts-expect-error Node domain tests load TypeScript sources directly.
 import { calculateReviewScores, reviewScoreLabel } from "./review-score-policy.ts"
+// @ts-expect-error Node domain tests load TypeScript sources directly.
+import { activeFeedbackSchedule } from "./review-schedule.ts"
 
 export type ReviewActor = { role: "student" | "agency" | "class" | "admin" | "external"; studentId?: string; institutionId?: string; classId?: string; name: string }
 export type ReviewItem = { id: string; title: string; description: string; example?: string }
@@ -71,6 +73,7 @@ export type ReviewRecord = {
   aiHistory: { requestId: string; at: string; status: "running" | "success" | "failure"; reason?: string; actor: string }[];
   aiUsed: number; aiScores?: ReviewScores; teacherScores?: ReviewScores; report?: ReviewReport;
   parentContact: boolean; parentSentAt?: string; flowers: number; flowersAt?: string; rejectedAt?: string; history: ReviewHistory[];
+  feedbackSchedules?: import("./review-schedule").FeedbackSchedule[];
 }
 export type ReviewDatabase = { version: 1; seedVersion?: number; reviews: ReviewCommon[]; records: ReviewRecord[]; pro?: import("./pro-types").ProState; studentPro?: import("./pro-selectors").StudentProView; currentTime?: string; proTestBaseline?: { pro: import("./pro-types").ProState; reviews: ReviewCommon[]; records: ReviewRecord[] } }
 export const reviewProgressLabels: Record<ReviewCommon["progress"], string> = {
@@ -391,18 +394,23 @@ export function hydrateLegacyReviewFeedback(db: ReviewDatabase): ReviewDatabase 
   }) }
 }
 export function canAccessReview(review: ReviewCommon, actor: ReviewActor, pro?: import("./pro-types").ProState) {
-  const member = pro?.members.find(m => m.id === review.studentId && (m.product === "pro" || pro.cases.some(c => c.reviewId === review.id)))
-  if (member && (actor.role === "agency" || actor.role === "class")) return actor.role === "agency" && !!member.institutionId && actor.institutionId === member.institutionId
+  const managedCase = pro?.cases.find(c => c.reviewId === review.id)
+  const member = pro?.members.find(m => m.id === review.studentId && (m.product === "pro" || !!managedCase))
+  if (member && (actor.role === "agency" || actor.role === "class")) {
+    // The current institution can read previous feedback; processing stays with the selected case owner.
+    const owner = managedCase?.selectedAt || managedCase?.firstSentAt ? managedCase.institutionId : member.institutionId
+    return actor.role === "agency" && !!actor.institutionId && (actor.institutionId === member.institutionId || actor.institutionId === owner)
+  }
   return actor.role === "admin" || (actor.role === "student" && actor.studentId === review.studentId) ||
     (actor.role === "agency" && actor.institutionId === review.institutionId) ||
     (actor.role === "class" && actor.institutionId === review.institutionId && actor.classId === review.classId)
 }
-export function canRejectReview(record: ReviewRecord) { return record.writingStatus === "submitted" && record.feedbackStatus === "작성전" && record.aiHistory.length === 0 }
+export function canRejectReview(record: ReviewRecord) { return !activeFeedbackSchedule(record) && record.writingStatus === "submitted" && record.feedbackStatus === "작성전" && record.aiHistory.length === 0 }
 export function canChangeReviewTemplate(record: ReviewRecord) {
   return record.round === 1 && record.writingStatus === "writing" && record.stage === "items" && record.feedbackStatus === "작성전" && !record.rewriteEdited && !record.history.some(h => h.action === "enter-rewrite" || h.action === "submit")
 }
 export function canAwardReview(record: ReviewRecord) { return record.writingStatus === "submitted" && record.feedbackStatus !== "작성전" && record.flowers === 0 }
-export function canSendReview(review: ReviewCommon, record: ReviewRecord) { return record.writingStatus === "submitted" && record.feedbackStatus === "작성완료" && !record.aiDraft && !record.aiHistory.some(h => h.status === "running") && (!review.reportEnabled || (!!record.report && validScores(review.level, record.teacherScores, record) && validAiScores(review.level, record.aiScores, record))) }
+export function canSendReview(review: ReviewCommon, record: ReviewRecord) { return !activeFeedbackSchedule(record) && record.writingStatus === "submitted" && record.feedbackStatus === "작성완료" && !record.aiDraft && !record.aiHistory.some(h => h.status === "running") && (!review.reportEnabled || (!!record.report && validScores(review.level, record.teacherScores, record) && validAiScores(review.level, record.aiScores, record))) }
 export function reportState(review: ReviewCommon, record: ReviewRecord) { return !review.reportEnabled ? "생성 불가" : record.report ? "생성 완료" : "생성 전" }
 
 export type ReviewCommand = ReviewCommandBase & { proDesignate?: boolean }
@@ -413,6 +421,8 @@ type ReviewCommandBase = {
   | { type: "save-writing"; recordId: string; stage: "items" | "rewrite"; answers: Record<string, string>; body: string; itemIndex: number; rewriteChecklist?: number[] }
   | { type: "enter-rewrite" | "submit" | "seen" | "reject" | "send" | "parent" | "ai-start"; recordId: string }
   | { type: "flower"; recordId: string; amount: number }
+  | { type: "schedule-feedback"; recordId: string; scheduledAt: string; expectedRevision: string }
+  | { type: "cancel-feedback-schedule"; recordId: string; scheduleId: string }
   | { type: "ai-result"; recordId: string; runId: string; result?: { feedback: string; reportFeedback?: string; items: ItemFeedback[]; scores?: ReviewScores; unscorableReason?: string }; error?: string }
   | { type: "save-feedback"; recordId: string; feedback: string; reportFeedback?: string; items: ItemFeedback[]; scores?: ReviewScores; decision?: "request" | "complete" }
 
@@ -466,6 +476,9 @@ function applyReviewCommandInternal(database: ReviewDatabase, command: ReviewCom
   requireCondition(canAccessReview(review, actor, db.pro), "조회·처리 권한이 없습니다.")
   const studentAction = ["switch-template", "start-second", "save-writing", "enter-rewrite", "submit", "seen"].includes(command.type)
   requireCondition(studentAction ? actor.role === "student" : actor.role === "agency" || actor.role === "class", "이 작업을 처리할 권한이 없습니다.")
+  const managedCase = db.pro?.cases.find(c => c.reviewId === review.id)
+  if (!studentAction && (managedCase?.selectedAt || managedCase?.firstSentAt)) requireCondition(actor.role === "agency" && actor.institutionId === managedCase.institutionId, "해당 관리 건의 처리 권한이 없습니다.")
+  if (["save-feedback", "send", "ai-start", "ai-result", "reject"].includes(command.type)) requireCondition(!activeFeedbackSchedule(record), "전송 예약을 취소한 후 처리해 주세요.")
   const first = db.records.find(r => r.reviewId === review.id && r.round === 1)!
   const prefix = record.round === 1 ? "first" : "second"
   requireCondition(!record.templateSelectionPending || command.type === "switch-template", "독후감을 선택한 후 작성해 주세요.")

@@ -40,7 +40,9 @@ export class PrototypeStore {
 
   constructor(options: StoreOptions = {}) {
     this.env = options.env ?? process.env
-    this.directory = options.directory ?? (this.env.VERCEL !== "1" && this.env.DOKDO_LOCAL_STATE_DIR ? path.resolve(this.env.DOKDO_LOCAL_STATE_DIR) : path.join(process.cwd(), ".local-state"))
+    // Interactive requests and background workers must serialize the same local file,
+    // even when one receives a relative DOKDO_LOCAL_STATE_DIR and the other an absolute path.
+    this.directory = path.resolve(options.directory ?? (this.env.VERCEL !== "1" && this.env.DOKDO_LOCAL_STATE_DIR ? this.env.DOKDO_LOCAL_STATE_DIR : path.join(process.cwd(), ".local-state")))
     this.fetcher = options.fetcher ?? fetch
     this.now = options.now ?? Date.now
     this.sqlQuery = options.sql

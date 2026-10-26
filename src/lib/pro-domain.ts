@@ -1,10 +1,12 @@
 // @ts-expect-error Node tests use explicit TypeScript extensions.
 import { addDays, consultationDate, kstDate, managementMonth, monthWeeks, secondDeadline, submissionPeriod, weekSchedule, weekStart } from "./pro-calendar.ts"
 // @ts-expect-error Node tests use explicit TypeScript extensions.
-import { applyReviewCommand, type ReviewActor, type ReviewCommand, type ReviewDatabase, type ReviewRecord } from "./review-domain.ts"
+import { applyReviewCommand, canAccessReview, canSendReview, type ReviewActor, type ReviewCommand, type ReviewDatabase, type ReviewRecord } from "./review-domain.ts"
 import type { ProCase, ProCommand, ProMember, ProState } from "./pro-types"
 // @ts-expect-error Node tests use explicit TypeScript extensions.
-import { atReviewTime, beginProClockTest, endProClockTest } from "./review-clock.ts"
+import { atReviewTime, beginProClockTest, endProClockTest, reviewNow } from "./review-clock.ts"
+// @ts-expect-error Node tests use explicit TypeScript extensions.
+import { activeFeedbackSchedule, feedbackScheduleRevision, feedbackScheduleSnapshot, validFeedbackScheduleTime, type FeedbackSchedule } from "./review-schedule.ts"
 export const PRO_SEND_CONFIRM = "피드백을 전송하면 학부모에게 결과가 자동 발송됩니다. 전송 후에는 '2차 작성 요청'으로 변경할 수 없습니다."
 export const PRO_BULK_SEND_CONFIRM = "프로 학생의 '1차 완료' 건은 학부모에게 결과가 자동 발송됩니다. 전송 후에는 '2차 작성 요청'으로 변경할 수 없습니다."
 function check(value: unknown, message: string): asserts value { if (!value) throw new Error(message) }
@@ -80,6 +82,9 @@ function newCase(pro: ProState, member: ProMember, reviewId: string, submittedAt
   return { reviewId, studentId: member.id, institutionId: member.institutionId!, teacherId: member.teacherId, ...period, parent: { status: "none", attempts: [] }, finalSnapshots: [], aiSnapshots: [] }
 }
 function select(pro: ProState, c: ProCase, at: string, selection: ProCase["selection"], actor: string) {
+  const member = pro.members.find(item => item.id === c.studentId)
+  const historical = member?.matchingHistory?.filter(item => item.at <= at).sort((a, b) => a.at.localeCompare(b.at)).at(-1)
+  c.institutionId = historical?.institutionId ?? member?.institutionId ?? c.institutionId
   c.selectedAt = at; c.selection = selection
   audit(pro, `select:${c.reviewId}:${at}`, "대상 선정", at, actor, c.studentId, { reviewId: c.reviewId, month: c.month, week: c.week, after: selection })
 }
@@ -206,7 +211,9 @@ export function applyProCommand(input: ReviewDatabase, command: ProCommand, acto
   const c = "reviewId" in command ? pro.cases.find(c => c.reviewId === command.reviewId) : undefined
   const reminder = command.type === "cancel-reminder" ? pro.reminders.find(r => r.id === command.id) : undefined
   const member = pro.members.find(m => m.id === ("studentId" in command ? command.studentId : c?.studentId ?? reminder?.studentId))
-  check(member, "학생을 찾을 수 없습니다."); access(pro, actor, member)
+  check(member, "학생을 찾을 수 없습니다.")
+  if (command.type === "retry-parent" && (c?.selectedAt || c?.firstSentAt)) check(actor.role === "agency" && actor.institutionId === c.institutionId, "해당 관리 건의 처리 권한이 없습니다.")
+  else access(pro, actor, member)
   if (["apply", "cancel", "change"].includes(command.type)) check(actor.role === "student", "학생만 신청·취소·변경할 수 있습니다.")
   else check(actor.role === "agency", "기관관리자만 처리할 수 있습니다.")
   if (command.type === "management-memo") {
@@ -282,6 +289,38 @@ export function applyManagedReviewCommand(input: ReviewDatabase, command: Review
   const managed = !!member && (member.product === "pro" || !!c)
   const at = managed ? pro!.clock : realAt
   if (db.records.some(r => r.history.some(h => h.requestId === requestId))) return db
+  if (command.type === "schedule-feedback" || command.type === "cancel-feedback-schedule") {
+    check(record && common && pro && member?.product === "pro" && member.external, "외부 프로 학생의 피드백만 예약 전송할 수 있습니다.")
+    const owner = c?.institutionId ?? member.institutionId
+    check(actor.role === "agency" && !!owner && actor.institutionId === owner && canAccessReview(common, actor, pro), "해당 관리 건의 예약 처리 권한이 없습니다.")
+    if (command.type === "schedule-feedback") {
+      check(c?.selectedAt && !c.closedAt, "선정된 프로 관리 대상만 예약 전송할 수 있습니다.")
+      check(!activeFeedbackSchedule(record), "이미 등록된 전송 예약이 있습니다. 예약을 취소한 후 다시 등록해 주세요.")
+      check(canSendReview(common, record), "저장 및 평가 완료 후 예약할 수 있습니다.")
+      check(!record.sentAt && !record.history.some(item => item.action === "send"), "이미 전송된 피드백은 예약할 수 없습니다.")
+      check(record.round !== 2 || !!c.firstSentAt && db.records.some(item => item.reviewId === common.id && item.round === 1 && item.feedbackStatus === "전송완료"), "1차 피드백 전송 후 2차 피드백을 예약할 수 있습니다.")
+      check(validFeedbackScheduleTime(command.scheduledAt, at), "예약 일시는 현재보다 이후의 날짜와 시간으로 분 단위까지 선택해 주세요.")
+      const revision = feedbackScheduleRevision(common, record)
+      check(typeof command.expectedRevision === "string" && command.expectedRevision === revision, "피드백 정보가 변경되었습니다. 최신 내용을 확인한 후 다시 예약해 주세요.")
+      const schedule: FeedbackSchedule = {
+        id: requestId, recordId: record.id, reviewId: common.id, round: record.round, institutionId: owner,
+        scheduledAt: new Date(command.scheduledAt).toISOString(), status: "waiting", createdAt: at, createdBy: structuredClone(actor),
+        snapshot: feedbackScheduleSnapshot(common, record), revision, firstSentAt: c.firstSentAt,
+        events: [{ action: "registered", at, actor: actor.name }],
+      }
+      record.feedbackSchedules = [...(record.feedbackSchedules ?? []), schedule]
+      audit(pro, requestId, "예약 등록", at, actor.name, member.id, { institutionId: owner, reviewId: common.id, month: c.month, week: c.week, after: { scheduleId: schedule.id, scheduledAt: schedule.scheduledAt, round: record.round } })
+    } else {
+      const schedule: FeedbackSchedule | undefined = activeFeedbackSchedule(record)
+      check(schedule && schedule.id === command.scheduleId, "예약 상태가 변경되었습니다. 최신 내용을 확인해 주세요.")
+      check(schedule.status === "waiting" || schedule.status === "failed", "예약 전송을 처리 중이어서 취소할 수 없습니다.")
+      schedule.status = "cancelled"; schedule.cancelledAt = at; schedule.cancelledBy = actor.name
+      schedule.events.push({ action: "cancelled", at, actor: actor.name })
+      audit(pro, requestId, "예약 취소", at, actor.name, member.id, { institutionId: owner, reviewId: common.id, month: c?.month, week: c?.week, after: { scheduleId: schedule.id } })
+    }
+    record.history.push({ requestId, action: command.type, actor: actor.name, at })
+    return db
+  }
   if (managed && record) {
     if (c && !c.selectedAt && command.proDesignate && ["ai-start", "save-feedback"].includes(command.type)) {
       check(actor.role === "agency" && actor.institutionId === member.institutionId, "해당 학생의 처리 권한이 없습니다.")
@@ -316,6 +355,68 @@ export function applyManagedReviewCommand(input: ReviewDatabase, command: Review
     } else close(db, nextCase, at, "2차 완료 전송")
   }
   return db
+}
+
+/** First durable transaction: cancellation and claim compete for the same aggregate revision. */
+export function claimDueFeedbackSchedules(input: ReviewDatabase, realAt: string): ReviewDatabase {
+  const at = reviewNow(input, realAt)
+  const due = input.records.filter(record => {
+    const schedule = activeFeedbackSchedule(record)
+    return schedule?.status === "waiting" && schedule.scheduledAt <= at
+  })
+  if (!due.length) return input
+  const db = atReviewTime(structuredClone(input), realAt)
+  for (const original of due) {
+    const record = db.records.find(item => item.id === original.id)!, schedule = activeFeedbackSchedule(record)!
+    schedule.status = "sending"; schedule.claimedAt = at
+    schedule.events.push({ action: "claimed", at, actor: "예약 자동 처리" })
+    record.history.push({ requestId: `${schedule.id}:claim`, action: "feedback-schedule-claim", actor: "예약 자동 처리", at })
+  }
+  return db
+}
+
+/** Second durable transaction. Safe to repeat after process restart or a store CAS conflict. */
+export function executeFeedbackSchedule(input: ReviewDatabase, recordId: string, scheduleId: string, realAt: string, options: { simulateFailure?: string } = {}): ReviewDatabase {
+  const original = input.records.find(record => record.id === recordId)?.feedbackSchedules?.find(schedule => schedule.id === scheduleId)
+  if (original?.status !== "sending") return input
+  const db = atReviewTime(structuredClone(input), realAt), at = reviewNow(db, realAt)
+  const record = db.records.find(item => item.id === recordId)!, schedule = record.feedbackSchedules!.find(item => item.id === scheduleId)!
+  const common = db.reviews.find(item => item.id === record.reviewId), member = memberFor(db, common?.studentId ?? "")
+  const c = db.pro?.cases.find(item => item.reviewId === common?.id)
+  const auditResult = (target: ReviewDatabase, kind: string, reason?: string) => {
+    if (target.pro && common) audit(target.pro, `${scheduleId}:${kind}`, kind, at, "예약 자동 처리", common.studentId, { institutionId: schedule.institutionId, reviewId: common.id, month: c?.month, week: c?.week, after: { scheduleId, round: record.round }, reason })
+  }
+  try {
+    check(schedule.scheduledAt <= at, "예약 전송 시간이 아직 되지 않았습니다.")
+    check(common && member?.product === "pro" && member.external && c?.selectedAt && !c.closedAt, "피드백 관리 대상 또는 선정 상태가 변경되었습니다.")
+    check(record.reviewId === schedule.reviewId && record.round === schedule.round && schedule.createdBy.role === "agency" && c.institutionId === schedule.institutionId && schedule.createdBy.institutionId === schedule.institutionId && canAccessReview(common, schedule.createdBy, db.pro), "예약 등록 기관의 처리 권한이 변경되었습니다.")
+    check(!record.sentAt && record.feedbackStatus !== "전송완료" && !record.history.some(item => item.action === "send"), "이미 전송된 피드백이어서 예약 전송하지 않았습니다.")
+    check(record.round !== 2 || !!c.firstSentAt && db.records.some(item => item.reviewId === common.id && item.round === 1 && item.feedbackStatus === "전송완료"), "1차 피드백 전송 상태가 변경되었습니다.")
+    check(feedbackScheduleRevision(common, record) === schedule.revision && c.firstSentAt === schedule.firstSentAt, "예약 당시 저장된 피드백 또는 전송 이력이 변경되었습니다.")
+    // This transition is private to this transaction: no intermediate 'sent' state is persisted.
+    schedule.status = "sent"
+    check(canSendReview(common, record), "저장 내용 또는 평가 정보가 전송 조건을 충족하지 않습니다.")
+    if (options.simulateFailure) throw new Error(options.simulateFailure)
+    const executionRequestId = `${scheduleId}:execute`
+    const next = applyManagedReviewCommand(db, { type: "send", recordId }, schedule.createdBy, executionRequestId, at)
+    const sentRecord = next.records.find(item => item.id === recordId)!
+    check(sentRecord.feedbackStatus === "전송완료" && sentRecord.sentAt === at && sentRecord.history.some(item => item.requestId === executionRequestId && item.action === "send" && item.at === at), "예약 전송 완료를 확인하지 못했습니다. 예약을 취소한 후 다시 등록해 주세요.")
+    const completed = sentRecord.feedbackSchedules!.find(item => item.id === scheduleId)!
+    completed.executedAt = at
+    completed.events.push({ action: "sent", at, actor: "예약 자동 처리" })
+    auditResult(next, "예약 전송 성공")
+    return next
+  } catch (error) {
+    // Failed execution never commits a partially sent record, debit or parent delivery.
+    const failed = atReviewTime(structuredClone(input), realAt)
+    const failedRecord = failed.records.find(item => item.id === recordId)!, failedSchedule = failedRecord.feedbackSchedules!.find(item => item.id === scheduleId)!
+    const reason = error instanceof Error ? error.message : "예약 전송 처리에 실패했습니다."
+    failedSchedule.status = "failed"; failedSchedule.executedAt = at; failedSchedule.failureReason = reason
+    failedSchedule.events.push({ action: "failed", at, actor: "예약 자동 처리", reason })
+    failedRecord.history.push({ requestId: `${scheduleId}:failure`, action: "feedback-schedule-failed", actor: "예약 자동 처리", at })
+    auditResult(failed, "예약 전송 실패", reason)
+    return failed
+  }
 }
 export function consultDue(member: ProMember, month: string) { const schedule = member.consultation; return member.overrides[month] ?? (schedule ? consultationDate(month, schedule.nth, schedule.weekday, schedule.time) : undefined) }
 export function currentConsultations(pro: ProState, studentId: string, month: string) { return pro.consultations.filter(c => c.studentId === studentId && c.month === month && !pro.consultations.some(n => n.previousId === c.id)) }

@@ -17,7 +17,7 @@ type Action = "reset" | "teacher-start" | "cutoff"
 const groups: { id: string; name: string; cases: StudentTestCaseId[] }[] = [
   { id: "before", name: "신청 전", cases: ["empty", "draft", "apply-one", "apply-many"] },
   { id: "apply", name: "신청·변경", cases: ["change-one", "change-many", "partial", "locked"] },
-  { id: "feedback", name: "피드백·2차", cases: ["arrival", "second-request", "second-draft", "second-sent"] },
+  { id: "feedback", name: "피드백·2차", cases: ["arrival", "second-request", "second-draft", "second-sent", "schedule-first", "schedule-request", "schedule-second"] },
   { id: "exceptions", name: "마감·예외", cases: ["expired-empty", "expired-draft", "reject-first", "reject-second", "unassigned", "closed-next", "month-boundary"] },
 ]
 const time = (at: string) => new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(at))
@@ -152,7 +152,7 @@ export function StudentFrontTest() {
                   <div className="flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => requestControl(row, "teacher-start")}>선생님 작성 시작</Button><Button variant="outline" size="sm" onClick={() => requestControl(row, "cutoff")}>신청 마감 진행</Button></div>
                 </details>}
               </td>
-              <td><div className="flex flex-col items-start gap-2"><Open href={studentTestScreenHref(row.href, screen)}/>{row.detailHref && <Link className="text-xs text-slate-600 underline underline-offset-4" href={studentTestScreenHref(row.detailHref, screen)} target="_blank" rel="noopener noreferrer">해당 글 바로 열기</Link>}<button type="button" className="mt-2 text-xs text-slate-500 underline underline-offset-4 hover:text-slate-800" onClick={() => requestControl(row, "reset")}>이 예시만 초기화</button></div></td>
+              <td><div className="flex flex-col items-start gap-2"><Open href={studentTestScreenHref(row.href, screen)}/>{row.teacherHref && <Open href={row.teacherHref} label="관리자 상세 열기"/>}{row.weeklyHref && <Link className="text-xs text-slate-600 underline underline-offset-4" href={row.weeklyHref} target="_blank" rel="noopener noreferrer">주간 관리 현황</Link>}{row.reviewListHref && <Link className="text-xs text-slate-600 underline underline-offset-4" href={row.reviewListHref} target="_blank" rel="noopener noreferrer">온라인 독후감 목록</Link>}{row.detailHref && <Link className="text-xs text-slate-600 underline underline-offset-4" href={studentTestScreenHref(row.detailHref, screen)} target="_blank" rel="noopener noreferrer">해당 글 바로 열기</Link>}<button type="button" className="mt-2 text-xs text-slate-500 underline underline-offset-4 hover:text-slate-800" onClick={() => requestControl(row, "reset")}>이 예시만 초기화</button></div></td>
             </tr>)}</tbody>
           </table>
         </div>

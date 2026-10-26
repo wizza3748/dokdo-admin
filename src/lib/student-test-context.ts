@@ -23,8 +23,20 @@ export function studentTestToken() {
   } else if (params.has("demoStudent")) { sessionStorage.removeItem(contextKey); sessionStorage.removeItem(screenKey) }
   return sessionStorage.getItem(contextKey) || ""
 }
+/** Agency test scope is explicit in the URL, never inherited by an ordinary agency tab. */
+export function agencyStudentTestToken() {
+  if (typeof window === "undefined") return ""
+  const params = new URLSearchParams(window.location.search)
+  if (params.has("studentTest")) return params.get("studentTest") || ""
+  const back = params.get("returnTo")
+  if (!back) return ""
+  try {
+    const url = new URL(back, "https://prototype.invalid")
+    return url.origin === "https://prototype.invalid" && /^\/agency\/(pro-management|online-workbooks)/.test(url.pathname) ? url.searchParams.get("studentTest") || "" : ""
+  } catch { return "" }
+}
 export function studentTestApi(kind: "reviews" | "pro", normal: string, role: string) {
-  return role === "student" && studentTestToken() ? `/api/mock/student-front-tests/${kind}` : normal
+  return (role === "student" && studentTestToken() || role === "agency" && agencyStudentTestToken()) ? `/api/mock/student-front-tests/${kind}` : normal
 }
 export function studentTestScreen(): StudentTestScreen {
   if (!studentTestToken()) return "normal"

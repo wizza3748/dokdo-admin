@@ -5,6 +5,7 @@ import type { ReviewDatabase } from "@/lib/review-domain"
 import { initializePro } from "@/lib/pro-seeds"
 import { resetTodayProDemo } from "@/lib/pro-today-demo"
 import { isProDemoResetRequest } from "@/lib/pro-demo-reset"
+import { resetLocalFeedbackScheduleExamples } from "@/lib/review-schedule-seeds"
 
 export const runtime = "nodejs"
 
@@ -19,7 +20,8 @@ export async function POST(request: Request) {
     await prototypeStore.update<ReviewDatabase>("online-reviews", getDefaultReviewDatabase, state => {
       const id = `today-demo:reset:${requestId}`
       if (state.pro?.audit.some(a => a.id === id)) return state
-      const now = new Date().toISOString(), next = resetTodayProDemo(initializePro(state), now)
+      const now = new Date().toISOString()
+      const next = resetLocalFeedbackScheduleExamples(resetTodayProDemo(initializePro(state), now), now, process.env)
       next.pro!.audit = next.pro!.audit.filter(a => a.kind !== "로컬 예시 초기화" && a.kind !== "예시 초기화")
       next.pro!.audit.push({ id, studentId: "", kind: "예시 초기화", at: now, actor: "프로토타입" })
       return next

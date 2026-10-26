@@ -21,10 +21,12 @@ export function FeedbackAction({ record, role, returnTo }: { record: OnlineWorkb
   const pending = React.useRef(false)
   const trigger = React.useRef<HTMLButtonElement>(null)
   const action = record.status === "작성전" ? "작성" : record.status === "작성완료" ? "수정" : "보기"
-  const href = `/agency/online-workbooks/${record.id}?role=${role}${new URLSearchParams(returnTo.split("?")[1]).get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""}&returnTo=${encodeURIComponent(returnTo)}`
+  const returnParams = new URLSearchParams(returnTo.split("?")[1])
+  const studentTest = returnParams.get("studentTest")
+  const href = `/agency/online-workbooks/${record.id}?role=${role}${returnParams.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""}${studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : ""}&returnTo=${encodeURIComponent(returnTo)}`
   const label = `${record.studentName} 피드백 ${action}, AI 사용 ${record.aiUsed}/2회`
   const className = "inline-flex items-center gap-2 font-medium text-blue-600 hover:underline"
-  const contents = <><Pencil className={cn("size-4", record.status !== "전송완료" ? "text-blue-600" : "text-slate-400")} /><span>{action} <span className="tabular-nums">({record.aiUsed}/2)</span></span></>
+  const contents = <><Pencil className={cn("size-4", record.status !== "전송완료" ? "text-blue-600" : "text-slate-400")} /><span className="tabular-nums">({record.aiUsed}/2)</span></>
   const close = React.useCallback(() => { if (!pending.current) { setDialog(null); trigger.current?.focus() } }, [])
   const enter = async () => {
     if (pending.current) return

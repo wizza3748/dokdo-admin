@@ -3,7 +3,7 @@ import * as React from "react"
 import { reviewReads, subscribeReviewRefresh } from "@/lib/review-refresh"
 import { STUDENT_MOCK_STORAGE_KEYS } from "@/lib/student-mock-state"
 import { emptyReviewDatabase, type ReviewActor, type ReviewCommand, type ReviewDatabase } from "@/lib/review-domain"
-import { studentTestApi, studentTestScreen, studentTestScreenEvent, studentTestToken } from "./student-test-context"
+import { agencyStudentTestToken, studentTestApi, studentTestScreen, studentTestScreenEvent, studentTestToken } from "./student-test-context"
 export type ReviewRole = ReviewActor["role"]
 const eventName = "dokdo-review-change"
 export function demoIdentityQuery(role: ReviewRole) {
@@ -16,7 +16,8 @@ export function demoIdentityQuery(role: ReviewRole) {
     const token = studentTestToken()
     return (current ? `&demoStudent=${encodeURIComponent(current)}` : "") + (token ? `&studentTest=${encodeURIComponent(token)}` : "")
   }
-  return params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""
+  const testToken = role === "agency" ? agencyStudentTestToken() : ""
+  return (params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : "") + (testToken ? `&studentTest=${encodeURIComponent(testToken)}` : "")
 }
 export async function reviewSharePath(recordId: string, role: ReviewRole = "student") {
   if (role === "student" && studentTestToken()) throw new Error("전용 테스트 데이터는 외부 공유하지 않습니다.")

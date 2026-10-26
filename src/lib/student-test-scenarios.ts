@@ -21,6 +21,9 @@ export const studentTestCases = [
   { id: "second-request", name: "2차 작성 요청", path: "1차 [피드백 확인하기] → [2차 글 시작하기] → 진입 확인", expect: "2차 제출 기한 표시. 2차 작성 시작·제출 시 1차 이용 권수 추가 차감 없음." },
   { id: "second-draft", name: "2차 작성 중 · 임시 저장", path: "2차 [이어서 쓰기] → 고쳐쓰기 → [제출하기]", expect: "저장한 2차 글 유지. 제출 후 피드백 대기, 추가 신청·권수 차감 없음." },
   { id: "second-sent", name: "2차 피드백 도착", path: "2차 [피드백 확인하기]", expect: "2차 피드백과 읽음 확인. 관리 종료, 1차 사용 1권만 유지됩니다." },
+  { id: "schedule-first", name: "1차 완료 · 예약 전송", path: "관리자 상세 → [피드백 예약 전송] → [예약하기] → 학생 화면", expect: "예약 중 작성 중·사용 0권 유지. 실제 전송 후 도착·사용 1권·관리 종료. 예약 확인에서 취소 후 다시 등록할 수 있습니다." },
+  { id: "schedule-request", name: "2차 요청 · 예약 전송", path: "관리자 상세 → [피드백 예약 전송] → [예약하기] → 학생 화면", expect: "실제 1차 전송 후 사용 1권·2차 작성 요청. 2차 제출 기한은 실제 전송 시각으로 계산합니다." },
+  { id: "schedule-second", name: "2차 완료 · 예약 전송", path: "관리자 상세 → [피드백 예약 전송] → [예약하기] → 학생 화면", expect: "2차 예약 중 피드백 대기. 실제 전송 후 도착·관리 종료, 사용 1권 유지. 화면을 닫아도 로컬 서버가 처리합니다." },
   { id: "expired-empty", name: "2차 미작성 · 제출 기한 종료", path: "기한 종료 글의 목록 → 1차 피드백 확인", expect: "2차 작성 진입 불가. 1차 글과 피드백 조회 가능. 제출 이력을 임의로 만들지 않습니다." },
   { id: "expired-draft", name: "2차 임시 저장 · 제출 기한 종료", path: "기한 종료 글의 목록 → 2차 글 확인", expect: "임시 저장 내용은 보존하고 수정·제출은 차단합니다. 추가 권수 차감 없음." },
   { id: "reject-first", name: "1차 반려 · 수정 후 재제출", path: "목록 [다시 쓰기] → 수정 → [제출하기]", expect: "반려된 신청 해제·권수 복구. 재제출 시 제출 시점의 관리 주차로 판단하고 다시 신청합니다." },
@@ -35,6 +38,7 @@ export const studentTestNames: Record<StudentTestCaseId, string> = {
   empty: "김하준", draft: "이서연", "apply-one": "박도윤", "apply-many": "최지우",
   "change-one": "정민준", "change-many": "강서윤", partial: "조예준", locked: "윤하은",
   arrival: "장시우", "second-request": "임지아", "second-draft": "한준서", "second-sent": "오수아",
+  "schedule-first": "배서진", "schedule-request": "문하린", "schedule-second": "차이준",
   "expired-empty": "서도현", "expired-draft": "신예린", "reject-first": "권지호", "reject-second": "황채원",
   unassigned: "안유찬", "closed-next": "송다은", "month-boundary": "유시온",
 }
@@ -84,7 +88,16 @@ export function buildStudentTest(id: StudentTestCaseId, today: string): StudentT
     write(`${reviewId}-r1`, at, submit); targetId = reviewId; return reviewId
   }
   const send = (reviewId: string, at: string, requestSecond = false, round = 1) => { run(testFeedback(`${reviewId}-r${round}`, requestSecond ? "request" : "complete"), at, true); run({ type: "send", recordId: `${reviewId}-r${round}` }, at, true) }
-  if (id === "draft") add("draft", "이어 쓰는 이야기", baseAt, false)
+  if (id.startsWith("schedule-")) {
+    const r = add("target", "신청할 글"); select(r)
+    if (id === "schedule-second") {
+      send(r, baseAt, true)
+      run({ type: "seen", recordId: `${r}-r1` })
+      run({ type: "start-second", recordId: `${r}-r1` })
+      write(`${r}-r2`, baseAt)
+    }
+    run(testFeedback(`${r}-r${id === "schedule-second" ? 2 : 1}`, id === "schedule-request" ? "request" : "complete"), baseAt, true)
+  } else if (id === "draft") add("draft", "이어 쓰는 이야기", baseAt, false)
   else if (id === "apply-one" || id === "unassigned") add("target", "신청할 글")
   else if (id === "apply-many") for (let n = 1; n <= 3; n++) add(`book-${n}`, `신청할 글 ${n}`)
   else if (["change-one", "change-many", "partial", "locked"].includes(id)) {
