@@ -59,7 +59,7 @@ export function createCloudFeedbackScheduler(options: Options = {}) {
   const workspaces = options.workspaceStore ?? createStudentTestWorkspaceStore(env)
   const publish: Publish = options.publish ?? (async (body, notBefore, deduplicationId) => {
     const client = new Client({ token: env.QSTASH_TOKEN!, baseUrl: env.QSTASH_URL!, retry: { retries: 1 } })
-    const result = await client.publishJSON({ url: config!.url, body, notBefore, deduplicationId, retries: 5,
+    const result = await client.publishJSON({ url: config!.url, body, notBefore, deduplicationId, retries: 3,
       retryDelay: "30000 * (1 + retried)", timeout: "60s", failureCallback: `${config!.url}/failure` })
     if (!("messageId" in result) || !result.messageId) throw new Error("Queue not accepted")
     return { messageId: result.messageId }
@@ -82,7 +82,14 @@ export function createCloudFeedbackScheduler(options: Options = {}) {
       try {
         const result = await enqueue(job, schedule.scheduledAt)
         return { binding: { nonce: job.nonce, messageId: result.messageId, queuedAt: job.queuedAt }, fingerprint: fingerprint(schedule) }
-      } catch { throw new Error("예약 전송 서버에 등록하지 못했습니다. 잠시 후 다시 시도해 주세요. 기존 내용은 유지됩니다.") }
+      } catch (error) {
+        // Fixed vocabulary only: provider errors can contain URLs, tokens or submitted payloads.
+        const message = error instanceof Error ? error.message : ""
+        const category = /token|authoriz|credential/i.test(message) ? "credentials" : /retries|retry|timeout|delay|limit|quota/i.test(message) ? "delivery-options-or-limit" : /fetch|network|connect/i.test(message) ? "connection" : "unknown"
+        const status = error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : undefined
+        console.warn("[feedback-schedule] queue-registration-failed", { category, status })
+        throw new Error("예약 전송 서버에 등록하지 못했습니다. 잠시 후 다시 시도해 주세요. 기존 내용은 유지됩니다.")
+      }
     },
     async receive(raw: string, signature: string, failure = false) {
       if (!config) return { status: 503, result: "unavailable" }
