@@ -5,6 +5,7 @@ import { prototypeStore } from "@/lib/prototype-store"
 import { applyManagedReviewCommand } from "@/lib/pro-domain"
 import { updateReviewState, reviewActor, visibleReviewState } from "@/lib/review-server"
 import { assertSharedReviewRequest } from "@/lib/review-request-scope"
+import { bindCloudFeedbackSchedule, createCloudFeedbackScheduler } from "@/lib/feedback-schedule-cloud"
 export const runtime = "nodejs"
 export async function GET(request: Request) {
   // Public results require an authenticated encrypted share token, not a guessed record ID.
@@ -24,6 +25,17 @@ export async function POST(request: Request) {
     assertSharedReviewRequest(request)
     const payload = await request.json() as { command: ReviewCommand; requestId: string }
     if (!payload.requestId || !payload.command?.type) throw new Error("잘못된 요청입니다.")
+    const scheduleCommand = payload.command.type === "schedule-feedback" ? payload.command : undefined
+    let prepared: Awaited<ReturnType<ReturnType<typeof createCloudFeedbackScheduler>["prepare"]>>
+    if (scheduleCommand) {
+      const scheduler = createCloudFeedbackScheduler()
+      if (scheduler.enabled) {
+        const snapshot = await prototypeStore.read("online-reviews", getDefaultReviewDatabase)
+        const at = new Date().toISOString()
+        const proposed = updateReviewState(snapshot, at, current => applyManagedReviewCommand(current, scheduleCommand, reviewActor(request, current), payload.requestId, at))
+        prepared = await scheduler.prepare(proposed, { kind: "shared" }, scheduleCommand.recordId, payload.requestId)
+      }
+    }
     let serverNow = ""
     const db = await prototypeStore.update<ReviewDatabase>("online-reviews", getDefaultReviewDatabase, state => {
       serverNow = new Date().toISOString()
@@ -31,7 +43,8 @@ export async function POST(request: Request) {
         const actor = reviewActor(request, current)
         const member = current.pro?.members.find(m => m.id === actor.studentId)
         const command = payload.command.type === "create" && member ? { ...payload.command, common: { ...payload.command.common, id: payload.command.common.id + "-" + member.id, studentId: member.id, studentName: member.name, institutionId: member.institutionId ?? "unassigned", institution: "독도학원", classId: "external" } } : payload.command
-        return applyManagedReviewCommand(current, command, actor, payload.requestId, serverNow)
+        const next = applyManagedReviewCommand(current, command, actor, payload.requestId, serverNow)
+        return scheduleCommand ? bindCloudFeedbackSchedule(next, scheduleCommand.recordId, payload.requestId, prepared) : next
       })
     })
     return NextResponse.json(visibleReviewState(db, reviewActor(request, db), undefined, serverNow), { headers: { "Cache-Control": "no-store" } })

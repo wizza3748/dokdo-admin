@@ -32,6 +32,8 @@ export type FeedbackSchedule = {
   cancelledBy?: string;
   failureReason?: string;
   events: { action: "registered" | "claimed" | "sent" | "failed" | "cancelled"; at: string; actor: string; reason?: string }[];
+  /** Server delivery binding; never included in student/external projections. */
+  cloudDelivery?: { nonce: string; messageId: string; queuedAt: string };
 }
 export type ActiveFeedbackSchedule = FeedbackSchedule & { status: "waiting" | "sending" | "failed" }
 

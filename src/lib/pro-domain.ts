@@ -358,11 +358,11 @@ export function applyManagedReviewCommand(input: ReviewDatabase, command: Review
 }
 
 /** First durable transaction: cancellation and claim compete for the same aggregate revision. */
-export function claimDueFeedbackSchedules(input: ReviewDatabase, realAt: string): ReviewDatabase {
+export function claimDueFeedbackSchedules(input: ReviewDatabase, realAt: string, target?: { recordId: string; scheduleId: string }): ReviewDatabase {
   const at = reviewNow(input, realAt)
   const due = input.records.filter(record => {
     const schedule = activeFeedbackSchedule(record)
-    return schedule?.status === "waiting" && schedule.scheduledAt <= at
+    return (!target || record.id === target.recordId && schedule?.id === target.scheduleId) && schedule?.status === "waiting" && schedule.scheduledAt <= at
   })
   if (!due.length) return input
   const db = atReviewTime(structuredClone(input), realAt)
@@ -372,6 +372,21 @@ export function claimDueFeedbackSchedules(input: ReviewDatabase, realAt: string)
     schedule.events.push({ action: "claimed", at, actor: "예약 자동 처리" })
     record.history.push({ requestId: `${schedule.id}:claim`, action: "feedback-schedule-claim", actor: "예약 자동 처리", at })
   }
+  return db
+}
+
+/** Transport exhaustion is terminal, like a business failure; never send/debit on failure. */
+export function failFeedbackScheduleDelivery(input: ReviewDatabase, recordId: string, scheduleId: string, realAt: string): ReviewDatabase {
+  const original = input.records.find(r => r.id === recordId)?.feedbackSchedules?.find(s => s.id === scheduleId)
+  if (!original || !["waiting", "sending"].includes(original.status)) return input
+  const db = structuredClone(input), at = reviewNow(db, realAt)
+  const record = db.records.find(r => r.id === recordId)!, schedule = record.feedbackSchedules!.find(s => s.id === scheduleId)!
+  const reason = "예약 전송 서버 연결에 실패했습니다. 예약을 취소한 후 다시 등록해 주세요."
+  schedule.status = "failed"; schedule.executedAt = at; schedule.failureReason = reason
+  schedule.events.push({ action: "failed", at, actor: "예약 자동 처리", reason })
+  record.history.push({ requestId: `${scheduleId}:failure`, action: "feedback-schedule-failed", actor: "예약 자동 처리", at })
+  const common = db.reviews.find(r => r.id === record.reviewId), c = db.pro?.cases.find(c => c.reviewId === record.reviewId)
+  if (db.pro && common) audit(db.pro, `${scheduleId}:예약 전송 실패`, "예약 전송 실패", at, "예약 자동 처리", common.studentId, { institutionId: schedule.institutionId, reviewId: common.id, month: c?.month, week: c?.week, after: { scheduleId, round: record.round }, reason })
   return db
 }
 
