@@ -6,12 +6,15 @@ import { applyManagedReviewCommand } from "@/lib/pro-domain"
 import { updateReviewState, reviewActor, visibleReviewState } from "@/lib/review-server"
 import { assertSharedReviewRequest } from "@/lib/review-request-scope"
 import { bindCloudFeedbackSchedule, createCloudFeedbackScheduler } from "@/lib/feedback-schedule-cloud"
+import { ensureProductionScheduleExamples } from "@/lib/review-schedule-example-server"
 export const runtime = "nodejs"
 export async function GET(request: Request) {
   // Public results require an authenticated encrypted share token, not a guessed record ID.
   if (new URL(request.url).searchParams.get("role") === "external") return NextResponse.json({version:1,reviews:[],records:[]},{status:403,headers:{"Cache-Control":"no-store"}})
   try {
     assertSharedReviewRequest(request)
+    try { await ensureProductionScheduleExamples() }
+    catch { console.warn("[feedback-schedule] shared-example-registration-pending") } // Existing data remains readable during a queue outage.
     let serverNow = ""
     const db = await prototypeStore.update<ReviewDatabase>("online-reviews", getDefaultReviewDatabase, state => {
       serverNow = new Date().toISOString()

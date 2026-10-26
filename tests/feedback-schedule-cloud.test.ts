@@ -12,11 +12,15 @@ import { feedbackScheduleRevision } from "../src/lib/review-schedule"
 import { newStudentTestSession, emptyStudentTests, resetStudentTest } from "../src/lib/student-test-store"
 import { testTeacher } from "../src/lib/student-test-scenarios"
 import { emptyReviewDatabase } from "../src/lib/review-domain"
+import { initializePro } from "../src/lib/pro-seeds"
+import { ensureProductionScheduleExamples, updateSharedScheduleExamples } from "../src/lib/review-schedule-example-server"
+import { resetFeedbackScheduleExamples } from "../src/lib/review-schedule-seeds"
 
 const before = "2026-10-26T04:00:00.000Z", due = "2026-10-26T04:01:00.000Z"
 const env = { VERCEL: "1", VERCEL_ENV: "production", DOKDO_STATE_PROVIDER: "neon", DOKDO_STATE_NAMESPACE: "test:production", DOKDO_FEEDBACK_SCHEDULE_ORIGIN: "https://example.test", DOKDO_FEEDBACK_SCHEDULE_KEY: "ab".repeat(32), QSTASH_URL: "https://qstash-eu-central-1.upstash.io", QSTASH_TOKEN: "fake", QSTASH_CURRENT_SIGNING_KEY: "fake-current", QSTASH_NEXT_SIGNING_KEY: "fake-next" }
 const key = Buffer.from(env.DOKDO_FEEDBACK_SCHEDULE_KEY, "hex")
 const ownerA = `browser-${"a".repeat(64)}`, ownerB = `browser-${"b".repeat(64)}`
+const exampleEnv = { ...env, DOKDO_STATE_NAMESPACE: "dokdo-admin:production:v1" }
 function fixture(id = "cloud-job", scheduledAt = due, caseId: "schedule-first" | "schedule-request" | "schedule-second" = "schedule-first") {
   const session = newStudentTestSession(caseId, before)
   const record = session.db.records.find(r => r.id === `${session.targetId}-${caseId === "schedule-second" ? "r2" : "r1"}`)!
@@ -38,6 +42,86 @@ async function setup(run: (context: {
   try { await run({ directory, shared, workspaces, scheduler, deliveries, advance: value => { at = value } }) }
   finally { await rm(directory, { recursive: true, force: true }) }
 }
+
+test("production shared examples match local seeds, preserve unrelated results, enqueue once and send without browsing", async () => setup(async ({ shared, workspaces, scheduler, deliveries, advance }) => {
+  const baseline = JSON.parse(JSON.stringify(initializePro(emptyReviewDatabase()))) as ReturnType<typeof initializePro>, other = newStudentTestSession("apply-one", before)
+  await shared.update("online-reviews", () => baseline, db => db)
+  const workspace = { day: "2026-10-26", sessions: [other] }
+  await workspaces.update(ownerA, () => workspace, db => db)
+  const options = { env: exampleEnv, store: shared, scheduler, now: () => before, defaults: () => baseline }
+  const result = (await ensureProductionScheduleExamples(options))!
+  assert.deepEqual(result.records.slice(0, baseline.records.length), baseline.records)
+  assert.deepEqual(result.pro!.members.slice(0, baseline.pro!.members.length), baseline.pro!.members)
+  const waiting = result.records.find(r => r.id === "review-pro-demo-schedule-waiting-r1")!
+  const failed = result.records.find(r => r.id === "review-pro-demo-schedule-failed-r1")!
+  assert.equal(waiting.feedbackStatus, "작성완료")
+  assert.equal(waiting.feedbackSchedules![0].status, "waiting")
+  assert.ok(waiting.feedbackSchedules![0].cloudDelivery)
+  assert.equal(failed.feedbackStatus, "작성완료")
+  assert.equal(failed.feedbackSchedules![0].status, "failed")
+  assert.equal(failed.feedbackSchedules![0].cloudDelivery, undefined)
+  assert.equal(deliveries.length, 1)
+  await ensureProductionScheduleExamples(options)
+  assert.equal(deliveries.length, 1)
+  const job = openScheduleJob(deliveries[0].body.job, key, env.DOKDO_STATE_NAMESPACE)
+  advance(waiting.feedbackSchedules![0].scheduledAt)
+  await scheduler.process(job)
+  const sent = await shared.read("online-reviews", emptyReviewDatabase)
+  assert.equal(sent.records.find(r => r.id === waiting.id)!.feedbackStatus, "전송완료")
+  assert.equal(sent.records.find(r => r.id === failed.id)!.feedbackSchedules![0].status, "failed")
+  const unchanged = await ensureProductionScheduleExamples(options)
+  assert.deepEqual(unchanged, sent)
+  assert.equal(deliveries.length, 1)
+  assert.equal(JSON.stringify(await workspaces.read(ownerA, emptyStudentTests)), JSON.stringify(workspace))
+}))
+
+test("production example registration failure leaves existing data intact, including explicit reset", async () => setup(async ({ shared, scheduler }) => {
+  const baseline = JSON.parse(JSON.stringify(initializePro(emptyReviewDatabase()))) as ReturnType<typeof initializePro>
+  await shared.update("online-reviews", () => baseline, db => db)
+  const options = { env: exampleEnv, store: shared, now: () => before, defaults: () => baseline, scheduler: { prepare: async () => { throw new Error("queue unavailable") } } }
+  await assert.rejects(ensureProductionScheduleExamples(options), /queue unavailable/)
+  assert.deepEqual(await shared.read("online-reviews", emptyReviewDatabase), baseline)
+  await ensureProductionScheduleExamples({ ...options, scheduler })
+  const existing = await shared.read("online-reviews", emptyReviewDatabase)
+  await assert.rejects(updateSharedScheduleExamples((db, at) => resetFeedbackScheduleExamples(db, at, exampleEnv), options), /queue unavailable/)
+  assert.deepEqual(await shared.read("online-reviews", emptyReviewDatabase), existing)
+}))
+
+test("production example reset connects the new reservation; the old callback cannot send it", async () => setup(async ({ shared, scheduler, deliveries, advance }) => {
+  const baseline = JSON.parse(JSON.stringify(initializePro(emptyReviewDatabase()))) as ReturnType<typeof initializePro>
+  await shared.update("online-reviews", () => baseline, db => db)
+  const options = { env: exampleEnv, store: shared, scheduler, now: () => before, defaults: () => baseline }
+  await ensureProductionScheduleExamples(options)
+  const oldJob = openScheduleJob(deliveries[0].body.job, key, env.DOKDO_STATE_NAMESPACE)
+  const reset = await updateSharedScheduleExamples((db, at) => resetFeedbackScheduleExamples(db, at, exampleEnv), options)
+  assert.equal(deliveries.length, 2)
+  const waiting = reset.records.find(r => r.id === "review-pro-demo-schedule-waiting-r1")!
+  assert.notEqual(waiting.feedbackSchedules![0].cloudDelivery!.nonce, oldJob.nonce)
+  advance(waiting.feedbackSchedules![0].scheduledAt)
+  assert.equal((await scheduler.process(oldJob)).result, "obsolete")
+  assert.equal((await shared.read("online-reviews", emptyReviewDatabase)).records.find(r => r.id === waiting.id)!.sentAt, undefined)
+  await scheduler.process(openScheduleJob(deliveries[1].body.job, key, env.DOKDO_STATE_NAMESPACE))
+  assert.ok((await shared.read("online-reviews", emptyReviewDatabase)).records.find(r => r.id === waiting.id)!.sentAt)
+}))
+
+test("parallel production seed requests do not duplicate examples and preserve concurrent edits", async () => setup(async ({ shared, scheduler, deliveries }) => {
+  const baseline = JSON.parse(JSON.stringify(initializePro(emptyReviewDatabase()))) as ReturnType<typeof initializePro>
+  await shared.update("online-reviews", () => baseline, db => db)
+  const options = { env: exampleEnv, store: shared, now: () => before, defaults: () => baseline, scheduler: { prepare: async (...args: Parameters<typeof scheduler.prepare>) => {
+    await shared.update("online-reviews", emptyReviewDatabase, db => ({ ...db, pro: { ...db.pro!, members: db.pro!.members.map((m, i) => i === 0 ? { ...m, name: "보존할 수정" } : m) } }))
+    return scheduler.prepare(...args)
+  } } }
+  await Promise.all([ensureProductionScheduleExamples(options), ensureProductionScheduleExamples(options)])
+  const db = await shared.read("online-reviews", emptyReviewDatabase)
+  assert.equal(db.records.filter(r => r.id === "review-pro-demo-schedule-waiting-r1").length, 1)
+  assert.equal(db.records.filter(r => r.id === "review-pro-demo-schedule-failed-r1").length, 1)
+  assert.equal(db.pro!.members[0].name, "보존할 수정")
+  const bound = db.records.find(r => r.id === "review-pro-demo-schedule-waiting-r1")!.feedbackSchedules![0].cloudDelivery!.nonce
+  for (const delivery of deliveries) {
+    const job = openScheduleJob(delivery.body.job, key, env.DOKDO_STATE_NAMESPACE)
+    if (job.nonce !== bound) assert.equal((await scheduler.process(job)).result, "obsolete")
+  }
+}))
 
 test("cloud delivery is production-only; absent configuration fails closed without changing local worker", () => {
   assert.equal(cloudScheduleConfig({ NODE_ENV: "development" }), null)

@@ -4,11 +4,13 @@ import { initializePro } from "./pro-seeds"
 import { ensureProAttentionExamples } from "./pro-attention-seeds"
 import { reconcilePro } from "./pro-domain"
 import { atReviewTime, persistReviewTime } from "./review-clock"
-import { ensureLocalFeedbackScheduleExamples } from "./review-schedule-seeds"
+import { ensureFeedbackScheduleExamples, localFeedbackScheduleExamplesEnabled } from "./review-schedule-seeds"
 export { visibleReviewState } from "./review-visibility"
 export function normalizedReviewState(db: ReviewDatabase, serverNow: string) {
   const normalized = normalizeReviewReportScores(normalizeReviewFeedbackScope(hydrateLegacyReviewFeedback(upgradeUnscoredMockAssessments(expandLegacyReviewScores(mergeReviewSeeds(db, getDefaultReviewDatabase()))))))
-  const examples = ensureLocalFeedbackScheduleExamples(ensureProAttentionExamples(initializePro(normalized), serverNow), serverNow, process.env)
+  const attention = ensureProAttentionExamples(initializePro(normalized), serverNow)
+  // Production seeds must be queued before commit by the shared example server helper.
+  const examples = localFeedbackScheduleExamplesEnabled(process.env) ? ensureFeedbackScheduleExamples(attention, serverNow, process.env) : attention
   const next = reconcilePro(atReviewTime(examples, serverNow))
   return JSON.stringify(next) === JSON.stringify(db) ? db : next
 }

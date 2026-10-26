@@ -2,7 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { emptyReviewDatabase } from "../src/lib/review-domain"
 import { initializePro } from "../src/lib/pro-seeds"
-import { FEEDBACK_SCHEDULE_EXAMPLES, ensureLocalFeedbackScheduleExamples, localFeedbackScheduleExamplesEnabled, resetLocalFeedbackScheduleExamples } from "../src/lib/review-schedule-seeds"
+import { FEEDBACK_SCHEDULE_EXAMPLES, ensureFeedbackScheduleExamples, localFeedbackScheduleExamplesEnabled, resetFeedbackScheduleExamples } from "../src/lib/review-schedule-seeds"
 import { resetTodayProDemo } from "../src/lib/pro-today-demo"
 import { readFileSync } from "node:fs"
 import { activeFeedbackSchedule } from "../src/lib/review-schedule"
@@ -15,24 +15,37 @@ import { newStudentTestSession } from "../src/lib/student-test-store"
 
 const now = "2026-10-26T04:00:00.000Z"
 const env = { NODE_ENV: "development", DOKDO_STATE_PROVIDER: "local" }
+const production = { NODE_ENV: "production", VERCEL: "1", VERCEL_ENV: "production", DOKDO_STATE_PROVIDER: "neon", DOKDO_STATE_NAMESPACE: "dokdo-admin:production:v1" }
 const baseline = () => initializePro(emptyReviewDatabase())
-const examples = (at = now) => ensureLocalFeedbackScheduleExamples(baseline(), at, env)
+const examples = (at = now) => ensureFeedbackScheduleExamples(baseline(), at, env)
 const recordId = (index: number) => `review-${FEEDBACK_SCHEDULE_EXAMPLES[index].id}-r1`
 
-test("공용 예약 예시는 로컬 개발에서만 추가하며 운영·원격 저장소·지정일 상태는 보존", () => {
+test("공용 예약 예시는 로컬 및 지정된 배포 프로토타입만 허용하며 Preview·다른 저장소·지정일 상태는 보존", () => {
   assert.equal(localFeedbackScheduleExamplesEnabled(env), true)
   for (const disabled of [{ NODE_ENV: "test" }, { NODE_ENV: "production" }, { ...env, VERCEL: "1" },
-    { ...env, DOKDO_STATE_PROVIDER: "neon" }, { ...env, DOKDO_STATE_PROVIDER: "redis" }, { ...env, UPSTASH_REDIS_REST_URL: "https://example.test" }]) {
+    { ...env, DOKDO_STATE_PROVIDER: "neon" }, { ...env, DOKDO_STATE_PROVIDER: "redis" }, { ...env, UPSTASH_REDIS_REST_URL: "https://example.test" },
+    { ...production, VERCEL_ENV: "preview" }, { ...production, DOKDO_STATE_NAMESPACE: "another-project:v1" }]) {
     const db = baseline()
-    assert.strictEqual(ensureLocalFeedbackScheduleExamples(db, now, disabled), db)
+    assert.strictEqual(ensureFeedbackScheduleExamples(db, now, disabled), db)
   }
   const db = baseline(); db.pro!.clockMode = "test"
-  assert.strictEqual(ensureLocalFeedbackScheduleExamples(db, now, env), db)
+  assert.strictEqual(ensureFeedbackScheduleExamples(db, now, env), db)
+  assert.strictEqual(ensureFeedbackScheduleExamples(db, now, production), db)
+  db.pro!.clockMode = "real"; db.proTestBaseline = { pro: structuredClone(db.pro!), reviews: [], records: [] }
+  assert.strictEqual(ensureFeedbackScheduleExamples(db, now, production), db)
+})
+
+test("로컬과 배포 예시의 학생·도서·예약 상태 및 초기화 결과가 동일", () => {
+  const local = examples(), cloud = ensureFeedbackScheduleExamples(baseline(), now, production)
+  assert.deepEqual(cloud, local)
+  const nextDay = "2026-10-27T04:00:00.000Z"
+  assert.deepEqual(resetFeedbackScheduleExamples(cloud, nextDay, production), resetFeedbackScheduleExamples(local, nextDay, env))
+  assert.strictEqual(ensureFeedbackScheduleExamples(cloud, nextDay, production), cloud)
 })
 
 test("예약 대기·실패 2건만 추가하고 기존 공용 데이터의 내용·순서·날짜를 모두 보존", () => {
   const original = baseline(), before = structuredClone(original)
-  const result = ensureLocalFeedbackScheduleExamples(original, now, env)
+  const result = ensureFeedbackScheduleExamples(original, now, env)
   assert.deepEqual(original, before)
   assert.equal(result.reviews.length, before.reviews.length + 2)
   assert.equal(result.records.length, before.records.length + 2)
@@ -42,7 +55,7 @@ test("예약 대기·실패 2건만 추가하고 기존 공용 데이터의 내�
     const actual = result.pro![key as keyof NonNullable<typeof result.pro>]
     assert.deepEqual(Array.isArray(value) ? (actual as unknown[]).slice(0, value.length) : actual, value, key)
   }
-  assert.strictEqual(ensureLocalFeedbackScheduleExamples(result, "2026-10-27T06:00:00.000Z", env), result)
+  assert.strictEqual(ensureFeedbackScheduleExamples(result, "2026-10-27T06:00:00.000Z", env), result)
 })
 
 test("실제 도서·회차·양식과 저장 피드백·신청·권수·예약·실패 이력이 연결됨", () => {
@@ -88,7 +101,7 @@ test("취소·전송 이후 재조회해도 예시를 다시 만들거나 예약
   const failed = activeFeedbackSchedule(db.records.find(r => r.id === recordId(1)))!
   db = applyManagedReviewCommand(db, { type: "cancel-feedback-schedule", recordId: recordId(1), scheduleId: failed.id },
     { role: "agency", institutionId: "dokdo", name: "검증" }, "cancel-seed", waiting.scheduledAt)
-  assert.strictEqual(ensureLocalFeedbackScheduleExamples(db, "2026-10-28T00:00:00.000Z", env), db)
+  assert.strictEqual(ensureFeedbackScheduleExamples(db, "2026-10-28T00:00:00.000Z", env), db)
   assert.equal(activeFeedbackSchedule(db.records.find(r => r.id === recordId(1))), undefined)
 })
 
@@ -103,7 +116,7 @@ test("주말·월초·연초에도 기존 기관 요일 정책에 따라 유효�
 test("기존 식별자가 일부라도 존재하면 해당 예시는 덮어쓰거나 불완전하게 추가하지 않음", () => {
   const db = baseline()
   db.pro!.members.push({ ...db.pro!.members[0], id: FEEDBACK_SCHEDULE_EXAMPLES[0].id, name: "사용자가 수정한 이름" })
-  const result = ensureLocalFeedbackScheduleExamples(db, now, env)
+  const result = ensureFeedbackScheduleExamples(db, now, env)
   assert.equal(result.pro!.members.find(m => m.id === FEEDBACK_SCHEDULE_EXAMPLES[0].id)!.name, "사용자가 수정한 이름")
   assert.equal(result.records.some(r => r.id === recordId(0)), false)
   assert.equal(result.records.length, db.records.length + 1)
@@ -124,7 +137,7 @@ test("명시적 예시 초기화는 예약 대기·실패를 복원하고 다른
   db = applyManagedReviewCommand(db, { type: "cancel-feedback-schedule", recordId: recordId(1), scheduleId: failed.id },
     { role: "agency", institutionId: "dokdo", name: "검증" }, "cancel-before-reset", waiting.scheduledAt)
   const before = structuredClone(db), nextDay = "2026-10-28T04:00:00.000Z"
-  const reset = resetLocalFeedbackScheduleExamples(db, nextDay, env)
+  const reset = resetFeedbackScheduleExamples(db, nextDay, env)
   assert.deepEqual(db, before)
   for (const [index, example] of FEEDBACK_SCHEDULE_EXAMPLES.entries()) {
     const record = reset.records.find(item => item.id === recordId(index))!
@@ -144,10 +157,10 @@ test("명시적 예시 초기화는 예약 대기·실패를 복원하고 다른
     assert.deepEqual(excludeExamples(reset.pro![key]), excludeExamples(before.pro![key]))
   }
   assert.deepEqual(reset.pro!.schedules, before.pro!.schedules)
-  assert.strictEqual(ensureLocalFeedbackScheduleExamples(reset, nextDay, env), reset)
-  assert.strictEqual(resetLocalFeedbackScheduleExamples(db, nextDay, { NODE_ENV: "production" }), db)
-  const combined = resetLocalFeedbackScheduleExamples(resetTodayProDemo(db, nextDay), nextDay, env)
+  assert.strictEqual(ensureFeedbackScheduleExamples(reset, nextDay, env), reset)
+  assert.strictEqual(resetFeedbackScheduleExamples(db, nextDay, { NODE_ENV: "production" }), db)
+  const combined = resetFeedbackScheduleExamples(resetTodayProDemo(db, nextDay), nextDay, env)
   assert.equal(activeFeedbackSchedule(combined.records.find(record => record.id === recordId(0)))!.status, "waiting")
   const route = readFileSync("src/app/api/mock/pro-demo/route.ts", "utf8")
-  assert.match(route, /resetLocalFeedbackScheduleExamples\(resetTodayProDemo\(initializePro\(state\), now\), now, process\.env\)/)
+  assert.match(route, /resetFeedbackScheduleExamples\(resetTodayProDemo\(initializePro\(state\), now\), now, process\.env\)/)
 })

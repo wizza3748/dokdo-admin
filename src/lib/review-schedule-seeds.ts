@@ -22,6 +22,15 @@ export function localFeedbackScheduleExamplesEnabled(env: Environment) {
     && !env.UPSTASH_REDIS_REST_URL && !env.KV_REST_API_URL
 }
 
+export function productionFeedbackScheduleExamplesEnabled(env: Environment) {
+  return env.VERCEL === "1" && env.VERCEL_ENV === "production"
+    && env.DOKDO_STATE_PROVIDER === "neon" && env.DOKDO_STATE_NAMESPACE === "dokdo-admin:production:v1"
+}
+
+function feedbackScheduleExamplesEnabled(env: Environment) {
+  return localFeedbackScheduleExamplesEnabled(env) || productionFeedbackScheduleExamplesEnabled(env)
+}
+
 function buildExample(input: ReviewDatabase, example: Example, now: string) {
   const minute = Math.floor(Date.parse(now) / 60_000) * 60_000
   const registeredAt = new Date(minute - (example.status === "failed" ? 120_000 : 0)).toISOString()
@@ -91,9 +100,9 @@ function buildExample(input: ReviewDatabase, example: Example, now: string) {
   return db
 }
 
-/** Install once in local shared state. Never reset, reschedule or re-add edited examples. */
-export function ensureLocalFeedbackScheduleExamples(input: ReviewDatabase, serverNow: string, env: Environment): ReviewDatabase {
-  if (!localFeedbackScheduleExamplesEnabled(env) || !input.pro || input.pro.clockMode === "test" || input.proTestBaseline) return input
+/** Install once in shared prototype state. Never reset, reschedule or re-add edited examples. */
+export function ensureFeedbackScheduleExamples(input: ReviewDatabase, serverNow: string, env: Environment): ReviewDatabase {
+  if (!feedbackScheduleExamplesEnabled(env) || !input.pro || input.pro.clockMode === "test" || input.proTestBaseline) return input
   const missing = FEEDBACK_SCHEDULE_EXAMPLES.filter(example => {
     const reviewId = `review-${example.id}`
     return !input.pro!.members.some(member => member.id === example.id)
@@ -118,8 +127,8 @@ export function ensureLocalFeedbackScheduleExamples(input: ReviewDatabase, serve
 }
 
 /** Only an explicit example reset may replace these two synthetic students' results. */
-export function resetLocalFeedbackScheduleExamples(input: ReviewDatabase, serverNow: string, env: Environment): ReviewDatabase {
-  if (!localFeedbackScheduleExamplesEnabled(env) || !input.pro || input.pro.clockMode === "test" || input.proTestBaseline) return input
+export function resetFeedbackScheduleExamples(input: ReviewDatabase, serverNow: string, env: Environment): ReviewDatabase {
+  if (!feedbackScheduleExamplesEnabled(env) || !input.pro || input.pro.clockMode === "test" || input.proTestBaseline) return input
   const ids = new Set<string>(FEEDBACK_SCHEDULE_EXAMPLES.map(example => example.id))
   const reviewIds = new Set([
     ...FEEDBACK_SCHEDULE_EXAMPLES.map(example => `review-${example.id}`),
@@ -139,5 +148,5 @@ export function resetLocalFeedbackScheduleExamples(input: ReviewDatabase, server
       reminderSnapshots: input.pro.reminderSnapshots.filter(item => !ids.has(item.studentId)),
     },
   }
-  return ensureLocalFeedbackScheduleExamples(cleared, serverNow, env)
+  return ensureFeedbackScheduleExamples(cleared, serverNow, env)
 }
