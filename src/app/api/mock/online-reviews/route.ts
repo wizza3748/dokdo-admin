@@ -7,6 +7,8 @@ import { updateReviewState, reviewActor, visibleReviewState } from "@/lib/review
 import { assertSharedReviewRequest } from "@/lib/review-request-scope"
 import { bindCloudFeedbackSchedule, createCloudFeedbackScheduler } from "@/lib/feedback-schedule-cloud"
 import { ensureProductionScheduleExamples } from "@/lib/review-schedule-example-server"
+import { withSharedWorkbookDisplayNumbers } from "@/lib/workbook-display-number-server"
+import { AGENCY_ONLINE_WORKBOOKS, normalizeStudentSubmittedRecord, type OnlineWorkbook } from "@/lib/online-workbooks"
 export const runtime = "nodejs"
 export async function GET(request: Request) {
   // Public results require an authenticated encrypted share token, not a guessed record ID.
@@ -20,7 +22,14 @@ export async function GET(request: Request) {
       serverNow = new Date().toISOString()
       return updateReviewState(state, serverNow)
     })
-    return NextResponse.json(visibleReviewState(db, reviewActor(request, db), new URL(request.url).searchParams.get("recordId"), serverNow), { headers: { "Cache-Control": "no-store" } })
+    const actor = reviewActor(request, db)
+    let visible = visibleReviewState(db, actor, new URL(request.url).searchParams.get("recordId"), serverNow)
+    if (["agency", "class", "admin"].includes(actor.role)) {
+      const submissions = await prototypeStore.read<OnlineWorkbook[]>("student-workbook-submissions", () => [])
+      const reserved = [...AGENCY_ONLINE_WORKBOOKS.map(row => row.id), ...submissions.map(row => normalizeStudentSubmittedRecord(row).id)]
+      visible = await withSharedWorkbookDisplayNumbers(db, visible, reserved)
+    }
+    return NextResponse.json(visible, { headers: { "Cache-Control": "no-store" } })
   } catch (error) { return NextResponse.json({ message: error instanceof Error ? error.message : "조회에 실패했습니다." }, { status: 503 }) }
 }
 export async function POST(request: Request) {

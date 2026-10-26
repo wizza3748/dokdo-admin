@@ -249,7 +249,7 @@ export function getStudentAgencyWorkbookRecordId(workbookId: string) {
   return String(60000 + hash)
 }
 
-function normalizeStudentSubmittedRecord(record: OnlineWorkbook): OnlineWorkbook {
+export function normalizeStudentSubmittedRecord(record: OnlineWorkbook): OnlineWorkbook {
   const sourceWorkbookId = record.sourceWorkbookId ?? (record.id.startsWith("student-") ? record.id.slice("student-".length) : undefined)
   return sourceWorkbookId
     ? { ...record, id: getStudentAgencyWorkbookRecordId(sourceWorkbookId), sourceWorkbookId }
@@ -368,7 +368,8 @@ export async function getAgencyWorkbookListAsync(role: "agency" | "class" | "adm
     return db.reviews.some(c => c.legacyRecordId === record.id) ? [] : [record]
   })
 
-  return withWorkbookDisplayNumbers([...newRecords, ...submittedRecords, ...seededRecords].filter((record) => !record.rejected), AGENCY_ONLINE_WORKBOOKS.map(record => record.id))
+  if (!db.displayNumbers) throw new Error("목록 고유번호를 불러오지 못했습니다. 새로고침해 주세요.")
+  return withWorkbookDisplayNumbers([...newRecords, ...submittedRecords, ...seededRecords].filter((record) => !record.rejected), AGENCY_ONLINE_WORKBOOKS.map(record => record.id), db.displayNumbers)
 }
 
 export async function syncStudentSubmittedAgencyWorkbooks() {

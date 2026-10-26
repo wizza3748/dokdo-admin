@@ -22,7 +22,13 @@ export function assignWorkbookDisplayNumbers(ids: string[], previous: Record<str
 }
 
 const storageKey = "dokdo-workbook-display-numbers-v1"
-export function withWorkbookDisplayNumbers<T extends { id: string }>(rows: T[], reservedIds: string[] = []): (T & { displayNumber: string })[] {
+export function withWorkbookDisplayNumbers<T extends { id: string }>(rows: T[], reservedIds: string[] = [], sharedNumbers?: Record<string, string>): (T & { displayNumber: string })[] {
+  // Shared lists use the server registry exclusively; retain old browser storage without reading/resetting it.
+  // The browser-only branch below remains for isolated legacy/test examples.
+  if (sharedNumbers) {
+    const mapping = assignWorkbookDisplayNumbers([...reservedIds, ...rows.map(row => row.id)], sharedNumbers)
+    return rows.map(row => ({ ...row, displayNumber: mapping[row.id] }))
+  }
   let previous: Record<string, string> = {}
   try { if (typeof window !== "undefined") previous = JSON.parse(localStorage.getItem(storageKey) ?? "{}") ?? {} } catch { /* Recover from unavailable or invalid prototype storage. */ }
   const mapping = assignWorkbookDisplayNumbers([...reservedIds, ...rows.map(row => row.id)], previous)

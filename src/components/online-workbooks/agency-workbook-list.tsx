@@ -42,6 +42,7 @@ import { agencyStudentTestToken } from "@/lib/student-test-context"
 import { cn } from "@/lib/utils"
 import { safeAgencyReturn, useReviewListPosition } from "@/lib/review-navigation"
 import { workbookClassification } from "@/lib/workbook-classification"
+import { compareAgencyWorkbooks } from "@/lib/workbook-list-sort"
 import { agencyReviewColumns, legacyAgencyReviewColumns, matchesReviewAudience, matchesReviewSelection, reviewAudienceFromParams, reviewAudienceHelp, reviewAudienceLabels, reviewFiltersOpen, reviewSelectionFilter, reviewSelectionFilterOptions, reviewSelectionHelp, reviewStatusForSelection, reviewStatusLocked, type ReviewAudience, type ReviewSelectionFilter } from "@/lib/review-list-presentation"
 
 type SortKey = "id" | "submittedAt"
@@ -310,15 +311,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
       .filter((record) => aiRemaining === "all" || 2 - record.aiUsed === Number(aiRemaining))
       .filter((record) => flower === "all" || record.flowers === Number(flower))
       .filter((record) => !normalizedQuery || `${record.studentName} ${record.bookTitle}`.toLowerCase().includes(normalizedQuery))
-      .sort((a, b) => {
-        const aDisplayNumber = a.displayNumber ?? a.id.padStart(5, "0")
-        const bDisplayNumber = b.displayNumber ?? b.id.padStart(5, "0")
-        const aValue = sort.key === "id" ? aDisplayNumber : a.submittedAtTime || a.submittedAt
-        const bValue = sort.key === "id" ? bDisplayNumber : b.submittedAtTime || b.submittedAt
-        const result = String(aValue).localeCompare(String(bValue), "ko", { numeric: true })
-        const fallback = result || aDisplayNumber.localeCompare(bDisplayNumber, "ko", { numeric: true })
-        return sort.direction === "asc" ? fallback : -fallback
-      })
+      .sort((a, b) => compareAgencyWorkbooks(a, b, sort))
   }, [audienceRecords, level, status, selectionFilter, scheduleFilter, aiRemaining, flower, query, sort, writingFilter, reportFilter])
 
   const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize))

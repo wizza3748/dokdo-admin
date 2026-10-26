@@ -75,7 +75,7 @@ export type ReviewRecord = {
   parentContact: boolean; parentSentAt?: string; flowers: number; flowersAt?: string; rejectedAt?: string; history: ReviewHistory[];
   feedbackSchedules?: import("./review-schedule").FeedbackSchedule[];
 }
-export type ReviewDatabase = { version: 1; seedVersion?: number; reviews: ReviewCommon[]; records: ReviewRecord[]; pro?: import("./pro-types").ProState; studentPro?: import("./pro-selectors").StudentProView; currentTime?: string; proTestBaseline?: { pro: import("./pro-types").ProState; reviews: ReviewCommon[]; records: ReviewRecord[] } }
+export type ReviewDatabase = { version: 1; seedVersion?: number; reviews: ReviewCommon[]; records: ReviewRecord[]; pro?: import("./pro-types").ProState; studentPro?: import("./pro-selectors").StudentProView; currentTime?: string; displayNumbers?: Record<string, string>; proTestBaseline?: { pro: import("./pro-types").ProState; reviews: ReviewCommon[]; records: ReviewRecord[] } }
 export const reviewProgressLabels: Record<ReviewCommon["progress"], string> = {
   "first-writing": "1차 작성중", "first-submitted": "1차 작성완료", "first-saved": "1차 피드백 작성완료", "first-sent": "1차 피드백 도착",
   "second-available": "2차 작성가능", "second-writing": "2차 작성중", "second-submitted": "2차 작성완료", "second-saved": "2차 피드백 작성완료", "second-sent": "2차 피드백 도착", complete: "최종 완료",
