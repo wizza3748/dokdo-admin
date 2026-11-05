@@ -1,0 +1,25 @@
+.studentLists { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 20px; }
+.tableScroll.tableScroll { overflow: auto; border: 1px solid #e2e8f0; background: white; }
+/* Header + ten 56px rows, including the horizontal scrollbar. */
+.studentScroll { max-height: 624px; overflow: auto; }
+.students.students { min-width: 590px; }
+.students.students td, .academies.academies td { height: 56px; padding: 12px; vertical-align: middle; }
+.students th { position: sticky; top: 0; z-index: 2; }
+.academies.academies { min-width: 1050px; }
+.academyName { width: 25%; }
+.students th:first-child, .academies th:first-child { position: sticky; left: 0; z-index: 3; }
+.students td:first-child, .academies td:first-child { position: sticky; left: 0; z-index: 1; background: white; }
+.students th, .academies th { overflow-wrap: normal; }
+.students td:first-child, .students td:nth-child(2), .academies td:first-child { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 1100px) { .studentLists { grid-template-columns: minmax(0, 1fr); } }
+/* Headquarters keeps columns and a fixed name column on small screens. */
+@media (max-width: 767px) {
+  .academyName { width: 136px; }
+  .students.students, .academies.academies { display: table; }
+  .students.students tbody, .academies.academies tbody { display: table-row-group; }
+  .students.students thead, .academies.academies thead { display: table-header-group; }
+  .students.students colgroup, .academies.academies colgroup { display: table-column-group; }
+  .students.students tr, .academies.academies tr { display: table-row; margin: 0; border: 0; border-radius: 0; overflow: visible; }
+  .students.students td, .academies.academies td { display: table-cell; }
+  .students.students td::before, .academies.academies td::before { display: none; }
+}

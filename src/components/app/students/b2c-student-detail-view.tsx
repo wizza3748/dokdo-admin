@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { adminStudents } from "@/lib/admin-local-catalog"
 import {
     User,
     Phone,
@@ -49,6 +50,7 @@ export interface B2CStudentDetailViewProps {
 }
 
 export function B2CStudentDetailView({ id, onBack }: B2CStudentDetailViewProps) {
+    const student = adminStudents.find(item => item.id === id);
     const searchParams = useSearchParams();
     const defaultTab = searchParams.get('tab') || "info";
 
@@ -62,7 +64,7 @@ export function B2CStudentDetailView({ id, onBack }: B2CStudentDetailViewProps) 
                 {/* Left: Student Profile Section */}
                 <div className="flex flex-col items-center xl:items-start gap-3 shrink-0 lg:min-w-[240px] relative">
                     <div className="flex flex-col items-center xl:items-start gap-1">
-                        <h1 className="text-[28px] font-bold text-slate-900 tracking-tight leading-tight">이서빈</h1>
+                        <h1 className="text-[28px] font-bold text-slate-900 tracking-tight leading-tight">{student?.name ?? "이서빈"}</h1>
                         <span className="text-[13px] font-semibold text-slate-400/80 uppercase tracking-widest">Student Profile</span>
                     </div>
                     <Button variant="outline" className="w-full border-slate-200 text-slate-700 font-bold rounded-2xl h-12 hover:bg-slate-50 hover:border-blue-200 hover:text-blue-600 transition-all shadow-sm group/btn">
@@ -78,7 +80,7 @@ export function B2CStudentDetailView({ id, onBack }: B2CStudentDetailViewProps) 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-5 flex-1 w-full relative pt-1">
                     {/* Parent Info Group */}
                     <div className="space-y-6">
-                        <InfoItem icon={User} label="부모님 성함" value="신민선" />
+                        <InfoItem icon={User} label="부모님 성함" value={student?.parent ?? "신민선"} />
                         <InfoItem icon={Phone} label="부모님 연락처" value="010-0000-0000" />
                     </div>
 
@@ -150,7 +152,7 @@ export function B2CStudentDetailView({ id, onBack }: B2CStudentDetailViewProps) 
                                 <div className="flex justify-between items-center px-2">
                                     <h3 className="text-xl font-bold text-slate-800 flex items-center gap-3">
                                         <div className="w-1.5 h-6 bg-[#002855] rounded-full" />
-                                        이서빈 상세 정보
+                                        {student?.name ?? "이서빈"} 상세 정보
                                     </h3>
                                     <Button variant="outline" className="h-9 px-4 border-[#002855] text-[#002855] font-bold rounded-lg hover:bg-slate-50 transition-all text-xs flex items-center gap-2">
                                         기관 정보
@@ -161,10 +163,10 @@ export function B2CStudentDetailView({ id, onBack }: B2CStudentDetailViewProps) 
                                     {/* Basic Info Section */}
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-6">
                                         <FormField label="학생 이름" required>
-                                            <Input defaultValue="이서빈" className="bg-slate-50 border-slate-100 rounded-xl h-11" />
+                                            <Input defaultValue={student?.name ?? "이서빈"} className="bg-slate-50 border-slate-100 rounded-xl h-11" />
                                         </FormField>
                                         <FormField label="아이디">
-                                            <Input defaultValue="tsalstjs83" className="bg-slate-50 border-slate-100 rounded-xl h-11" />
+                                            <Input defaultValue={student?.userId ?? "tsalstjs83"} className="bg-slate-50 border-slate-100 rounded-xl h-11" />
                                         </FormField>
                                         <FormField label="비밀번호">
                                             <div className="relative">
@@ -186,13 +188,13 @@ export function B2CStudentDetailView({ id, onBack }: B2CStudentDetailViewProps) 
                                             </div>
                                         </FormField>
                                         <FormField label="연락처">
-                                            <Input defaultValue="01045038375" className="bg-slate-50 border-slate-100 rounded-xl h-11" />
+                                            <Input defaultValue={student?.phone ?? "01045038375"} className="bg-slate-50 border-slate-100 rounded-xl h-11" />
                                         </FormField>
                                         <FormField label="학부모 이름" required>
-                                            <Input defaultValue="신민선" className="bg-slate-50 border-slate-100 rounded-xl h-11" />
+                                            <Input defaultValue={student?.parent ?? "신민선"} className="bg-slate-50 border-slate-100 rounded-xl h-11" />
                                         </FormField>
                                         <FormField label="학부모 연락처">
-                                            <Input defaultValue="01045038375" className="bg-slate-50 border-slate-100 rounded-xl h-11" />
+                                            <Input defaultValue={student?.phone ?? "01045038375"} className="bg-slate-50 border-slate-100 rounded-xl h-11" />
                                         </FormField>
                                     </div>
 
@@ -347,7 +349,7 @@ function FormField({ label, children, required }: { label: string; children: Rea
     )
 }
 
-function InfoItem({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+function InfoItem({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
     return (
         <div className="flex flex-col gap-2 group/item">
             <div className="flex items-center gap-2.5 text-slate-400 group-hover/item:text-blue-500 transition-colors">

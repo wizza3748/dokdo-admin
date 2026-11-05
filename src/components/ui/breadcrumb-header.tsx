@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronRight } from "lucide-react"
+import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE } from "@/lib/admin-navigation"
 
 export function BreadcrumbHeader() {
     const pathname = usePathname()
@@ -55,9 +56,13 @@ export function BreadcrumbHeader() {
                     crumbs.push({ label: "기관 목록", href: "#" })
                 }
             }
-            // B2C관리
+            else if (pathname === ADMIN_PRO_WEEKLY_PATH) {
+                crumbs.push({ label: "학생관리", href: "/admin/b2c/students" })
+                crumbs.push({ label: ADMIN_PRO_WEEKLY_TITLE, href: "#" })
+            }
+            // 학생관리
             else if (pathname.includes("/admin/b2c/students")) {
-                crumbs.push({ label: "B2C관리", href: "/admin/b2c/students" })
+                crumbs.push({ label: "학생관리", href: "/admin/b2c/students" })
                 if (pathname.split("/").length > 4) {
                     crumbs.push({ label: "학생 상세 정보", href: "#" })
                 } else {

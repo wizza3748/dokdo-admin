@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { Grid2X2, Pin, RefreshCw, X } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
+import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE } from "@/lib/admin-navigation"
 
 type AdminTab = { href: string; title: string }
 
@@ -12,6 +13,7 @@ const DASHBOARD_TAB: AdminTab = { href: "/", title: "대시보드" }
 
 function resolveTab(pathname: string): AdminTab {
   if (pathname === "/") return DASHBOARD_TAB
+  if (pathname === ADMIN_PRO_WEEKLY_PATH) return { href: pathname, title: ADMIN_PRO_WEEKLY_TITLE }
   if (pathname === "/agency/students/external") return { href: pathname, title: "외부 관리 학생" }
   if (pathname === "/agency/pro-management") return { href: pathname, title: "주간 관리 현황" }
   if (pathname === "/agency/pro-management/student-front-test") return { href: pathname, title: "학생프론트 테스트" }

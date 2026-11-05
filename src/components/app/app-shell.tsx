@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, canViewAdminWeekly = true }: { children: React.ReactNode; canViewAdminWeekly?: boolean }) {
   const pathname = usePathname()
   const isStudentFront = pathname === "/student" || pathname.startsWith("/student/")
   const isReadingFront = pathname === "/reading/index" || pathname.startsWith("/reading/")
@@ -27,7 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider key={`app-shell:${pathname}`} defaultOpen={isTaskBoard || isProWeeklyManagement} className={isOnlineWorkbookReviewDetail ? "h-svh overflow-hidden" : undefined} style={{ "--sidebar-width": "17.5rem" } as React.CSSProperties}>
-      <AppSidebar />
+      <AppSidebar canViewAdminWeekly={canViewAdminWeekly}/>
       <SidebarInset className={cn("min-w-0 bg-[#f3f5f7] [--admin-fixed-left:0px] md:[--admin-fixed-left:var(--sidebar-width)] md:peer-data-[state=collapsed]:[--admin-fixed-left:0px]", isOnlineWorkbookReviewDetail && "h-full min-h-0 overflow-hidden")}>
         <header className="sticky top-0 z-30 flex h-[60px] shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-4">
           <SidebarTrigger className="-ml-1 text-slate-500" aria-label="사이드 메뉴 열기 또는 닫기" />

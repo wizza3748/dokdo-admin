@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { adminInstitutions } from "@/lib/admin-local-catalog"
 import Link from "next/link"
 import {
     ChevronRight,
@@ -49,7 +50,7 @@ const FormLabel = ({ children, required = false, className = "" }: { children: R
     </Label>
 );
 
-const InfoItem = ({ label, value, icon: Icon }: { label: string; value: string | React.ReactNode; icon?: any }) => (
+const InfoItem = ({ label, value, icon: Icon }: { label: string; value: string | React.ReactNode; icon?: React.ElementType }) => (
     <div className="flex flex-col gap-1">
         <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-tight flex items-center gap-1.5">
             {Icon && <Icon className="w-3 h-3" />}
@@ -62,6 +63,7 @@ const InfoItem = ({ label, value, icon: Icon }: { label: string; value: string |
 export default function InstitutionDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = React.use(params);
     const id = resolvedParams.id;
+    const institution = adminInstitutions.find(item => item.id === id);
     return (
         <div className="flex flex-col gap-8 p-4">
             {/* Summary Header Card - Premium Redesign */}
@@ -70,8 +72,8 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                 {/* Left: Agency Profile Section */}
                 <div className="flex flex-col items-center xl:items-start gap-3 shrink-0 lg:min-w-[240px] relative">
                     <div className="flex flex-col items-center xl:items-start gap-1">
-                        <h1 className="text-[28px] font-bold text-slate-900 tracking-tight leading-tight">진순이학원</h1>
-                        <span className="text-[13px] font-semibold text-slate-400/80 uppercase tracking-widest">성남지사</span>
+                        <h1 className="text-[28px] font-bold text-slate-900 tracking-tight leading-tight">{institution?.name ?? "진순이학원"}</h1>
+                        <span className="text-[13px] font-semibold text-slate-400/80 uppercase tracking-widest">{institution?.region1 ?? "성남"}지사</span>
                     </div>
                     <Button className="w-full bg-[#002855] hover:bg-[#001d3d] text-white font-black rounded-2xl h-12 shadow-lg shadow-blue-900/15 transition-all transform hover:-translate-y-0.5">
                         <ExternalLink className="w-4 h-4 mr-2 opacity-70" />
@@ -156,7 +158,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                             <div>
                                 <h2 className="text-xl font-bold text-slate-800 mb-8 flex items-center gap-3">
                                     <div className="w-1.5 h-6 bg-[#002855] rounded-full" />
-                                    진순이학원 상세 정보
+                                    {institution?.name ?? "진순이학원"} 상세 정보
                                 </h2>
 
                                 <div className="flex flex-col gap-12">
@@ -166,7 +168,7 @@ export default function InstitutionDetailPage({ params }: { params: Promise<{ id
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
                                             <div className="flex flex-col gap-2">
                                                 <FormLabel required>기관명</FormLabel>
-                                                <Input defaultValue="진순이학원" className="h-11 bg-slate-50/50 border-slate-200 rounded-xl focus:bg-white transition-all font-semibold" />
+                                                <Input defaultValue={institution?.name ?? "진순이학원"} className="h-11 bg-slate-50/50 border-slate-200 rounded-xl focus:bg-white transition-all font-semibold" />
                                             </div>
                                             <div className="flex flex-col gap-2">
                                                 <FormLabel required>연락처</FormLabel>

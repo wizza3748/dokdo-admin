@@ -5,6 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useReviews } from "@/lib/review-client"
 import { proTasks } from "@/lib/pro-selectors"
+import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE } from "@/lib/admin-navigation"
 import {
   BookOpenCheck,
   Building2,
@@ -73,9 +74,12 @@ const navConfig: NavItem[] = [
   },
   {
     id: "admin-b2c",
-    title: "B2C관리",
+    title: "학생관리",
     icon: "Users",
-    children: [{ title: "학생목록", href: "/admin/b2c/students" }]
+    children: [
+      { title: "학생목록", href: "/admin/b2c/students" },
+      { title: ADMIN_PRO_WEEKLY_TITLE, href: ADMIN_PRO_WEEKLY_PATH },
+    ]
   },
   {
     id: "admin-exploration",
@@ -112,7 +116,7 @@ const navConfig: NavItem[] = [
   { id: "student-home", title: "홈", href: "/student", icon: "House" }
 ]
 
-export function AppNav() {
+export function AppNav({ canViewAdminWeekly = true }: { canViewAdminWeekly?: boolean }) {
   const pathname = usePathname()
   const { db } = useReviews("agency")
   const proVisible = !!db.pro?.members.some(m => m.product === "pro") || !!db.pro?.cases.length
@@ -130,6 +134,7 @@ export function AppNav() {
   const isChildActive = (child: NavChild): boolean => isMatch(child.href) || Boolean(child.children?.some(isChildActive))
 
   const renderChild = (child: NavChild, depth = 0): React.ReactNode => {
+    if (child.href === ADMIN_PRO_WEEKLY_PATH && !canViewAdminWeekly) return null
     if (child.children) {
       const ChildIcon = child.icon ? icons[child.icon] : null
       const childActive = isChildActive(child)

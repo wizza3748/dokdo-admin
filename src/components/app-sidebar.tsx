@@ -14,7 +14,7 @@ import {
     SidebarMenuButton,
 } from "@/components/ui/sidebar"
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ canViewAdminWeekly = true, ...props }: React.ComponentProps<typeof Sidebar> & { canViewAdminWeekly?: boolean }) {
     return (
         <Sidebar collapsible="offcanvas" className="border-r border-slate-200" {...props}>
             <SidebarHeader className="h-[66px] justify-center border-b border-slate-100 px-3 py-2">
@@ -31,7 +31,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>
-            <AppNav />
+            <AppNav canViewAdminWeekly={canViewAdminWeekly}/>
             <SidebarRail />
         </Sidebar>
     )

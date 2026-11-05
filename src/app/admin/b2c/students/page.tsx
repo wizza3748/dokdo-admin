@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { adminStudents } from "@/lib/admin-local-catalog"
 import Link from "next/link"
 import {
     Search,
@@ -166,18 +167,7 @@ export default function B2CStudentListPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {[
-                                { id: "26775", name: "이서연", parent: "신민선", userId: "tsalstjs83", age: 10, phone: "01045038375", type: "책 읽기+글쓰기", status: "사용전", endDate: "-", regDate: "2026-02-05", ref: "-" },
-                                { id: "26762", name: "구현모", parent: "김하영", userId: "blossom0818", age: 9, phone: "01033872262", type: "책 읽기+글쓰기", status: "사용전", endDate: "-", regDate: "2026-02-03", ref: "DD뽀이맘260123" },
-                                { id: "26761", name: "권수윤", parent: "소명기", userId: "mk6126", age: 7, phone: "01038290126", type: "책 읽기+글쓰기", status: "사용전", endDate: "-", regDate: "2026-02-02", ref: "DD뽀이맘260123" },
-                                { id: "26760", name: "김민한", parent: "류신지", userId: "psw1212", age: 12, phone: "01090162254", type: "책 읽기+글쓰기", status: "사용전", endDate: "2026-03-03", regDate: "2026-02-02", ref: "-" },
-                                { id: "26759", name: "예지윤", parent: "권윤수", userId: "ing4487", age: 9, phone: "01031090152", type: "책 읽기+글쓰기", status: "사용중", endDate: "2027-02-01", regDate: "2026-02-02", ref: "-" },
-                                { id: "26757", name: "이서연", parent: "금새빈", userId: "rmyjhl17", age: 6, phone: "01077583146", type: "책 읽기+글쓰기", status: "서비스 만료", endDate: "2026-02-04", regDate: "2026-02-02", ref: "DD뽀이맘260123" },
-                                { id: "26756", name: "강규원", parent: "이민선", userId: "komdi83", age: 9, phone: "01066645668", type: "책 읽기+글쓰기", status: "사용전", endDate: "-", regDate: "2026-02-02", ref: "DD뽀이맘260123" },
-                                { id: "26754", name: "이유주", parent: "신정원", userId: "uju8278", age: 10, phone: "01053108278", type: "책 읽기+글쓰기", status: "사용전", endDate: "-", regDate: "2026-02-02", ref: "-" },
-                                { id: "26753", name: "이유민", parent: "신정원", userId: "uan8278", age: 10, phone: "01053108278", type: "책 읽기+글쓰기", status: "서비스 만료", endDate: "2026-02-04", regDate: "2026-02-02", ref: "DD뽀이맘260123" },
-                                { id: "26751", name: "박지인", parent: "학부모", userId: "seop0211", age: 35, phone: "01063658450", type: "책 읽기+글쓰기", status: "사용전", endDate: "-", regDate: "2026-02-02", ref: "-" },
-                            ].map((student, idx) => (
+                            {adminStudents.map((student, idx) => (
                                 <tr key={idx} className="hover:bg-slate-50/50 transition-all group border-b border-slate-50/50 last:border-0 font-medium">
                                     <td className="px-4 py-4 text-[14px] text-slate-500">{student.id}</td>
                                     <td className="px-4 py-4 text-[14px]">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/app/app-shell";
 import { PrototypeBootstrap } from "@/components/app/prototype-bootstrap";
+import { adminWeeklyAllowed } from "@/lib/admin-operator";
 
 export const metadata: Metadata = {
   title: "Dokdo - Admin",
@@ -17,7 +18,7 @@ export default function RootLayout({
     <html lang="ko" suppressHydrationWarning>
       <body className="font-sans antialiased">
         <PrototypeBootstrap enabled={process.env.VERCEL === "1"}>
-          <AppShell>{children}</AppShell>
+          <AppShell canViewAdminWeekly={adminWeeklyAllowed()}>{children}</AppShell>
         </PrototypeBootstrap>
       </body>
     </html>
