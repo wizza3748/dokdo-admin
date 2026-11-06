@@ -6,7 +6,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, LoaderCircl
 import { Button } from "@/components/ui/button"
 import { addDays, kstDate, managementMonth, monthWeeks, weekLabel, weekStart } from "@/lib/pro-calendar"
 import { ADMIN_PRO_WEEKLY_TITLE } from "@/lib/admin-navigation"
-import { sortWeeklyInstitutions, weeklyDateTime, weeklyEnd, weeklyNumber, weeklyPage, type AdminWeeklySummary, type WeeklySort, type WeeklyStudent } from "@/lib/admin-pro-weekly"
+import { sortWeeklyInstitutions, weeklyDateTime, weeklyEnd, weeklyStudentEndDate, weeklyNumber, weeklyPage, type AdminWeeklySummary, type WeeklySort, type WeeklyStudent } from "@/lib/admin-pro-weekly"
 import { panel, field, ProBadge } from "./pro-common"
 import { ProHelp } from "./pro-help"
 import shared from "./pro-management.module.css"
@@ -16,8 +16,8 @@ type Section = "assigned" | "ended" | "academies"
 type Status = "loading" | "retrying" | "ready" | "error"
 const sections: Section[] = ["assigned", "ended", "academies"]
 const help = {
-  assigned: ["조회한 주에 프로 관리 대상으로 새로 배정된 학생입니다.", "같은 주에 관리가 종료된 학생도 포함됩니다.", "관리가 이어지는 학원 변경은 신규 배정으로 세지 않습니다."],
-  ended: ["조회한 주에 프로 이용이 종료되거나 매칭 학원 연결이 해제된 학생입니다.", "관리가 이어지는 학원 변경은 관리 종료로 세지 않습니다."],
+  assigned: ["조회한 주에 해당 학원의 프로 관리 대상으로 배정된 학생입니다.", "다른 학원에서 변경 배정된 학생도 포함됩니다.", "같은 주에 관리가 종료된 학생도 포함됩니다.", "학생 수는 학원별 신규 배정 인원의 합계입니다."],
+  ended: ["조회한 주에 해당 학원의 프로 관리가 종료된 학생입니다.", "프로 이용 종료, 학원 연결 해제, 다른 학원으로 변경된 학생이 포함됩니다.", "프로 이용 종료일은 마지막 이용일로 표시합니다.", "프로 이용 종료의 집계 주차는 실제 이용 종료 시각을 기준으로 합니다.", "학생 수는 학원별 관리 종료 인원의 합계입니다."],
   current: ["매칭 학원에 배정되어 관리 중인 프로 학생 수입니다.", "피드백을 진행한 횟수와 관계없이 집계합니다.", "지난 주차는 해당 주 일요일 종료 시점의 인원입니다.", "이번 주는 현재 조회 시각의 인원이며, 일요일 종료 시점에 확정됩니다.", "학원이 변경된 학생은 집계 기준 시점의 학원에만 포함됩니다."],
   average: ["조회한 주가 속한 관리월의 확정 주차별 관리 인원 평균입니다.", "확정된 관리 인원이 0명인 주차는 계산에 포함합니다."],
 }
@@ -98,7 +98,7 @@ export function AdminWeeklyManagement({ initialNow }: { initialNow: string }) {
       <div ref={section === "assigned" ? assignedScroll : endedScroll} className={`${shared.tableWrap} ${styles.tableScroll} ${styles.studentScroll}`} tabIndex={0} role="region" aria-label={`${title} 학생 목록`}>
         <table className={`${shared.table} ${styles.students}`}><colgroup><col style={{ width: "23%" }}/><col style={{ width: "31%" }}/>{section === "ended" && <col style={{ width: "25%" }}/>}<col/></colgroup>
           <thead><tr><th scope="col">학생명</th><th scope="col">매칭 학원</th>{section === "ended" && <th scope="col">종료 사유</th>}<th scope="col">{section === "assigned" ? "배정 일시" : "종료일"}</th></tr></thead>
-          <tbody>{status[section] === "ready" && rows.map(row => <tr key={row.id}><td>{studentLink(row)}</td><td>{institutionLink(row.institutionId, row.institutionName)}</td>{section === "ended" && <td>{row.reason}</td>}<td className="whitespace-nowrap tabular-nums">{section === "assigned" ? weeklyDateTime(row.at) : kstDate(row.at)}</td></tr>)}{messageRow(section, rows.length, section === "assigned" ? 3 : 4, `해당 주에 ${section === "assigned" ? "신규 배정된" : "관리가 종료된"} 학생이 없습니다.`)}</tbody>
+          <tbody>{status[section] === "ready" && rows.map(row => <tr key={`${row.id}:${row.institutionId}`}><td>{studentLink(row)}</td><td>{institutionLink(row.institutionId, row.institutionName)}</td>{section === "ended" && <td>{row.reason}</td>}<td className="whitespace-nowrap tabular-nums">{section === "assigned" ? weeklyDateTime(row.at) : weeklyStudentEndDate(row)}</td></tr>)}{messageRow(section, rows.length, section === "assigned" ? 3 : 4, `해당 주에 ${section === "assigned" ? "신규 배정된" : "관리가 종료된"} 학생이 없습니다.`)}</tbody>
         </table>
       </div>
     </section>

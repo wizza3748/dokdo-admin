@@ -10,17 +10,21 @@ type Segment = { member: ProMember; institutionId: string; start: number; end: n
 export type AdminWeeklySummary = ReturnType<typeof summarizeAdminWeekly>
 export const weeklyEnd = (week: string) => new Date(Date.parse(addDays(week, 7)) - 1).toISOString()
 export const weeklyDateTime = (at: string) => new Date(Date.parse(at) + 9 * 3_600_000).toISOString().slice(0, 16).replace("T", " ")
+// Group by the actual end instant; only the displayed last service day moves back.
+export const weeklyStudentEndDate = (row: Pick<WeeklyStudent, "at" | "reason">) => kstDate(row.reason === "프로 이용 종료" ? addDays(row.at, -1) : row.at)
 export const weeklyNumber = (value: number | null) => value === null ? "-" : `${new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 2 }).format(value)}명`
 
-/** Connected academy changes are segments of one management period, not starts/ends. */
+/** Each academy segment starts/ends its own management, including transfers. */
 function segments(member: ProMember): Segment[] {
   if (member.product !== "pro" || !member.external || !member.assignedAt) return []
   const start = Math.max(Date.parse(member.effectiveAt), Date.parse(member.assignedAt))
   const end = Math.min(Date.parse(member.serviceEnd), member.endedAt ? Date.parse(member.endedAt) : Infinity)
-  const history = member.matchingHistory?.length ? [...member.matchingHistory].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)) : [{ at: member.assignedAt, institutionId: member.institutionId ?? "" }]
+  const history = (member.matchingHistory?.length ? [...member.matchingHistory].sort((a, b) => Date.parse(a.at) - Date.parse(b.at)) : [{ at: member.assignedAt, institutionId: member.institutionId ?? "" }])
+    .filter((event, index, events) => index === 0 || event.institutionId !== events[index - 1].institutionId)
   return history.flatMap((event, index) => {
     const from = Math.max(start, Date.parse(event.at)), to = Math.min(end, history[index + 1] ? Date.parse(history[index + 1].at) : Infinity)
-    return event.institutionId && from < to ? [{ member, institutionId: event.institutionId, start: from, end: to, reason: to === end ? "프로 이용 종료" : "학원 연결 해제" }] : []
+    const reason = to === end ? "프로 이용 종료" : history[index + 1]?.institutionId ? "학원 변경" : "학원 연결 해제"
+    return event.institutionId && from < to ? [{ member, institutionId: event.institutionId, start: from, end: to, reason }] : []
   })
 }
 
@@ -35,16 +39,16 @@ export function summarizeAdminWeekly(members: ProMember[], institutions: Institu
   const row = (segment: Segment, at: number): WeeklyStudent => ({ id: segment.member.id, name: segment.member.name, institutionId: segment.institutionId, institutionName: names.get(segment.institutionId) ?? segment.institutionId, at: new Date(at).toISOString() })
   const assigned: WeeklyStudent[] = [], ended: WeeklyStudent[] = []
   for (const periods of byStudent.values()) {
-    const starts = periods.filter((item, i) => item.start >= from && item.start <= until && periods[i - 1]?.end !== item.start)
-    const ends = periods.filter((item, i) => item.end >= from && item.end <= until && periods[i + 1]?.start !== item.end)
-    if (starts.length) {
-      const latest = periods.filter(item => item.start <= until).at(-1)!
-      assigned.push(row(latest, starts[0].start))
+    const starts = new Map<string, Segment>(), ends = new Map<string, Segment>()
+    for (const period of periods) {
+      if (period.start >= from && period.start <= until && !starts.has(period.institutionId)) starts.set(period.institutionId, period)
+      if (period.end >= from && period.end <= until) ends.set(period.institutionId, period)
     }
-    if (ends.length) { const last = ends.at(-1)!; ended.push({ ...row(last, last.end), reason: last.reason }) }
+    assigned.push(...[...starts.values()].map(first => row(first, first.start)))
+    ended.push(...[...ends.values()].map(last => ({ ...row(last, last.end), reason: last.reason })))
   }
   assigned.sort((a, b) => b.at.localeCompare(a.at) || a.name.localeCompare(b.name, "ko") || a.id.localeCompare(b.id, undefined, { numeric: true }))
-  ended.sort((a, b) => kstDate(b.at).localeCompare(kstDate(a.at)) || a.name.localeCompare(b.name, "ko") || a.id.localeCompare(b.id, undefined, { numeric: true }))
+  ended.sort((a, b) => weeklyStudentEndDate(b).localeCompare(weeklyStudentEndDate(a)) || a.name.localeCompare(b.name, "ko") || a.id.localeCompare(b.id, undefined, { numeric: true }))
   const month = managementMonth(week), weeks = monthWeeks(month)
   const confirmed = weeks.filter(w => weeklyEnd(w) < now)
   const count = (id: string, time: string): number | null => {

@@ -18,9 +18,10 @@ function member(index: number, institutionId: string, start: string, extra: Part
 
 export function adminWeeklyMembers(): ProMember[] {
   return [
-    // This week: five starts and five ends; only 김민한 appears in both lists.
+    // This week: six starts and six ends, including the existing academy transfer.
     member(0, "1085", "2026-11-02T09:00:00"),
-    member(1, "1085", "2026-10-05T09:00:00", { status: "ended", endedAt: at("2026-11-03T10:00:00"), serviceEnd: at("2026-11-03T10:00:00") }),
+    // Monday expiry counts in November week 1; the last service day is Sunday 11/1.
+    member(1, "1085", "2026-10-05T09:00:00", { status: "ended", endedAt: at("2026-11-02T00:00:00"), serviceEnd: at("2026-11-02T00:00:00") }),
     member(2, "1085", "2026-10-05T09:00:00", { status: "ended", endedAt: at("2026-11-04T10:00:00"), serviceEnd: at("2026-11-04T10:00:00") }),
     member(3, "", "2026-11-03T11:00:00", { matchingHistory: [
       { at: at("2026-11-03T11:00:00"), institutionId: "1082" },
@@ -30,8 +31,8 @@ export function adminWeeklyMembers(): ProMember[] {
       { at: at("2026-09-28T09:00:00"), institutionId: "1070" },
       { at: at("2026-11-02T16:00:00"), institutionId: "" },
     ] }),
-    // Continuous academy transfers are excluded from starts/ends. October's
-    // confirmed count at 신통방통 is truly zero, distinguishable from missing data.
+    // A transfer ends the old academy's management and starts the new academy's.
+    // October's confirmed count at 신통방통 is zero, distinguishable from missing data.
     member(5, "1082", "2026-09-28T09:00:00", { matchingHistory: [
       { at: at("2026-09-28T09:00:00"), institutionId: "1082" },
       { at: at("2026-09-30T10:00:00"), institutionId: "1085" },
