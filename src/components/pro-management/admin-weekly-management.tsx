@@ -21,10 +21,10 @@ const help = {
   current: ["매칭 학원에 배정되어 관리 중인 프로 학생 수입니다.", "피드백을 진행한 횟수와 관계없이 집계합니다.", "지난 주차는 해당 주 일요일 종료 시점의 인원입니다.", "이번 주는 현재 조회 시각의 인원이며, 일요일 종료 시점에 확정됩니다.", "학원이 변경된 학생은 집계 기준 시점의 학원에만 포함됩니다."],
   average: ["조회한 주가 속한 관리월의 확정 주차별 관리 인원 평균입니다.", "확정된 관리 인원이 0명인 주차는 계산에 포함합니다."],
 }
-const columns: { key: WeeklySort; title: string }[] = [
-  { key: "name", title: "매칭 학원" }, { key: "previous", title: "이전 주 관리 인원" }, { key: "current", title: "조회 주 관리 인원" },
-  { key: "assigned", title: "신규 배정" }, { key: "ended", title: "관리 종료" }, { key: "average", title: "월평균 관리 인원" },
-]
+function weekColumnTitle(at: string) {
+  const month = managementMonth(at)
+  return `${Number(month.slice(5))}월 ${monthWeeks(month).indexOf(weekStart(at)) + 1}째주 관리 인원`
+}
 
 export function AdminWeeklyManagement({ initialNow }: { initialNow: string }) {
   const [week, setWeek] = React.useState(() => weekStart(initialNow))
@@ -65,6 +65,10 @@ export function AdminWeeklyManagement({ initialNow }: { initialNow: string }) {
 
   const currentWeek = data?.currentWeek ?? weekStart(initialNow), current = week === currentWeek
   const month = managementMonth(week), [year, monthNumber] = month.split("-")
+  const columns: { key: WeeklySort; title: string }[] = [
+    { key: "name", title: "매칭 학원" }, { key: "previous", title: weekColumnTitle(addDays(week, -7)) }, { key: "current", title: weekColumnTitle(week) },
+    { key: "assigned", title: "신규 배정" }, { key: "ended", title: "관리 종료" }, { key: "average", title: "월평균 관리 인원" },
+  ]
   const snapshot = data?.week === week ? data : null
   const sorted = sortWeeklyInstitutions(snapshot?.academies ?? [], sort.key, sort.direction)
   const pagination = weeklyPage(sorted, page, size), loadingAcademies = status.academies === "loading" || status.academies === "retrying"
@@ -113,10 +117,10 @@ export function AdminWeeklyManagement({ initialNow }: { initialNow: string }) {
         <div className="flex items-center gap-2 text-sm"><strong className="font-semibold">{year}년 {Number(monthNumber)}월 평균</strong>{(snapshot?.monthInProgress ?? managementMonth(initialNow) === month) && <ProBadge tone="blue">집계 중</ProBadge>}</div>
       </div>
       <div className={`${shared.tableWrap} ${styles.tableScroll}`} tabIndex={0} role="region" aria-label="학원별 관리 인원 목록">
-        <table className={`${shared.table} ${styles.academies}`}><colgroup><col className={styles.academyName}/>{columns.slice(1).map(col => <col key={col.key}/>)}</colgroup><thead><tr>{columns.map(col => <th scope="col" key={col.key} aria-sort={sort.key === col.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}><span className="inline-flex items-center gap-1.5"><button type="button" className="inline-flex items-center gap-1 text-left disabled:opacity-50" disabled={loadingAcademies} aria-label={`${col.title} 정렬`} onClick={() => { setSort({ key: col.key, direction: sort.key === col.key && sort.direction === "asc" ? "desc" : "asc" }); setPage(1) }}>{col.title}{sort.key === col.key ? sort.direction === "asc" ? <ArrowUp className="size-3.5 shrink-0"/> : <ArrowDown className="size-3.5 shrink-0"/> : <ArrowUpDown className="size-3.5 shrink-0 text-slate-400"/>}</button>{(col.key === "current" || col.key === "average") && info(col.key, col.title)}</span></th>)}</tr></thead>
+        <table className={`${shared.table} ${styles.academies}`}><colgroup><col className={styles.academyName}/>{columns.slice(1).map(col => <col key={col.key}/>)}</colgroup><thead><tr>{columns.map(col => <th scope="col" key={col.key} aria-sort={sort.key === col.key ? sort.direction === "asc" ? "ascending" : "descending" : "none"}><span className="inline-flex items-center gap-1.5"><button type="button" className={`inline-flex items-center gap-1 text-left disabled:opacity-50 ${col.key === "current" ? styles.currentEmphasis : ""}`} disabled={loadingAcademies} aria-label={`${col.title} 정렬`} onClick={() => { setSort({ key: col.key, direction: sort.key === col.key && sort.direction === "asc" ? "desc" : "asc" }); setPage(1) }}>{col.title}{sort.key === col.key ? sort.direction === "asc" ? <ArrowUp className="size-3.5 shrink-0"/> : <ArrowDown className="size-3.5 shrink-0"/> : <ArrowUpDown className="size-3.5 shrink-0 text-slate-400"/>}</button>{(col.key === "current" || col.key === "average") && info(col.key, col.title)}</span></th>)}</tr></thead>
           <tbody>{status.academies === "ready" && pagination.rows.map(row => <tr key={row.id}><td>{institutionLink(row.id, row.name)}</td>{columns.slice(1).map(col => {
             const value = row[col.key] as number | null
-            return <td key={col.key} className="tabular-nums"><span>{weeklyNumber(value)}</span>{value === null && !(col.key === "average" && snapshot?.confirmedWeeks === 0) && <p className="mt-1 text-xs text-slate-500">집계 자료가 없습니다.</p>}</td>
+            return <td key={col.key} className="tabular-nums"><span className={col.key === "current" && value !== null ? styles.currentEmphasis : undefined}>{weeklyNumber(value)}</span>{value === null && !(col.key === "average" && snapshot?.confirmedWeeks === 0) && <p className="mt-1 text-xs text-slate-500">집계 자료가 없습니다.</p>}</td>
           })}</tr>)}{messageRow("academies", sorted.length, 6, "조회할 학원의 관리 이력이 없습니다.")}</tbody>
         </table>
       </div>

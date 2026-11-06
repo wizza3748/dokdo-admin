@@ -7,6 +7,7 @@
 .students th { position: sticky; top: 0; z-index: 2; }
 .academies.academies { min-width: 1050px; }
 .academyName { width: 25%; }
+.currentEmphasis { color: #2563eb; font-weight: 700; }
 .students th:first-child, .academies th:first-child { position: sticky; left: 0; z-index: 3; }
 .students td:first-child, .academies td:first-child { position: sticky; left: 0; z-index: 1; background: white; }
 .students th, .academies th { overflow-wrap: normal; }
