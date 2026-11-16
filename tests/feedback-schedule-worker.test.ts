@@ -15,6 +15,7 @@ import { sharedReviewState } from "../src/lib/review-share-projection"
 import { runAgencyStudentTest, studentTestRequestActor } from "../src/lib/student-test-agency"
 import { proTasks, scopePro, weeklyStudent } from "../src/lib/pro-selectors"
 import { weekStart } from "../src/lib/pro-calendar"
+import { initializePro } from "../src/lib/pro-seeds"
 
 const before = "2026-10-21T04:00:00.000Z", due = "2026-10-21T04:01:00.000Z"
 const browserA = `browser-${"a".repeat(64)}`, browserB = `browser-${"b".repeat(64)}`
@@ -64,6 +65,26 @@ test("empty/no-due ticks neither create fixtures nor rewrite unrelated shared or
   const snapshots = [await readFile(sharedFile, "utf8"), await readFile(workspaceFile, "utf8")]
   await worker.tick()
   assert.deepEqual([await readFile(sharedFile, "utf8"), await readFile(workspaceFile, "utf8")], snapshots)
+}))
+
+test("monthly generation runs without a page request and preserves the first transition snapshot", async () => temporary(async directory => {
+  const { shared } = stores(directory), db = initializePro(emptyReviewDatabase())
+  db.pro!.clockMode = "real"
+  const at = "2026-11-25T00:23:00.000Z"
+  // Compare the stored JSON representation, which omits optional undefined fields.
+  const existing = JSON.parse(JSON.stringify({ reviews: db.reviews, records: db.records, cases: db.pro!.cases }))
+  await shared.update("online-reviews", () => db, state => state)
+  const worker = createFeedbackScheduleWorker({ directory, now: () => at })
+  await worker.tick(); await worker.tick()
+  let saved = await shared.read("online-reviews", emptyReviewDatabase)
+  assert.equal(saved.pro!.monthly!.transition!.at, at)
+  assert.ok(saved.pro!.monthly!.records.length > 0)
+  assert.ok(saved.pro!.monthly!.records.every(r => r.generations.length === 1 && !r.job))
+  const monthly = structuredClone(saved.pro!.monthly)
+  await worker.tick()
+  saved = await shared.read("online-reviews", emptyReviewDatabase)
+  assert.deepEqual(saved.pro!.monthly, monthly)
+  assert.deepEqual({ reviews: saved.reviews, records: saved.records, cases: saved.pro!.cases }, existing)
 }))
 
 test("due feedback sends without any page request and repeated or concurrent ticks send only once", async () => temporary(async directory => {

@@ -10,6 +10,8 @@ export type ProMember = {
   limits: Record<string, number>;
   consultation?: { nth: number; weekday: number; time: string }; overrides: Record<string, string>;
   managementMemo?: { text: string; revision: string; at: string; actor: string };
+  /** The time the end was confirmed, distinct from the actual service end. */
+  endConfirmedAt?: string;
 }
 export type ProCase = {
   reviewId: string; studentId: string; institutionId: string; teacherId: string;
@@ -32,8 +34,10 @@ export type ProState = {
   schedules: { institutionId: string; teacherId: string; weekday: number; from: string }[];
   audit: ProAudit[]; reminders: ProReminder[]; consultations: ProConsultation[];
   processed: string[]; reminderSnapshots: { studentId: string; week: string; kind: "submission" | "revision"; sequence: 1 | 2; due: string }[];
+  monthly?: import("./pro-monthly-types").MonthlyState;
 }
 export type ProCommand =
+  | import("./pro-monthly-types").MonthlyCommand
   | { type: "apply" | "cancel" | "designate" | "retry-parent"; reviewId: string }
   | { type: "change"; reviewId: string; previousReviewId: string }
   | { type: "clock"; at: string }

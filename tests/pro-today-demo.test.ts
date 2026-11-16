@@ -104,14 +104,14 @@ test("기관 피드백 요일을 바꾸어도 자동 선정은 과거 마감 시
   }
 })
 
-test("오늘 초기 예시: 지연 1건, 모든 피드백 상태 및 상담 5종, 중복 학생 없음", () => {
+test("오늘 초기 예시: 이전 담당 미완료를 포함한 지연 2건, 모든 피드백 상태 및 상담 5종, 중복 학생 없음", () => {
   const db = fixture(), pro = db.pro!, week = weekStart(now)
   const members = pro.members.filter(m => TODAY_DEMO_IDS.includes(m.id))
   const rows = members.map(m => weeklyStudent(db, m, week))
   assert.equal(new Set(members.map(m => m.id)).size, TODAY_DEMO_IDS.length)
   assert.deepEqual(new Set(rows.map(r => r.status)), new Set(proStatuses))
   assert.deepEqual(new Set(rows.map(r => consultationSummary(r, week).label)), new Set(["예정", "오늘 상담", "유선 완료", "카톡 대체", "미진행"]))
-  assert.deepEqual(proTasks(db).counts, [1, 3, 0, 0, 3, 0, 0])
+  assert.deepEqual(proTasks(db).counts, [2, 3, 0, 0, 0, 0, 0])
   assert.equal(pro.clockMode, "real")
   assert.equal(pro.clock, now)
   const reminders = rows.flatMap(r => weeklyReminderItems(db, r, week).map(i => i.buttonLabel))
@@ -153,10 +153,10 @@ test("목요일 정확한 경계부터 1·2차 독려 집계, 완료 기록은 �
   assert.equal(JSON.stringify(proTasks(reconcilePro(db))), before, "반복 조회는 초기화·중복 집계하지 않음")
 })
 
-test("월말 주차에 상담 미완료·소멸 예정 집계, 실제 시각 복원", () => {
+test("월말 상담 기록은 유지하고 소멸 예정 집계 및 실제 시각 복원", () => {
   const original = fixture()
   const db = applyProCommand(original, { type: "clock", at: "2026-10-26T01:00:00.000Z" }, teacher, "month-end", now)
-  assert.deepEqual(proTasks(db).counts.slice(5), [8,9])
+  assert.deepEqual(proTasks(db).counts.slice(5), [0,9])
   const rows = db.pro!.members.filter(m => TODAY_DEMO_IDS.includes(m.id)).map(m => weeklyStudent(db,m,weekStart(db.pro!.clock)))
   assert.ok(rows.some(r => consultationSummary(r, weekStart(db.pro!.clock)).label === "이번 달 상담 미완료"))
   const restored = applyProCommand(db, { type: "clock-real" }, teacher, "real", now)
@@ -195,6 +195,6 @@ test("다른 오늘 날짜에도 이력을 미래로 만들지 않고 현재 관
     const db = resetTodayProDemo(initializePro(emptyReviewDatabase()), at)
     assert.equal(db.pro!.clock, at)
     assert.ok(db.records.filter(r => r.reviewId.startsWith("review-pro-today-")).every(r => !r.submittedAt || r.submittedAt <= at))
-    assert.equal(proTasks(db).counts[0], 1)
+    assert.equal(proTasks(db).counts[0], 2)
   }
 })

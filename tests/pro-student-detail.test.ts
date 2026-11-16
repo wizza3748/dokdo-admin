@@ -120,13 +120,13 @@ test("일정은 한국 시간으로 표시하고 기록 없음을 구분", () =>
 test("학생 상세는 2차 작성 여부를 유지하고 차감 취소는 선택한 행 바로 아래에서 입력", () => {
   const source = readFileSync(new URL("../src/components/pro-management/student-management-detail.tsx",import.meta.url),"utf8")
   assert.doesNotMatch(source, /<details|JSON\.stringify|online-review\/|reviewPath|styles\.detailGrid|WeeklyReminders|진행 상태|StudentDetailDialog/)
-  for (const value of ["정기 일정 변경", "일정만 변경", "차감 취소", "취소 사유", "consultation.records", "previousId", "월별 피드백 내역", "2차 작성 여부"]) assert.ok(source.includes(value), value)
-  assert.match(source, /<\/tr>\s*\{editor === "cancel-debit" && cancelId === row\.c\.reviewId && <tr className=\{styles\.debitEditorRow\}><td colSpan=\{4\}>/)
+  for (const value of ["MonthlyFeedbackEditor", "학부모 발송", "차감 취소", "취소 사유", "월별 피드백 내역", "2차 작성 여부"]) assert.ok(source.includes(value), value)
+  assert.match(source, /<\/tr>\s*\{editor === "cancel-debit" && cancelId === row\.c\.reviewId && <tr className=\{styles\.debitEditorRow\}><td colSpan=\{5\}>/)
   assert.match(source, /type:"cancel-debit", reviewId:row\.c\.reviewId, reason, memo/)
   const limitForm = source.slice(source.indexOf('{editor === "limit" &&'), source.indexOf('<div className="overflow-x-auto"'))
   assert.doesNotMatch(limitForm, /메모|memo/)
   assert.match(limitForm, /조정 사유 \(필수\)<Input required/)
-  assert.match(source, /window\.location\.hash !== "#consultation"/)
+  assert.match(source, /navigationRef=\{navigation\}/)
   assert.match(source, /selectedMonth === currentMonth/)
   assert.match(source, /사용 권수만 되돌립니다\. 이미 보낸 피드백과 발송 기록은 유지됩니다\./)
 })
@@ -151,8 +151,10 @@ test("학생 상세 양쪽 박스는 같은 높이로 늘어나고 좁은 화면
   assert.match(css, /@container student-detail \(max-width: 1100px\) \{[^}]*\}[^}]*\.studentDetailLayout > section \{ min-height: 0; \}/)
 })
 
-test("상담 변경 이력의 빈 안내는 상담 기록과 일정 변경 이력이 모두 없을 때만 표시", () => {
-  const source = readFileSync(new URL("../src/components/pro-management/student-management-detail.tsx",import.meta.url),"utf8")
-  assert.match(source, /consultationScheduleHistory\.length > 0 && auditRows\(consultationScheduleHistory\)/)
-  assert.match(source, /!consultationHistory\.length && !consultationScheduleHistory\.length && <p[^>]*>기록된 이력이 없습니다\./)
+test("전환 전 상담 기록과 변경 이력은 월간 편집 영역에서 읽기 전용 조회", () => {
+  const source = readFileSync(new URL("../src/components/pro-management/monthly-feedback-editor.tsx",import.meta.url),"utf8")
+  assert.ok(source.includes("기존 상담 기록 보기"))
+  assert.ok(source.includes("상담 변경 이력"))
+  assert.ok(source.includes('c.at<=state.transition.at'))
+  assert.doesNotMatch(source, /type:\s*"consult"/)
 })

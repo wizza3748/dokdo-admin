@@ -5,6 +5,7 @@ import { emptyReviewDatabase, type ReviewDatabase } from "./review-domain"
 import { reviewNow } from "./review-clock"
 import { PrototypeStore } from "./prototype-store"
 import { emptyStudentTests, type StudentTestState } from "./student-test-store"
+import { reconcileMonthly } from "./pro-monthly"
 
 type Environment = Readonly<Record<string, string | undefined>>
 type ScheduleExecutor = typeof executeFeedbackSchedule
@@ -29,7 +30,16 @@ function needsWork(db: ReviewDatabase, realAt: string) {
 
 /** Each claim and final result uses the same serialized update as interactive actions. */
 async function processScope<T>(scope: Scope<T>, now: () => string, execute: ScheduleExecutor) {
-  const snapshot = await scope.store.read(scope.key, scope.fallback)
+  let snapshot = await scope.store.read(scope.key, scope.fallback)
+  const monthlyChanged = scope.databases(snapshot).some(({ db }) => db.pro && JSON.stringify(reconcileMonthly(structuredClone(db),reviewNow(db,now()))) !== JSON.stringify(db))
+  if (monthlyChanged) snapshot = await scope.store.update(scope.key, scope.fallback, state => {
+    let next = state
+    for (const { id } of scope.databases(state)) next = scope.change(next,id,db => {
+      const updated = reconcileMonthly(structuredClone(db),reviewNow(db,now()))
+      return JSON.stringify(updated) === JSON.stringify(db) ? db : updated
+    })
+    return next
+  })
   if (!scope.databases(snapshot).some(({ db }) => needsWork(db, now()))) return
 
   const claimed = await scope.store.update(scope.key, scope.fallback, state => {

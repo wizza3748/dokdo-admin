@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { Grid2X2, Pin, RefreshCw, X } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
-import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE } from "@/lib/admin-navigation"
+import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE, ADMIN_MONTHLY_PATH, ADMIN_MONTHLY_TITLE } from "@/lib/admin-navigation"
 
 type AdminTab = { href: string; title: string }
 
@@ -13,6 +13,8 @@ const DASHBOARD_TAB: AdminTab = { href: "/", title: "대시보드" }
 
 function resolveTab(pathname: string): AdminTab {
   if (pathname === "/") return DASHBOARD_TAB
+  if (pathname === ADMIN_MONTHLY_PATH) return { href: pathname, title: ADMIN_MONTHLY_TITLE }
+  if (pathname === "/agency/pro-management/academy-style") return { href: pathname, title: "학원 말투 설정" }
   if (pathname === ADMIN_PRO_WEEKLY_PATH) return { href: pathname, title: ADMIN_PRO_WEEKLY_TITLE }
   if (pathname === "/agency/students/external") return { href: pathname, title: "외부 관리 학생" }
   if (pathname === "/agency/pro-management") return { href: pathname, title: "주간 관리 현황" }
@@ -82,8 +84,12 @@ export function AdminPageTabs({ scope = "admin" }: { scope?: "admin" | "agency" 
     const next = tabs.filter((tab) => tab.href !== href)
     const nextHref = (next[Math.max(0, index - 1)] ?? DASHBOARD_TAB).href
 
-    setTabs(next)
-    if (href.split("?")[0] === pathname) router.push(nextHref)
+    const close = () => { setTabs(next); if (href.split("?")[0] === pathname) router.push(nextHref) }
+    if (href.split("?")[0] === pathname) {
+      const navigation = new CustomEvent("dokdo:before-navigation", { cancelable: true, detail: close })
+      if (!window.dispatchEvent(navigation)) return
+    }
+    close()
   }
 
   return <div className="sticky top-[60px] z-20 flex h-12 min-w-0 items-stretch border-b border-slate-200 bg-white">

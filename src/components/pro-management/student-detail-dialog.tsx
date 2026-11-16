@@ -4,8 +4,8 @@ import { Dialog } from "radix-ui"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-export function StudentDetailDialog({ title, children, onClose, onConfirm, confirmLabel = "저장", disabled, busy, triggerRef }: {
-  title: string; children: ReactNode; onClose: () => void; onConfirm?: () => void; confirmLabel?: string;
+export function StudentDetailDialog({ title, children, onClose, onConfirm, confirmLabel = "저장", closeLabel = "닫기", disabled, busy, triggerRef }: {
+  title: string; children: ReactNode; onClose: () => void; onConfirm?: () => void; confirmLabel?: string; closeLabel?: string;
   disabled?: boolean; busy?: boolean; triggerRef: RefObject<HTMLElement | null>;
 }) {
   return <Dialog.Root open onOpenChange={open => { if (!open && !busy) onClose() }}><Dialog.Portal>
@@ -19,7 +19,7 @@ export function StudentDetailDialog({ title, children, onClose, onConfirm, confi
       </header>
       <div className="min-h-0 overflow-y-auto p-5">{children}</div>
       <footer className="flex shrink-0 justify-end gap-2 border-t border-slate-200 px-5 py-4">
-        <Button variant="outline" disabled={busy} onClick={onClose}>닫기</Button>
+        <Button variant="outline" disabled={busy} onClick={onClose}>{closeLabel}</Button>
         {onConfirm && <Button className="bg-blue-600 text-white hover:bg-blue-700" disabled={disabled || busy} onClick={onConfirm}>{busy ? "저장 중…" : confirmLabel}</Button>}
       </footer>
     </Dialog.Content>

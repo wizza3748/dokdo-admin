@@ -4,7 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronRight } from "lucide-react"
-import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE } from "@/lib/admin-navigation"
+import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE, ADMIN_MONTHLY_PATH, ADMIN_MONTHLY_TITLE } from "@/lib/admin-navigation"
 
 export function BreadcrumbHeader() {
     const pathname = usePathname()
@@ -56,6 +56,7 @@ export function BreadcrumbHeader() {
                     crumbs.push({ label: "기관 목록", href: "#" })
                 }
             }
+            else if (pathname === ADMIN_MONTHLY_PATH) { crumbs.push({ label: "학생관리", href: "/admin/b2c/students" }); crumbs.push({ label: ADMIN_MONTHLY_TITLE, href: "#" }); }
             else if (pathname === ADMIN_PRO_WEEKLY_PATH) {
                 crumbs.push({ label: "학생관리", href: "/admin/b2c/students" })
                 crumbs.push({ label: ADMIN_PRO_WEEKLY_TITLE, href: "#" })
@@ -82,7 +83,7 @@ export function BreadcrumbHeader() {
         // [기관관리자] 그룹
         if (pathname.startsWith("/agency")) {
             const crumbs = [{ label: "[기관관리자]", href: "#" }]
-            if (pathname.startsWith("/agency/pro-management")) return [...crumbs, { label: "독도 프로 관리", href: "/agency/pro-management" }, { label: pathname.endsWith("/feedback-day") ? "피드백 요일 설정" : pathname.includes("/students/") ? "프로 학생 관리" : "주간 관리 현황", href: "#" }]
+            if (pathname.startsWith("/agency/pro-management")) return [...crumbs, { label: "독도 프로 관리", href: "/agency/pro-management" }, { label: pathname.endsWith("/academy-style") ? "학원 말투 설정" : pathname.endsWith("/feedback-day") ? "피드백 요일 설정" : pathname.includes("/students/") ? "프로 학생 관리" : "주간 관리 현황", href: "#" }]
             if (pathname === "/agency/students/external") return [...crumbs, { label: "학생관리", href: "/agency/students" }, { label: "외부 관리 학생", href: "#" }]
 
             if (pathname.startsWith("/agency/online-workbooks")) {

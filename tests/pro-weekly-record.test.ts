@@ -1,7 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 // @ts-expect-error Node tests load TypeScript sources.
-import { resetTodayProDemo, TODAY_DEMO_IDS } from "../src/lib/pro-today-demo.ts"
+import { resetTodayProDemo } from "../src/lib/pro-today-demo.ts"
 // @ts-expect-error Node tests load TypeScript sources.
 import { emptyReviewDatabase } from "../src/lib/review-domain.ts"
 // @ts-expect-error Node tests load TypeScript sources.
@@ -11,7 +11,7 @@ import { applyManagedReviewCommand, proUsage } from "../src/lib/pro-domain.ts"
 // @ts-expect-error Node tests load TypeScript sources.
 import { weeklyRecord } from "../src/lib/pro-weekly-presentation.ts"
 // @ts-expect-error Node tests load TypeScript sources.
-import { proStatuses, taskLabels, weeklyStudent, weeklyTaskBooks, proTasks } from "../src/lib/pro-selectors.ts"
+import { proStatuses, taskLabels, weeklyStudent, weeklyTaskBooks, proTasks, showWeeklyMember } from "../src/lib/pro-selectors.ts"
 // @ts-expect-error Node tests load TypeScript sources.
 import { addDays, weekStart } from "../src/lib/pro-calendar.ts"
 
@@ -116,8 +116,8 @@ test("지연 전송해도 1차 원래 주차 유지, 미래 전송은 과거 실
 })
 
 test("오늘 할 일 7종은 작업 단위, 상태 필터는 전체 + 대표 상태 7종이며 학생 중복 없음", () => {
-  const db = fixture(), rows = db.pro!.members.filter(m => TODAY_DEMO_IDS.includes(m.id)).map(m => weeklyStudent(db,m,week))
-  assert.deepEqual(taskLabels, ["지연된 피드백", "이번 주 피드백", "1차 제출 독려", "2차 제출 독려", "상담 필요", "이번 달 상담 미완료", "이번 달 소멸 예정"])
+  const db = fixture(), rows = db.pro!.members.filter(m => m.institutionId === "dokdo" && showWeeklyMember(db,m,false)).map(m => weeklyStudent(db,m,week))
+  assert.deepEqual(taskLabels, ["지연된 피드백", "이번 주 피드백", "1차 제출 독려", "2차 제출 독려", "월간 피드백 작성", "월간 피드백 지연", "이번 달 소멸 예정"])
   assert.deepEqual(["전체", ...proStatuses], ["전체", "지연", "피드백 필요", "미제출", "2차 대기", "자동 선정 대기", "관리 완료", "한도 사용"])
   const buckets = proStatuses.map(status => rows.filter(r => r.status === status))
   assert.equal(buckets.flat().length, rows.length)
@@ -131,5 +131,5 @@ test("오늘 할 일 7종은 작업 단위, 상태 필터는 전체 + 대표 상
     assert.ok(delayed.every(f => !upcoming.some(next => next.record.id === f.record.id)))
     for (const index of [2,3,4,5,6]) assert.ok(row.tasks[index] === 0 || row.tasks[index] === 1)
   }
-  assert.ok(rows.some(r => r.tasks[1] > 0 && r.tasks[4] > 0), "다른 종류의 작업이 있으면 같은 학생이 각 할 일에 포함될 수 있음")
+  assert.ok(rows.every(r => r.tasks[4] === 0 && r.tasks[5] === 0), "전환 전 상담을 월간 작업으로 합산하지 않음")
 })

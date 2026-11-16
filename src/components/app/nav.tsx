@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useReviews } from "@/lib/review-client"
 import { proTasks } from "@/lib/pro-selectors"
-import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE } from "@/lib/admin-navigation"
+import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE, ADMIN_MONTHLY_PATH, ADMIN_MONTHLY_TITLE } from "@/lib/admin-navigation"
 import {
   BookOpenCheck,
   Building2,
@@ -79,6 +79,7 @@ const navConfig: NavItem[] = [
     children: [
       { title: "학생목록", href: "/admin/b2c/students" },
       { title: ADMIN_PRO_WEEKLY_TITLE, href: ADMIN_PRO_WEEKLY_PATH },
+      { title: ADMIN_MONTHLY_TITLE, href: ADMIN_MONTHLY_PATH },
     ]
   },
   {
@@ -111,7 +112,7 @@ const navConfig: NavItem[] = [
     icon: "BookOpenCheck",
     children: [{ title: "온라인 독후감 목록", href: "/agency/online-workbooks" }]
   },
-  { id: "agency-pro", title: "독도 프로 관리", icon: "BookOpenCheck", children: [{ title: "주간 관리 현황", href: "/agency/pro-management" }, { title: "피드백 요일 설정", href: "/agency/pro-management/feedback-day" }] },
+  { id: "agency-pro", title: "독도 프로 관리", icon: "BookOpenCheck", children: [{ title: "주간 관리 현황", href: "/agency/pro-management" }, { title: "피드백 요일 설정", href: "/agency/pro-management/feedback-day" }, { title: "학원 말투 설정", href: "/agency/pro-management/academy-style" }] },
   { id: "student-label", title: "[학생프론트]", type: "label" },
   { id: "student-home", title: "홈", href: "/student", icon: "House" }
 ]
@@ -134,7 +135,7 @@ export function AppNav({ canViewAdminWeekly = true }: { canViewAdminWeekly?: boo
   const isChildActive = (child: NavChild): boolean => isMatch(child.href) || Boolean(child.children?.some(isChildActive))
 
   const renderChild = (child: NavChild, depth = 0): React.ReactNode => {
-    if (child.href === ADMIN_PRO_WEEKLY_PATH && !canViewAdminWeekly) return null
+    if ((child.href === ADMIN_PRO_WEEKLY_PATH || child.href === ADMIN_MONTHLY_PATH) && !canViewAdminWeekly) return null
     if (child.children) {
       const ChildIcon = child.icon ? icons[child.icon] : null
       const childActive = isChildActive(child)

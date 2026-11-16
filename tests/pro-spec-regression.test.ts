@@ -87,7 +87,7 @@ test("발송 실패/재시도: 학생 전송과 차감 유지, 성공 이후 중
   assert.throws(() => applyProCommand(db,{type:"retry-parent",reviewId:c.reviewId},teacher,"again"))
 })
 
-test("할 일 필터는 해당 글만 포함하고 상담 필요에 예정일 경과도 포함", () => {
+test("할 일 필터는 해당 글만 포함하고 과거 상담 예정 판정은 조회용으로 보존", () => {
   let db = fixture()
   const member = db.pro!.members.find(m => m.id === "pro-demo-4")!
   const row = weeklyStudent(db,member,weekStart(db.pro!.clock))
@@ -95,8 +95,8 @@ test("할 일 필터는 해당 글만 포함하고 상담 필요에 예정일 �
   assert.equal(weeklyTaskBooks(row,weekStart(db.pro!.clock),db.pro!.clock,1).feedback.length,0)
   db = applyProCommand(db,{type:"clock",at:"2026-10-09T01:00:00.000Z"},teacher,"tomorrow")
   const next = weeklyStudent(db,member,weekStart(db.pro!.clock))
-  assert.equal(next.tasks[4],1); assert.equal(next.consultationDue,true)
-  assert.ok(proTasks(db).badge > proTasks(db).counts.slice(0,4).reduce((a,b) => a+b,0))
+  assert.equal(next.tasks[4],0); assert.equal(next.consultationDue,true)
+  assert.equal(proTasks(db).badge, proTasks(db).counts.slice(0,4).reduce((a,b) => a+b,0))
 })
 
 test("과거 조회에 미래 저장/잠금/전송 상태가 섞이지 않음", () => {

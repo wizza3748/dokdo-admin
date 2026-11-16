@@ -4,8 +4,8 @@ import Link from "next/link"
 import { Check, ChevronLeft, ChevronRight, Settings2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { addDays, managementMonth, weekdayNames, weekLabel, weekSchedule, weekStart } from "@/lib/pro-calendar"
-import { isActivePro, weekdayFor } from "@/lib/pro-domain"
-import { proStatuses, taskLabels, weeklyStudent } from "@/lib/pro-selectors"
+import { weekdayFor } from "@/lib/pro-domain"
+import { proStatuses, taskLabels, weeklyStudent, showWeeklyMember } from "@/lib/pro-selectors"
 import { hasPriorOverdue, weeklyColumnHelp, weeklyDate, weeklyDeadline, weeklyTaskHelp } from "@/lib/pro-weekly-presentation"
 import { useReviewListPosition } from "@/lib/review-navigation"
 import { agencyStudentTestToken } from "@/lib/student-test-context"
@@ -16,7 +16,7 @@ import { WeeklyRecordLegend } from "./weekly-record-marker"
 import styles from "./pro-management.module.css"
 
 const taskTones = ["rose", "blue", "amber", "cyan", "green", "violet", "orange"]
-const columns = ["학생", "월 주차별 기록", "피드백 이용 권수", "피드백 현황", "제출 독려 현황", "상담 현황", "관리"]
+const columns = ["학생", "월 주차별 기록", "피드백 이용 권수", "피드백 현황", "제출 독려 현황", "월간 피드백 현황", "관리"]
 export function WeeklyManagement() {
   const hook = useProManagement(), pro = hook.db.pro
   const [selectedWeek, setSelectedWeek] = React.useState("")
@@ -43,7 +43,8 @@ export function WeeklyManagement() {
   const month = managementMonth(week), activeTask = week === current ? task : null
   const identity = new URLSearchParams(window.location.search).get("demoAgency")
   const studentTest = agencyStudentTestToken()
-  const agencyQuery = (identity ? `&demoAgency=${encodeURIComponent(identity)}` : "") + (studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : "")
+  const monthlyTest = new URLSearchParams(window.location.search).get("monthlyTest")
+  const agencyQuery = (monthlyTest ? `&monthlyTest=${encodeURIComponent(monthlyTest)}` : "") + (identity ? `&demoAgency=${encodeURIComponent(identity)}` : "") + (studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : "")
   const returnUrl = `/agency/pro-management?week=${encodeURIComponent(week)}&status=${encodeURIComponent(filter)}${activeTask === null ? "" : `&task=${activeTask}`}${ended ? "&ended=1" : ""}${openedBooks.map(id => `&books=${encodeURIComponent(id)}`).join("")}${hook.readOnly ? "&role=admin" : ""}${agencyQuery}`
   const keepUrl = (w: string, status: string, t: number | null) => {
     const p = new URLSearchParams(window.location.search)
@@ -52,7 +53,7 @@ export function WeeklyManagement() {
     window.history.replaceState(null, "", `?${p}`)
     if (hook.messageKind === "success") hook.setMessage("")
   }
-  const all = pro.members.filter(m => m.product === "pro" && (ended || isActivePro(m, pro.clock))).map(m => weeklyStudent(hook.db, m, week))
+  const all = pro.members.filter(m => showWeeklyMember(hook.db,m,ended)).map(m => weeklyStudent(hook.db, m, week))
   const rows = all.filter(r => activeTask !== null ? r.tasks[activeTask] > 0 : filter === "전체" || r.status === filter)
     .sort((a,b) => Number(hasPriorOverdue(b,week)) - Number(hasPriorOverdue(a,week)) || proStatuses.indexOf(a.status) - proStatuses.indexOf(b.status) || ([...a.feedback].sort((x,y) => x.due.localeCompare(y.due))[0]?.due ?? "z").localeCompare([...b.feedback].sort((x,y) => x.due.localeCompare(y.due))[0]?.due ?? "z") || a.member.name.localeCompare(b.member.name))
   const weekday = pro.members[0] ? weekdayFor(pro, pro.members[0], week) : 7, schedule = weekSchedule(week, weekday)
@@ -75,7 +76,7 @@ export function WeeklyManagement() {
       <div className={styles.taskGrid}>{taskLabels.map((label,index) => {
         const count = all.reduce((s,r) => s+r.tasks[index],0)
         return <div key={label} className={styles.taskCard} data-tone={taskTones[index]} data-selected={activeTask === index}>
-          <button type="button" aria-pressed={activeTask === index} className={styles.taskButton} onClick={() => { const next = activeTask === index ? null : index; setTask(next); setFilter("전체"); keepUrl(week,"전체",next) }}><span className={styles.taskTitle}>{label}</span><span className={styles.taskValue}><strong>{count}<small>{index < 2 ? "건" : "명"}</small>{index === 6 && <small className="ml-2">{all.reduce((s,r) => s+(r.tasks[6] ? r.usage.available : 0),0)}권</small>}</strong>{activeTask === index && <Check className="size-4 shrink-0" aria-hidden="true"/>}</span></button>
+          <button type="button" aria-pressed={activeTask === index} className={styles.taskButton} onClick={() => { const next = activeTask === index ? null : index; setTask(next); setFilter("전체"); keepUrl(week,"전체",next) }}><span className={styles.taskTitle}>{label}</span><span className={styles.taskValue}><strong>{count}<small>{index < 2 || index === 4 || index === 5 ? "건" : "명"}</small>{index === 6 && <small className="ml-2">{all.reduce((s,r) => s+(r.tasks[6] ? r.usage.available : 0),0)}권</small>}</strong>{activeTask === index && <Check className="size-4 shrink-0" aria-hidden="true"/>}</span></button>
           <div className={styles.taskHelp}><ProHelp label={`${label} 안내`} lines={weeklyTaskHelp[index]}/></div>
         </div>
       })}</div>

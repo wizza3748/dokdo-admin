@@ -2,13 +2,15 @@
 import Link from "next/link"
 import { OctagonAlert, TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { addDays, kstDate, managementMonth, monthWeeks, weekLabel } from "@/lib/pro-calendar"
+import { addDays, managementMonth, monthWeeks, weekLabel } from "@/lib/pro-calendar"
 import { feedbackActionLabel, proCaseStatus, weeklyTaskBooks, type weeklyStudent } from "@/lib/pro-selectors"
-import { consultationSummary, hasPriorOverdue, weeklyDate, weeklyDeadline, weeklyRecord, weeklyWarning } from "@/lib/pro-weekly-presentation"
+import { hasPriorOverdue, weeklyDate, weeklyDeadline, weeklyRecord, weeklyWarning } from "@/lib/pro-weekly-presentation"
 import { ExternalBadge, ProBadge, type useProManagement } from "./pro-common"
 import { ProHelp } from "./pro-help"
 import { WeeklyReminders } from "./weekly-reminders"
 import { WeeklyRecordMarker } from "./weekly-record-marker"
+import { MonthlyBadge } from "./monthly-feedback-parts"
+import { monthlyDateTime, monthlyScheduleAt } from "@/lib/pro-monthly"
 import styles from "./pro-management.module.css"
 import { activeFeedbackScheduleAt } from "@/lib/review-schedule"
 import { FeedbackScheduleStatus } from "@/components/online-workbooks/review-schedule-status"
@@ -26,8 +28,10 @@ export function WeeklyStudentRow({ hook, row, week, task, returnUrl, agencyQuery
   const detailUrl = (id: string) => `/agency/online-workbooks/${id}?role=${hook.role}${agencyQuery}&returnTo=${encodeURIComponent(returnUrl)}`
   const books = weeklyTaskBooks(row, week, row.asOf, task), jobs = books.feedback, primary = jobs[0], waiting = books.waiting[0]
   const otherCases = [...new Map([...books.waiting, ...books.submissions].filter(c => !jobs.some(f => f.c.reviewId === c.reviewId)).map(c => [c.reviewId, c])).values()]
-  const consult = consultationSummary(row, week)
-  const warning = weeklyWarning(row)
+  const monthly = task === 4 ? row.monthly.write : task === 5 ? row.monthly.late : hook.db.pro!.monthly?.records.filter(r => r.studentId === member.id && r.month === month) ?? []
+  const excluded = hook.db.pro!.monthly?.exclusions.find(e => e.studentId === member.id && e.month === month)
+  const monthlyUrl = (m: string) => studentUrl.replace(`month=${month}`, `month=${m}`) + "#monthly-feedback"
+  const warning = row.previousOwner ? undefined : weeklyWarning(row)
   const book = (id: string) => hook.db.reviews.find(r => r.id === id)
   const title = (id: string) => book(id)?.bookTitle ?? "온라인 독후감"
   const bookLine = (id: string, round: number) => <p className="truncate font-medium text-slate-900" title={`${title(id)} · ${round}차 · ${book(id)?.level ?? "-"}레벨`}>{title(id)} <span className="text-xs font-normal text-slate-500">· {round}차 · {book(id)?.level ?? "-"}레벨</span></p>
@@ -40,13 +44,13 @@ export function WeeklyStudentRow({ hook, row, week, task, returnUrl, agencyQuery
   return <tr data-student-row={member.id} className={hasPriorOverdue(row, week) ? styles.priorOverdue : undefined}>
     <td data-label="학생"><div className="flex items-center gap-1 whitespace-nowrap">
       {warning && <ProHelp label={`${member.name} ${warning.label}`} trigger={warning.level === "hq" ? <OctagonAlert className="size-4 text-rose-600"/> : <TriangleAlert className="size-4 text-amber-600"/>} lines={warning.lines}><strong>{warning.label} · {row.missed}주 연속 미제출</strong></ProHelp>}
-      {member.caseOnly ? <span className="font-semibold text-slate-900">{member.name}</span> : <Link className="cursor-pointer rounded-sm font-semibold text-blue-700 underline decoration-blue-400 decoration-1 underline-offset-4 hover:text-blue-800 hover:decoration-blue-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" href={studentUrl}>{member.name}</Link>}{member.external && <ExternalBadge/>}
+      <Link className="cursor-pointer rounded-sm font-semibold text-blue-700 underline decoration-blue-400 decoration-1 underline-offset-4 hover:text-blue-800 focus-visible:outline-2" href={studentUrl}>{member.name}</Link><span className="text-xs text-slate-500">{member.level}레벨</span>{member.external && <ExternalBadge/>}{row.previousOwner && <ProBadge>이전 담당</ProBadge>}
     </div></td>
     <td data-label={`${Number(month.slice(5))}월 주차별 기록`}><div className="flex gap-1.5" aria-label={`${Number(month.slice(5))}월 주차별 기록`}>{monthWeeks(month).map(w => {
       const info = weeklyRecord(hook.db, member, w, row.asOf, hook.db.pro!.clock)
       return <ProHelp key={w} label={`${member.name} ${weekLabel(w)} ${info.label}${info.current ? " 현재 주" : ""}`} trigger={<WeeklyRecordMarker label={info.label} current={info.current}/>} lines={[`기간: ${weeklyDate(w)} ~ ${weeklyDate(addDays(w,6))}`, `상태: ${info.label}`, `제출한 독후감: ${info.submitted}건`, `전송한 피드백: ${info.sent}건`]}><strong>{weekLabel(w)}{info.current ? " · 현재 주" : ""}</strong></ProHelp>
     })}</div></td>
-    <td data-label="피드백 이용 권수">{member.caseOnly ? <span className="text-slate-400">—</span> : <div className={`${styles.usage} ${styles.weeklyUsage}`}>
+    <td data-label="피드백 이용 권수">{row.previousOwner ? <span className="text-slate-400">-</span> : <div className={`${styles.usage} ${styles.weeklyUsage}`}>
       <div className={styles.usagePrimary}><span className={styles.usageAmount}><strong>{row.usage.used}</strong><span>/ {row.usage.limit}권 사용</span></span></div>
       <p className={styles.usageAvailable}>남은 신청 권수 <strong>{row.usage.available}권</strong>{row.usage.rolloverAvailable > 0 && <span className={`${styles.usageRollover} ml-1.5 whitespace-nowrap`}>(이월 {row.usage.rolloverAvailable}권 포함)</span>}</p>
     </div>}</td>
@@ -54,10 +58,10 @@ export function WeeklyStudentRow({ hook, row, week, task, returnUrl, agencyQuery
       {(jobs.length > 1 || remaining.length > 0) && <button type="button" className="mt-2 text-xs font-semibold text-blue-700 hover:underline" aria-expanded={expanded} aria-controls={`pro-books-${member.id}`} onClick={toggle}>{expanded ? "글 목록 접기" : jobs.length > 1 ? `미처리 ${jobs.length}건 · 모두 보기` : `제출·대기 글 ${otherCases.length}건 보기`}</button>}
       {expanded && <div id={`pro-books-${member.id}`} className="mt-3 space-y-3">{jobs.slice(1).map(f => <div key={f.record.id} className="border-t border-slate-200 pt-3">{feedbackInfo(f)}</div>)}{remaining.map(c => <div key={c.reviewId} className="space-y-1.5 border-t border-slate-200 pt-3"><p className="text-xs text-slate-600">{proCaseStatus(hook.db,c)}</p>{bookLine(c.reviewId,c.secondDeadline ? 2 : 1)}{c.secondDeadline && !c.closedAt && <p className="text-xs">학생 제출 {weeklyDeadline(c.secondDeadline)}까지</p>}</div>)}</div>}
     </td>
-    <td data-label="제출 독려 현황">{member.caseOnly ? <span className="text-slate-400">—</span> : <WeeklyReminders hook={hook} row={row} week={week}/>}</td>
-    <td data-label="상담 현황">{member.caseOnly ? <span className="text-slate-400">—</span> : <><div className="flex flex-wrap items-center gap-1.5"><ProBadge tone={consult.tone}>{consult.label}</ProBadge><span className="text-xs text-slate-600">{weeklyDate(consult.date)}</span></div>{row.consultDue && kstDate(row.consultDue) < kstDate(row.asOf) && !row.consulted && !row.consultation.length && <p className="mt-1 text-xs text-amber-800">예정일 경과 · 결과 미기록</p>}</>}</td>
+    <td data-label="제출 독려 현황">{row.previousOwner ? <span className="text-slate-400">-</span> : <WeeklyReminders hook={hook} row={row} week={week}/>}</td>
+    <td data-label="월간 피드백 현황"><div className="space-y-3">{monthly.length ? monthly.map(r => <div key={r.id} className="space-y-1.5">{(task === 4 || task === 5) && <p className="font-medium">{r.month} 월간 피드백</p>}<MonthlyBadge record={r} now={hook.db.pro!.clock}/>{!r.required && <p className="text-xs text-slate-500">11월 상담 완료 (발송 선택)</p>}<p className="text-xs text-slate-600">{r.sent ? `발송 ${monthlyDateTime(r.sent.actualAt)}` : `기한 ${monthlyDateTime(r.due)}`}</p>{!r.sent && monthlyScheduleAt(hook.db.pro!,r) && <p className="text-xs text-slate-500">지정 {monthlyDateTime(monthlyScheduleAt(hook.db.pro!,r))}</p>}</div>) : excluded ? <><ProBadge>대상 제외</ProBadge><p className="text-xs text-slate-500">{excluded.reason === "first-month" ? "매칭 첫 달 피드백 0편" : "정기 생성 후 신규 매칭"}</p></> : <span className="text-xs text-slate-500">{row.previousOwner ? "-" : "생성 전"}</span>}</div></td>
     <td data-label="관리"><div className={styles.managementActions}>{(expanded ? jobs : jobs.slice(0,1)).map(f => <div key={f.record.id}>{jobs.length > 1 && <p className="mb-1 text-xs text-slate-500">{title(f.c.reviewId)} · {f.record.round}차</p>}{feedbackButton(f)}</div>)}
-      {!member.caseOnly && <Button asChild size="sm" variant="outline"><Link href={`${studentUrl}#consultation`}>{hook.readOnly ? "상담 내역" : "상담 기록"}</Link></Button>}
+      {monthly.map(r => <div key={r.id}>{monthly.length > 1 && <p className="mb-1 text-xs text-slate-500">{r.month}</p>}<Button asChild size="sm" variant="outline"><Link href={monthlyUrl(r.month)}>월간 피드백</Link></Button></div>)}
     </div></td>
   </tr>
 }

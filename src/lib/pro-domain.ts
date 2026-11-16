@@ -3,6 +3,8 @@ import { addDays, consultationDate, kstDate, managementMonth, monthWeeks, second
 // @ts-expect-error Node tests use explicit TypeScript extensions.
 import { applyReviewCommand, canAccessReview, canSendReview, type ReviewActor, type ReviewCommand, type ReviewDatabase, type ReviewRecord } from "./review-domain.ts"
 import type { ProCase, ProCommand, ProMember, ProState } from "./pro-types"
+// @ts-expect-error Node tests load TypeScript directly.
+import { applyMonthlyCommand, isMonthlyCommand, reconcileMonthly } from "./pro-monthly.ts"
 // @ts-expect-error Node tests use explicit TypeScript extensions.
 import { atReviewTime, beginProClockTest, endProClockTest, reviewNow } from "./review-clock.ts"
 // @ts-expect-error Node tests use explicit TypeScript extensions.
@@ -186,6 +188,10 @@ export function reconcilePro(db: ReviewDatabase, at = db.pro?.clock ?? new Date(
 }
 function access(pro: ProState, actor: ReviewActor, member: ProMember) { check(actor.role === "student" ? actor.studentId === member.id : actor.role === "agency" && actor.institutionId === member.institutionId, "해당 학생의 처리 권한이 없습니다.") }
 export function applyProCommand(input: ReviewDatabase, command: ProCommand, actor: ReviewActor, requestId: string, serverNow = new Date().toISOString()) {
+  if (isMonthlyCommand(command)) {
+    const current = atReviewTime(input, serverNow)
+    return applyMonthlyCommand(current, command, actor, requestId, current.pro!.clock)
+  }
   if (command.type === "clock-real") {
     check(actor.role === "agency" && !!actor.institutionId, "기관관리자만 테스트 시각을 변경할 수 있습니다.")
     return reconcilePro(endProClockTest(structuredClone(input), serverNow))
@@ -198,7 +204,7 @@ export function applyProCommand(input: ReviewDatabase, command: ProCommand, acto
     check(actor.role === "agency" && !!actor.institutionId && !Number.isNaN(Date.parse(command.at)) && Date.parse(command.at) >= Date.parse(at) && Date.parse(command.at) <= Date.parse(addDays(at, 370)), "테스트 시간은 현재 시점 이후 1년 이내로만 진행할 수 있습니다.")
     beginProClockTest(db)
     pro.clockMode = "test"
-    pro.clock = new Date(command.at).toISOString(); audit(pro, requestId, "테스트 시간 진행", pro.clock, actor.name, "", { before: at, after: pro.clock }); return reconcilePro(db)
+    pro.clock = new Date(command.at).toISOString(); audit(pro, requestId, "테스트 시간 진행", pro.clock, actor.name, "", { before: at, after: pro.clock }); return reconcileMonthly(reconcilePro(db))
   }
   if (command.type === "schedule") {
     check(actor.role === "agency" && Number.isInteger(command.weekday) && command.weekday >= 1 && command.weekday <= 7 && pro.members.some(m => m.institutionId === actor.institutionId && m.product === "pro"), "요일 설정 권한 또는 입력값을 확인해 주세요.")
@@ -225,6 +231,7 @@ export function applyProCommand(input: ReviewDatabase, command: ProCommand, acto
     return db
   }
   const month = managementMonth(at), before = proUsage(pro, member, at)
+  if ((command.type === "consult" || command.type === "consult-schedule") && pro.monthly?.transition) throw new Error("기존 상담 기록은 읽기 전용입니다. 이후 통화 내용은 관리 메모에 기록해 주세요.")
   const auditMonth = c?.month ?? ("month" in command && command.month ? command.month : month)
   const auditBefore = command.type === "consult-schedule" ? structuredClone({ consultation: member.consultation, overrides: member.overrides }) : proUsage(pro, member, at, auditMonth)
   if (command.type === "apply" || command.type === "designate") {

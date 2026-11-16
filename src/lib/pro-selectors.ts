@@ -4,9 +4,11 @@ import { addDays, cutoffLabel, dateLabel, kstDate, managementMonth, monthWeeks, 
 import { autoCandidates, consultDue, currentConsultations, isActivePro, pendingFeedback, proChangeCandidates, proUsage, weekdayFor } from "./pro-domain.ts"
 import type { ReviewDatabase, ReviewRecord } from "./review-domain"
 import type { ProCase, ProMember, ProState } from "./pro-types"
+// @ts-expect-error Node tests load TypeScript directly.
+import { monthlyTasks, monthlyCanRead, monthlyOwner } from "./pro-monthly.ts"
 export const selectionLabels = { student: "학생 신청", auto: "자동 선정", teacher: "선생님 지정", migration: "기존 기록 승계" }
 export const proStatuses = ["지연", "피드백 필요", "미제출", "2차 대기", "자동 선정 대기", "관리 완료", "한도 사용"]
-export const taskLabels = ["지연된 피드백", "이번 주 피드백", "1차 제출 독려", "2차 제출 독려", "상담 필요", "이번 달 상담 미완료", "이번 달 소멸 예정"]
+export const taskLabels = ["지연된 피드백", "이번 주 피드백", "1차 제출 독려", "2차 제출 독려", "월간 피드백 작성", "월간 피드백 지연", "이번 달 소멸 예정"]
 /** Past weeks are rendered as of their closing time, not today's sent/closed state. */
 export function proSnapshotAt(db: ReviewDatabase, at: string): ReviewDatabase {
   const snapshot = structuredClone(db), pro = snapshot.pro!
@@ -36,7 +38,8 @@ export function proSnapshotAt(db: ReviewDatabase, at: string): ReviewDatabase {
   return snapshot
 }
 export function weeklyStudent(db: ReviewDatabase, member: ProMember, week: string) {
-  const caseOnly = !!member.caseOnly
+  const caseOnly = !!member.caseOnly || !isActivePro(member, db.pro!.clock)
+  const monthly = monthlyTasks(db.pro!,member.id)
   const consultationAsOf = db.pro!.clock
   const consultation = caseOnly ? [] : currentConsultations(db.pro!, member.id, managementMonth(week))
   const due = caseOnly ? undefined : consultDue(member, managementMonth(week))
@@ -54,7 +57,7 @@ export function weeklyStudent(db: ReviewDatabase, member: ProMember, week: strin
   const consulted = consultation.some(c => c.result !== "미진행")
   const consultationDue = !consulted && !!due && kstDate(due) <= kstDate(consultationAsOf)
   const lastWeek = monthWeeks(month).at(-1) === week
-  const tasks = [overdue.length, relevant.filter(f => weekStart(f.due) === week && f.due >= now).length, !caseOnly && !submissions.length && remainingReminders.some(r => r.kind === "submission") ? 1 : 0, !caseOnly && waiting.length && remainingReminders.some(r => r.kind === "revision") ? 1 : 0, consultationDue ? 1 : 0, !caseOnly && !consulted && lastWeek ? 1 : 0, !caseOnly && lastWeek && usage.available > 0 ? 1 : 0]
+  const tasks = [overdue.length, relevant.filter(f => weekStart(f.due) === week && f.due >= now).length, !caseOnly && !submissions.length && remainingReminders.some(r => r.kind === "submission") ? 1 : 0, !caseOnly && waiting.length && remainingReminders.some(r => r.kind === "revision") ? 1 : 0, monthly.write.length, monthly.late.length, !caseOnly && lastWeek && usage.available > 0 ? 1 : 0]
   const status = overdue.length ? "지연" : relevant.length ? "피드백 필요" : caseOnly ? waiting.length ? "2차 대기" : "관리 완료" : !submissions.length && usage.available > 0 ? "미제출" : waiting.length ? "2차 대기" : submissions.some(c => !c.selectedAt) && usage.available > 0 && now < weekSchedule(week, weekdayFor(pro, member, week)).cutoff ? "자동 선정 대기" : cases.some(c => c.week === week && c.closedAt) ? "관리 완료" : usage.used >= usage.limit ? "한도 사용" : submissions.length ? "관리 완료" : "미제출"
   const missedWeeks: string[] = []
   const submittedRecords = cases.flatMap(c => db.records.filter(r => r.reviewId === c.reviewId && r.writingStatus === "submitted" && r.submittedAt && r.submittedAt <= at).map(r => ({ week: r.round === 1 ? c.week : c.secondWeek, at: r.submittedAt! })))
@@ -65,7 +68,7 @@ export function weeklyStudent(db: ReviewDatabase, member: ProMember, week: strin
     if (submittedRecords.some(r => r.week === previous)) break
     if (proUsage(pro, member, new Date(Date.parse(addDays(previous, 7)) - 1).toISOString()).available > 0) missedWeeks.unshift(previous)
   }
-  return { member, usage, cases, submissions, waiting, feedback: relevant, overdue, tasks, status, consultation, consulted, consultDue: due, consultationDue, consultationAsOf, missed: missedWeeks.length, missedWeeks, asOf: now }
+  return { member, previousOwner: caseOnly, monthly, usage, cases, submissions, waiting, feedback: relevant, overdue, tasks, status, consultation, consulted, consultDue: due, consultationDue, consultationAsOf, missed: missedWeeks.length, missedWeeks, asOf: now }
 }
 /** Task filters apply to books as well as students; prior work appears only once. */
 export function weeklyTaskBooks(row: ReturnType<typeof weeklyStudent>, week: string, now: string, task: number | null) {
@@ -79,12 +82,19 @@ export function weeklyTaskBooks(row: ReturnType<typeof weeklyStudent>, week: str
 export function feedbackActionLabel(record: Pick<ReviewRecord, "savedAt" | "feedbackStatus">, readOnly = false) {
   return readOnly ? "피드백 조회" : record.savedAt || record.feedbackStatus === "작성완료" ? "피드백 확인" : "피드백 작성"
 }
+export function showWeeklyMember(db: ReviewDatabase, member: ProMember, ended: boolean) {
+  const pro = db.pro!
+  if (isActivePro(member,pro.clock) && !member.caseOnly) return true
+  const followup = pro.cases.some(c => c.studentId === member.id && (!pro.scopeInstitutionId || c.institutionId === pro.scopeInstitutionId) && (c.selectedAt || c.firstSentAt) && (!c.closedAt || c.parent.status !== "sent"))
+  const monthly = monthlyTasks(pro,member.id)
+  return followup || monthly.write.length > 0 || monthly.late.length > 0 || !!pro.monthly?.records.some(r => r.studentId === member.id && !r.sent) || ended && (member.product === "pro" || !!member.endedAt)
+}
 export function proTasks(db: ReviewDatabase, institutionId = "dokdo") {
   if (!db.pro) return { counts: taskLabels.map(() => 0), badge: 0 }
   db = { ...db, pro: scopePro(db.pro, institutionId) }
-  const rows = db.pro!.members.filter(m => isActivePro(m, db.pro!.clock)).map(m => weeklyStudent(db, m, weekStart(db.pro!.clock)))
+  const rows = db.pro!.members.filter(m => showWeeklyMember(db,m,false)).map(m => weeklyStudent(db, m, weekStart(db.pro!.clock)))
   const counts = taskLabels.map((_, i) => rows.reduce((sum, r) => sum + r.tasks[i], 0))
-  const badge = rows.reduce((sum, r) => sum + r.tasks.slice(0, 4).reduce((a, b) => a + b, 0) + (r.tasks[4] || r.tasks[5] ? 1 : 0), 0)
+  const badge = counts.slice(0,6).reduce((a,b) => a+b,0)
   return { counts, badge }
 }
 export function reminderCopy(db: ReviewDatabase, member: ProMember, kind: "submission" | "revision", week: string, recordedAt?: string) {
@@ -118,19 +128,21 @@ export function studentProView(db: ReviewDatabase, studentId: string): StudentPr
   }) }
 }
 export function scopePro(pro: ProState, institutionId: string): ProState {
-  const assignedMembers = pro.members.filter(m => m.institutionId === institutionId), assignedIds = new Set(assignedMembers.map(m => m.id))
+  const assignedMembers = pro.members.filter(m => m.institutionId === institutionId || !m.institutionId && monthlyOwner(pro,m) === institutionId), assignedIds = new Set(assignedMembers.map(m => m.id))
+  const monthlyRecords = pro.monthly?.records.filter(r => monthlyCanRead(pro,r,{ role:"agency", institutionId, name:"" })) ?? []
   // Current institutions can read the student's prior feedback; previous institutions
   // retain only their own selected books. Mutation authority is checked separately.
   const cases = pro.cases.filter(c => assignedIds.has(c.studentId) || (c.selectedAt || c.firstSentAt) && c.institutionId === institutionId)
   const caseIds = new Set(cases.map(c => c.reviewId)), caseStudentIds = new Set(cases.map(c => c.studentId))
   const members = pro.members.flatMap(member => {
     if (assignedIds.has(member.id)) return [member.caseOnly ? { ...member, caseOnly: undefined } : member]
-    if (!caseStudentIds.has(member.id)) return []
+    if (!caseStudentIds.has(member.id) && !monthlyRecords.some(r => r.studentId === member.id)) return []
     // Include only the information needed to render an already-owned book. Never expose
     // the newly assigned institution's memo, consultations, teacher or matching history.
     return [{ ...member, caseOnly: true, teacherId: "", managementMemo: undefined, consultation: undefined, overrides: {}, matchingHistory: undefined }]
   })
   return { ...pro, scopeInstitutionId: institutionId, members, cases,
+    monthly: pro.monthly ? { ...pro.monthly, records: monthlyRecords, exclusions: pro.monthly.exclusions.filter(e => assignedIds.has(e.studentId)), styles: pro.monthly.styles.filter(s => s.institutionId === institutionId), schedules: pro.monthly.schedules.filter(s => assignedIds.has(s.studentId)), transition: pro.monthly.transition ? { at:pro.monthly.transition.at, optional:Object.fromEntries(Object.entries(pro.monthly.transition.optional).filter(([id]) => assignedIds.has(id))) } : undefined } : undefined,
     schedules: pro.schedules.filter(s => s.institutionId === institutionId || assignedMembers.some(m => m.matchingHistory?.some(h => h.institutionId === s.institutionId))),
     audit: pro.audit.filter(a => a.reviewId ? caseIds.has(a.reviewId) : a.institutionId ? a.institutionId === institutionId : assignedIds.has(a.studentId)),
     reminders: pro.reminders.filter(r => assignedIds.has(r.studentId)), consultations: pro.consultations.filter(c => assignedIds.has(c.studentId)), processed: [], reminderSnapshots: pro.reminderSnapshots.filter(s => assignedIds.has(s.studentId)) }

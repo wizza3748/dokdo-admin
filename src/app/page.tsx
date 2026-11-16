@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { STUDENT_FRONT_TEST_PATH } from "@/lib/pro-demo-navigation";
-import { ADMIN_PRO_WEEKLY_PATH } from "@/lib/admin-navigation";
+import { ADMIN_PRO_WEEKLY_PATH, ADMIN_MONTHLY_PATH } from "@/lib/admin-navigation";
 
 export default function Home() {
   return (
@@ -20,6 +20,7 @@ export default function Home() {
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">일감 ID</div>
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center border-l border-slate-100">제목</div>
               </div>
+<div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group"><div className="p-5 text-center"><a href="https://sloop-dev.atlassian.net/browse/DD-1811" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline">DD-1811</a></div><div className="p-5 text-[15px] font-semibold text-slate-700 border-l border-slate-50"><Link href={ADMIN_MONTHLY_PATH} className="hover:underline">월간 피드백 기능 추가</Link></div></div>
               <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group">
                 <div className="p-5 text-center">
                   <a
@@ -106,6 +107,7 @@ export default function Home() {
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">일감 ID</div>
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center border-l border-slate-100">제목</div>
               </div>
+<div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group"><div className="p-5 text-center"><a href="https://sloop-dev.atlassian.net/browse/DD-1811" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline">DD-1811</a></div><div className="p-5 text-[15px] font-semibold text-slate-700 border-l border-slate-50"><Link href="/agency/pro-management" className="hover:underline">월간 피드백 기능 추가</Link></div></div>
               <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group">
                 <div className="p-5 text-center">
                   <a href="https://sloop-dev.atlassian.net/browse/DD-1723" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors underline-offset-4 hover:underline">DD-1723</a>

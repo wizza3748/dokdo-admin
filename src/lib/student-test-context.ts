@@ -36,6 +36,7 @@ export function agencyStudentTestToken() {
   } catch { return "" }
 }
 export function studentTestApi(kind: "reviews" | "pro", normal: string, role: string) {
+  if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("monthlyTest") && (role === "agency" || role === "admin")) return "/api/mock/monthly-feedback-test"
   return (role === "student" && studentTestToken() || role === "agency" && agencyStudentTestToken()) ? `/api/mock/student-front-tests/${kind}` : normal
 }
 export function studentTestScreen(): StudentTestScreen {

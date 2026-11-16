@@ -16,6 +16,7 @@ export function demoIdentityQuery(role: ReviewRole) {
     const token = studentTestToken()
     return (current ? `&demoStudent=${encodeURIComponent(current)}` : "") + (token ? `&studentTest=${encodeURIComponent(token)}` : "")
   }
+  if (params.has("monthlyTest")) return `&monthlyTest=${encodeURIComponent(params.get("monthlyTest") || "")}${params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""}`
   const testToken = role === "agency" ? agencyStudentTestToken() : ""
   return (params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : "") + (testToken ? `&studentTest=${encodeURIComponent(testToken)}` : "")
 }
@@ -38,7 +39,7 @@ function preserveLegacyProgress(db: ReviewDatabase): ReviewDatabase {
 }
 export async function readReviews(role: ReviewRole = "student", recordId?: string, options: { fresh?: boolean } = {}): Promise<ReviewDatabase> {
   const sharedToken = role === "external" ? new URLSearchParams(window.location.search).get("share") || recordId : undefined
-  const url = role === "external" ? `/api/mock/review-share?token=${encodeURIComponent(sharedToken ?? "")}` : `${studentTestApi("reviews", "/api/mock/online-reviews", role)}?role=${role}${demoIdentityQuery(role)}${recordId ? `&recordId=${encodeURIComponent(recordId)}` : ""}`
+  const url = role === "external" ? `/api/mock/review-share?token=${encodeURIComponent(sharedToken ?? "")}` : `${studentTestApi("reviews", role === "admin" && window.location.pathname === "/admin/b2c/monthly-feedback" ? "/api/mock/monthly-feedback" : "/api/mock/online-reviews", role)}?role=${role}${demoIdentityQuery(role)}${recordId ? `&recordId=${encodeURIComponent(recordId)}` : ""}`
   const db = await reviewReads.read<ReviewDatabase>(url, async () => {
     const response = await fetch(url, { cache: "no-store" })
     if (!response.ok) { const error = await response.json().catch(() => ({})); throw new Error(error.message || "온라인 독후감을 불러오지 못했습니다.") }

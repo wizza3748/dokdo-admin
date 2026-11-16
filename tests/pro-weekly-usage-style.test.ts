@@ -9,7 +9,7 @@ const detail = readFileSync(new URL("../src/components/pro-management/student-ma
 test("compact quota typography is scoped to the weekly usage cell", () => {
   const usageCell = weekly.match(/data-label="피드백 이용 권수">([\s\S]*?)<\/td>/)?.[1] ?? ""
   assert.ok(usageCell.includes('className={`${styles.usage} ${styles.weeklyUsage}`}'))
-  assert.ok(usageCell.includes("member.caseOnly ?"))
+  assert.ok(usageCell.includes("row.previousOwner ?"))
   assert.ok(!detail.includes("styles.weeklyUsage"))
   assert.match(css, /\.weeklyUsage \.usageAmount strong \{[^}]*font-size: 14px;[^}]*font-weight: 600;/)
   assert.match(css, /\.weeklyUsage \.usageAmount span \{[^}]*font-size: 14px;/)
