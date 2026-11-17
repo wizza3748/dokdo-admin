@@ -16,7 +16,7 @@ export function demoIdentityQuery(role: ReviewRole) {
     const token = studentTestToken()
     return (current ? `&demoStudent=${encodeURIComponent(current)}` : "") + (token ? `&studentTest=${encodeURIComponent(token)}` : "")
   }
-  if (params.has("monthlyTest")) return `&monthlyTest=${encodeURIComponent(params.get("monthlyTest") || "")}${params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""}`
+  if (params.has("monthlyTest")) return `&monthlyTest=${encodeURIComponent(params.get("monthlyTest") || "")}${params.has("monthlyCase")?`&monthlyCase=${encodeURIComponent(params.get("monthlyCase")!)}`:""}${params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""}`
   const testToken = role === "agency" ? agencyStudentTestToken() : ""
   return (params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : "") + (testToken ? `&studentTest=${encodeURIComponent(testToken)}` : "") + (params.get("monthlyLive") === "1" && !testToken ? "&monthlyLive=1" : "")
 }

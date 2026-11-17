@@ -6,9 +6,19 @@ export type MonthlySource = {
   submittedAt: string; sentAt?: string; body: string; feedback: string; itemFeedback: string[];
   scores?: Record<string, number>; report?: unknown; reportFeedback?: string;
   institutionId?: string; is_current_academy: boolean | null; round_status: string;
+  /** The first draft may be carried in only to compare with an in-period revision. */
+  comparisonOnly?: boolean;
+}
+export type MonthlyEvidence = {
+  point: string;
+  source: string;
+  references: { recordId: string; field: "body" | "feedback" | "itemFeedback" | "reportFeedback"; quote: string }[];
+  criterion?: string;
 }
 export type MonthlyInput = {
   studentName: string; level: number; periodStart: string; periodEnd: string; kind: MonthlyKind;
+  studentFullName?: string; parentSalutation?: string; isFirst?: boolean;
+  writings?: { reviewId: string; firstRecordId?: string; revisedRecordId?: string; status: string }[];
   sources: MonthlySource[]; submittedWeeks: number; totalWeeks: number;
   previous?: { body: string; carry: MonthlyCarry[]; composition: string; peerComparison: boolean; teachingOutcome: boolean };
   style: string[]; examples: string[];
@@ -17,6 +27,8 @@ export type MonthlyOutput = {
   body: string; carry: MonthlyCarry[]; kind: MonthlyKind; composition: string; focus: string;
   reviewSpans: { text: string; reason: "작성 과정의 도움 여부" | "부족한 점의 직접 언급" | "제출 횟수 언급" }[];
   peerComparison: boolean; teachingOutcome: boolean; warnings: string[];
+  /** Optional for historical generations. Never backfill their evidence or rewrite their body. */
+  evidence?: MonthlyEvidence[]; notesForTeacher?: string[]; charCount?: number; promptVersion?: string;
 }
 export type MonthlyGeneration = MonthlyOutput & { id: string; at: string; institutionId: string; input: MonthlyInput; direction?: MonthlyDirection; request?: string }
 export type MonthlyVersion = { body: string; carry: MonthlyCarry[]; sourceId: string; at: string; actor: string; revision: number }
@@ -42,6 +54,8 @@ export type MonthlyState = {
   exclusions: { studentId: string; month: string; reason: "first-month" | "late-assignment"; at: string }[];
   evaluatedMonths: string[]; styles: AcademyStyle[];
   schedules: { studentId: string; weekday: number | null; time: string; at: string; actor: string }[];
+  /** Dedicated monthly examples only; not an operational policy or a shared data migration. */
+  validation?: { version: number; scenario: string; caseId: string; createdAt: string; fault?: {recordId:string;type:string} };
 }
 export type MonthlyCommand =
   | { type: "monthly-save"; id: string; body: string; carry: MonthlyCarry[]; sourceId: string; revision: number }

@@ -6,6 +6,8 @@ import type { AcademyStyle, MonthlyCommand, MonthlyRecord, MonthlyState } from "
 import { addDays, kstDate, managementMonth, midnight, monthWeeks, weekStart } from "./pro-calendar.ts"
 // @ts-expect-error Node tests load TypeScript directly.
 import { canShortenMonthly, generateMonthly, monthlyDirections, monthlyInput } from "./pro-monthly-generation.ts"
+// @ts-expect-error Node tests load TypeScript directly.
+import { monthlyExpressionKey, monthlyStyleObservations } from "./pro-monthly-language.ts"
 
 export const MONTHLY_LAUNCH_DAY = "2026-11-25"
 function assert(ok: unknown, message: string): asserts ok { if (!ok) throw new Error(message) }
@@ -152,16 +154,17 @@ function updateStyle(pro: ProState, record: MonthlyRecord, actor: ReviewActor, a
   if (record.simulateStyleFailureOnce) { record.simulateStyleFailureOnce = false; record.styleUpdate = "failed"; return }
   const before = JSON.stringify(style.items)
   const generation = record.generations.find(g => g.id === record.sent!.sourceId)!
-  const requested = record.generations.map(g => g.request ?? "").join(" ")
-  const text = `${record.sent!.body} ${requested}`
-  const observations: string[] = []
-  if (/따뜻|부드럽/.test(requested)) observations.push("따뜻하고 부드러운 표현을 사용합니다.")
-  if (/이모티콘/.test(requested) && /빼|없이|사용하지/.test(requested)) observations.push("이모티콘을 사용하지 않습니다.")
-  if (/간결|짧은 문장/.test(requested)) observations.push("짧고 간결한 문장으로 작성합니다.")
-  if (generation.body !== record.sent!.body && /해요[.!?]?|드려요[.!?]?/.test(text)) observations.push("부드러운 해요체로 안내합니다.")
-  for (const expression of new Set(observations)) {
-    const item = style.items.find(i => i.text === expression)
-    if (item) item.observations++; else if (style.items.length < 10) style.items.push({ text: expression, observations: 1 })
+  const requested = [generation.request ?? "", generation.direction === "더 따뜻하게" ? "말투를 더 따뜻하게" : generation.direction === "더 간결하게" ? "문장을 더 간결하게" : ""].join("\n")
+  const observations = monthlyStyleObservations(generation.body, record.sent!.body, requested)
+  for (const observation of observations) {
+    const item = style.items.find(i => i.text === observation.text)
+    if (item) item.observations++
+    else {
+      // A contrary expression replaces the current preference; history retains the previous value.
+      const contrary = style.items.findIndex(i => monthlyExpressionKey(i.text) === observation.key)
+      if (contrary >= 0) style.items[contrary] = { text: observation.text, observations: 1 }
+      else if (style.items.length < 10) style.items.push({ text: observation.text, observations: 1 })
+    }
   }
   style.revision++; style.updatedAt = at
   style.history.push({ id, at, actor: actor.name, kind: "발송본 반영", before, after: JSON.stringify(style.items) })

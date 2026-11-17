@@ -146,3 +146,9 @@
   .carryRow { flex-wrap: wrap; }
   .carryRow input { flex-basis: 100%; }
 }
+.emptyEvidence {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+.emptyEvidence h3, .emptyEvidence p { margin: 0; }

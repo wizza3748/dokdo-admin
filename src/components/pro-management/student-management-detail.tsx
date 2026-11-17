@@ -43,9 +43,10 @@ export function StudentManagementDetail({ id }: { id: string }) {
   const currentMonth = managementMonth(pro.clock), selectedMonth = month || currentMonth, monthName = `${Number(selectedMonth.slice(5))}월`
   const studentTest = agencyStudentTestToken()
   const monthlyTest = new URLSearchParams(window.location.search).get("monthlyTest")
+  const monthlyCase = monthlyTest && new URLSearchParams(window.location.search).get("monthlyCase")
   const identity = new URLSearchParams(window.location.search).get("demoAgency")
   const live = new URLSearchParams(window.location.search).get("monthlyLive") === "1" ? "&monthlyLive=1" : ""
-  const testQuery = (monthlyTest ? `&monthlyTest=${encodeURIComponent(monthlyTest)}` : studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : live) + (identity ? `&demoAgency=${encodeURIComponent(identity)}` : "")
+  const testQuery = (monthlyTest ? `&monthlyTest=${encodeURIComponent(monthlyTest)}${monthlyCase?`&monthlyCase=${encodeURIComponent(monthlyCase)}`:""}` : studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : live) + (identity ? `&demoAgency=${encodeURIComponent(identity)}` : "")
   const usage = proUsage(pro, member, pro.clock, selectedMonth)
   const rows = studentFeedbackRows(hook.db, id, selectedMonth)
   const audit = pro.audit.filter(a => a.studentId === id && a.kind !== "management-memo" && (!a.month || a.month === selectedMonth)).slice().sort((a, b) => b.at.localeCompare(a.at))

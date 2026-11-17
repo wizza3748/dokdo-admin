@@ -11,6 +11,7 @@ import { monthlyDirections, monthlyLength, canShortenMonthly } from "@/lib/pro-m
 import { localDateTime, consultationResultLabel, dayNames, regularConsultationLabel } from "@/lib/pro-student-detail"
 import type { MonthlyCarry, MonthlyDirection, MonthlyGeneration } from "@/lib/pro-monthly-types"
 import { monthlyMessages, monthlyActionFailures } from "@/lib/pro-monthly-messages"
+import { demoIdentityQuery } from "@/lib/review-client"
 import type { ProMember } from "@/lib/pro-types"
 import styles from "./pro-management.module.css"
 import ui from "./monthly-feedback.module.css"
@@ -127,8 +128,7 @@ export function MonthlyFeedbackEditor({ hook, member, month, navigationRef }: Pr
   const consultations=pro.consultations.filter(c=>c.studentId===member.id&&c.month===month&&(!state?.transition||c.at<=state.transition.at))
   const validConsultations=consultations.filter(c=>!consultations.some(n=>n.previousId===c.id))
   const owner = pro.scopeInstitutionId ?? member.institutionId
-  const query=typeof window==="undefined"?"":new URLSearchParams(window.location.search)
-  const evidenceQuery=`${query && query.get("monthlyTest")?`monthlyTest=${encodeURIComponent(query.get("monthlyTest")!)}&`:""}${query && query.get("monthlyLive")==="1"?"monthlyLive=1&":""}role=${hook.role}${query && query.get("demoAgency")?`&demoAgency=${encodeURIComponent(query.get("demoAgency")!)}`:""}`
+  const evidenceQuery=`role=${hook.role}${demoIdentityQuery(hook.role)}`
   const schedule=state?.schedules.find(s=>s.studentId===member.id)
   const selectedGeneration = record?.generations.find(g => g.id === historyId) ?? record?.generations.at(-1)
   const primaryAction = !record?.saved || dirty ? "save" : record.copied?.revision === record.saved.revision ? "send" : "copy"
@@ -157,11 +157,10 @@ export function MonthlyFeedbackEditor({ hook, member, month, navigationRef }: Pr
         {!record.sent&&source&&source.institutionId!==owner&&<p className={`${ui.notice} bg-amber-50 text-amber-900`}>{monthlyMessages.beforeTransfer}</p>}
         <div className={ui.bodyHeading}><h3>월간 피드백 본문</h3><span className={ui.bodyMeta}><span>{monthlyGenerationLabel(source)}</span><span>{monthlyLength(record.sent?.body??body)}자</span></span></div>
         {readOnly?<p className={`${ui.bodyInput} ${ui.readOnlyBody}`} tabIndex={0} aria-label="월간 피드백 본문">{record.sent?.body??body}</p>:<MessageEditor value={body} onChange={setBody} generation={source} disabled={busy}/>}
-        {!!source?.warnings.length&&<div className="text-amber-800">{source.warnings.map(w=><p key={w}>{w}</p>)}</div>}
+        {!!source && !![...source.warnings,...(source.notesForTeacher??[])].length&&<div className="text-amber-800">{[...new Set([...source.warnings,...(source.notesForTeacher??[])])].map(w=><p key={w}>{w}</p>)}</div>}
         {!readOnly && <div className={ui.editTools}><Button type="button" size="sm" variant="outline" disabled={busy||record.regenerationCount>=2} onClick={()=>{setDirection(undefined);setRequest("");setModal("regenerate")}}><RefreshCw className="size-3.5"/>다시 만들기</Button><span className={ui.help}>{record.regenerationCount>=2?monthlyMessages.exhausted:`남은 다시 만들기 횟수 ${2-record.regenerationCount}/2`}</span></div>}
         <section className={ui.carry}><h3 className={ui.sectionTitle}>다음 달 이어 볼 항목</h3>{(record.sent?.carry??carry).map((c,i)=><label key={i} className={ui.carryRow}><span>{c.continued?"이어서 확인":"새 항목"}</span>{readOnly?<span>{c.text}</span>:<Input aria-label={`다음 달 이어 볼 항목 ${i+1}`} value={c.text} disabled={busy} onChange={e=>setCarry(carry.map((item,n)=>n===i?{...item,text:e.target.value}:item))}/>}</label>)}</section>
         <div className={ui.workflow}>
-          {!readOnly && <p className={ui.help}>저장 → 문구 복사 → 카카오톡 발송 후 보냈어요</p>}
           <div className={ui.actions} aria-label="월간 피드백 처리">{!readOnly&&<Button size="sm" variant={primaryAction==="save"?"default":"outline"} disabled={busy||!body.trim()} onClick={()=>void save()}>저장</Button>}<Button size="sm" variant={primaryAction==="copy"&&!readOnly?"default":"outline"} disabled={busy||!saved?.body.trim()||!!dirty} onClick={()=>void copy()}>문구 복사</Button>{!readOnly&&<Button size="sm" variant={primaryAction==="send"?"default":"outline"} disabled={busy||!record.saved||!!dirty||record.copied?.revision!==record.saved.revision} onClick={()=>void send()}>보냈어요</Button>}</div>
           {record.sent?<p className={ui.help}>발송 완료 {monthlyDateTime(record.sent.actualAt)} · {record.sent.actor}</p>:record.saved&&<p className={ui.help}>저장 {monthlyDateTime(record.saved.at)}</p>}
         </div>
@@ -183,7 +182,7 @@ export function MonthlyFeedbackEditor({ hook, member, month, navigationRef }: Pr
       {replacement && <p ref={confirmationText} tabIndex={-1} className="leading-7 outline-none">{modal === "regenerate" ? monthlyMessages.regenerateConfirm : monthlyMessages.loadConfirm}</p>}
       <div hidden={!!replacement}>
         {modal === "evidence" && source && <MonthlyEvidence generation={source} db={hook.db} query={evidenceQuery}/>}
-        {modal === "history" && <MonthlyHistory record={record} selectedId={selectedGeneration?.id} onSelect={setHistoryId}/>}
+        {modal === "history" && <MonthlyHistory record={record} db={hook.db} query={evidenceQuery} selectedId={selectedGeneration?.id} onSelect={setHistoryId}/>}
         {modal === "regenerate" && source && <div className={ui.dialogContent}>
           <fieldset><legend className={`${ui.sectionTitle} mb-2`}>생성 방향</legend><div className={ui.directions}>{monthlyDirections.map(d => <button type="button" key={d} className={ui.direction} aria-pressed={direction === d} disabled={busy || d === "더 간결하게" && !canShortenMonthly(source.kind, body)} onClick={() => setDirection(direction === d ? undefined : d)}>{d}<Check className={`size-4 shrink-0 ${direction === d ? "" : "invisible"}`} aria-hidden="true"/></button>)}</div>{!canShortenMonthly(source.kind,body) && <p className={`${ui.help} mt-2`}>{monthlyMessages.cannotShorten}</p>}</fieldset>
           <div><label className={ui.request}><span className={ui.sectionTitle}>직접 요청</span><textarea value={request} disabled={busy} onChange={e => setRequest(e.target.value)}/></label><div className={`${ui.requestHelp} mt-2`}><p>내용에 관한 요청은 이 학생의 이번 달 생성에만 적용됩니다.</p><p>{monthlyMessages.requestHelp}</p></div></div>
