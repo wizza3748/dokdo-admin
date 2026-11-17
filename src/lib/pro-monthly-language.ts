@@ -47,10 +47,32 @@ export function monthlyExpressionRequests(request: string): MonthlyExpression[] 
       if (/간결|짧/.test(plain)) add("length", "짧고 간결한 문장으로 작성합니다.")
       if (/자세|상세|길게/.test(plain)) add("length", "문장을 충분히 풀어서 안내합니다.")
     }
-    if (/이모티콘|\^\^/.test(plain)) add("emoticon", /빼|없이|사용하지|넣지|제외|금지/.test(plain) ? "이모티콘을 사용하지 않습니다." : "문자 이모티콘 ^^를 한 번 사용합니다.")
+    if (/이모티콘|\^\^/.test(plain) && !/그림|이모지|\p{Extended_Pictographic}/u.test(plain)) add("emoticon", /빼|없이|사용하지|넣지|제외|금지/.test(plain) ? "이모티콘을 사용하지 않습니다." : "문자 이모티콘 ^^를 한 번 사용합니다.")
   }
   return [...result.values()]
 }
+
+/** Recognize the prototype's explicit home-question edits independently of other requests. */
+export function monthlyQuestionRequest(request: string) {
+  const quoted = request.match(/(?:질문|물어볼 말)(?:에|을|는)?\s*[‘“"']([^‘’“”"']+)[’”"']\s*(?:을|를)?\s*(?:(?:로|으로)\s*)?(바꿔|바꾸어|변경|넣어|추가해|추가하여)/)
+  const plain = quoted ? undefined : request.match(/(?:질문|물어볼 말)(?:에|을)\s+([^\n]+?)(?:을|를)(?:\s*(?:로|으로))?\s*(바꿔|바꾸어|변경|넣어|추가해|추가하여)/)
+  const match = quoted ?? plain
+  return match ? { question: match[1].trim(), append: /넣어|추가/.test(match[2]) } : undefined
+}
+
+/** Change complete predicates outside quotations; retain the learning action and its object. */
+export function monthlyApplyWarmth(body: string) {
+  return body.split(/([“‘"'][\s\S]*?[”’"'])/g).map((part, index) => index % 2 ? part : part
+    .replace(/연습에 집중하겠습니다\./g, "연습을 아이의 속도에 맞춰 차근차근 이어 가겠습니다.")
+    .replace(/연습에 집중할게요\./g, "연습을 아이의 속도에 맞춰 차근차근 이어 갈게요.")
+    .replace(/(?<!아이의 속도를 살피며 )집중하겠습니다\./g, "아이의 속도를 살피며 집중하겠습니다.")
+    .replace(/(?<!아이의 속도를 살피며 )집중할게요\./g, "아이의 속도를 살피며 집중할게요.")
+    .replace(/아직 부족합니다\./g, "아직은 함께 연습하며 익혀 가는 중입니다.")).join("")
+}
+
+/** Legacy mock-adapter notes belong in the validation tool, not the writing UI. */
+export const monthlyDisplayNotices = (warnings: string[], notes: string[] = []) =>
+  [...new Set([...warnings, ...notes])].filter(text => !text.includes("모의 생성"))
 export function monthlyExpressionKey(text: string): MonthlyExpression["key"] | undefined {
   if (/이모티콘|\^\^/.test(text)) return "emoticon"
   if (/해요체|습니다체|격식체/.test(text)) return "ending"

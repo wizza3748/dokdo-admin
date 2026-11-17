@@ -10,13 +10,17 @@ import { buildMonthlyValidation } from "../src/lib/pro-monthly-fixtures.ts"
 // @ts-expect-error Node tests load TypeScript directly.
 import { generateMonthly, mockMonthlyOutput, monthlyInput, monthlyLength, validateMonthlyOutput } from "../src/lib/pro-monthly-generation.ts"
 // @ts-expect-error Node tests load TypeScript directly.
-import { monthlyGivenName, monthlyNameWithParticle, monthlySentences, monthlyStyleObservations } from "../src/lib/pro-monthly-language.ts"
+import { monthlyGivenName, monthlyNameWithParticle, monthlySentences, monthlyStyleObservations, monthlyApplyWarmth, monthlyDisplayNotices } from "../src/lib/pro-monthly-language.ts"
 // @ts-expect-error Node tests load TypeScript directly.
-import { applyMonthlyCommand, reconcileMonthly, monthlyRegularAt, monthlyCanRead } from "../src/lib/pro-monthly.ts"
+import { applyMonthlyCommand, reconcileMonthly, monthlyRegularAt, monthlyCanRead, monthlyEligibility } from "../src/lib/pro-monthly.ts"
 // @ts-expect-error Node tests load TypeScript directly.
 import { monthlyContextHref, MONTHLY_FIXTURE_VERSION } from "../src/lib/monthly-test-context.ts"
 // @ts-expect-error Node tests load TypeScript directly.
 import { summarizeMonthly } from "../src/lib/pro-monthly-summary.ts"
+// @ts-expect-error Node tests load TypeScript directly.
+import { advanceMonthlyTiming, monthlyTimingBoundary } from "../src/lib/pro-monthly-fixture-details.ts"
+// @ts-expect-error Node tests load TypeScript directly.
+import { monthlyValidationGuide } from "../src/lib/monthly-validation-guide.ts"
 
 const source=(overrides:Partial<MonthlySource>={}):MonthlySource=>({recordId:"first",reviewId:"book",title:"바다를 건너온 편지",level:2,writingType:"생각 쓰기",round:1,submittedAt:"2026-11-05T01:00:00.000Z",sentAt:"2026-11-06T01:00:00.000Z",body:"주인공이 친구를 도와주었다. 나는 주인공이 좋다고 생각했다.",feedback:"생각의 이유를 책 속 행동과 연결해 보세요.",itemFeedback:[],is_current_academy:true,institutionId:"dokdo",round_status:"done_first",...overrides})
 const input=(overrides:Partial<MonthlyInput>={}):MonthlyInput=>({studentName:"서윤",studentFullName:"김서윤",parentSalutation:"서윤이 부모님",isFirst:true,level:2,periodStart:"2026-11-01T15:00:00.000Z",periodEnd:"2026-11-24T15:00:00.000Z",kind:"general",sources:[source()],submittedWeeks:3,totalWeeks:4,style:[],examples:[],...overrides})
@@ -28,9 +32,75 @@ test("성 제외 이름·받침 호칭과 책 제목 표기, 공통 인사",()=>
   for(const [full,name,call] of [["김서윤","서윤","서윤이"],["이희유","희유","희유"],["남궁민준","민준","민준이"]]){assert.equal(monthlyGivenName(full),name);assert.equal(monthlyNameWithParticle(name),call)}
   const g=generateMonthly(input());assert.ok(g.body.startsWith("서윤이 부모님, 안녕하세요. 책글섬 독도 관리 선생님입니다."));assert.ok(g.body.includes("『바다를 건너온 편지』"));assert.ok(!g.body.includes("김서윤"));assert.equal(g.charCount,monthlyLength(g.body))
 })
-test("허용 질문 요청 반영, 그림 이모지는 제외하고 ^^ 한 번만 허용",()=>{
+test("허용 질문 변경과 문자 이모티콘은 반영하고 그림 요청과 구분",()=>{
   const i=input(),first=generateMonthly(i),g=generateMonthly(i,{body:first.body,request:"가정에서 해볼 질문을 ‘주인공은 왜 그렇게 행동했을까?’로 바꿔 주세요. 이모티콘을 넣어 주세요."})
-  assert.match(g.body,/가정에서는 ‘주인공은 왜 그렇게 행동했을까\?’ 하고 물어봐 주세요/);assert.ok(!/\p{Extended_Pictographic}/u.test(g.body));assert.equal((g.body.match(/\^\^/g)??[]).length,1);assert.ok(g.notesForTeacher!.some(n=>n.includes("그림 이모지")))
+  assert.match(g.body,/가정에서는 ‘주인공은 왜 그렇게 행동했을까\?’ 하고 물어봐 주세요/);assert.ok(!/\p{Extended_Pictographic}/u.test(g.body));assert.equal((g.body.match(/\^\^/g)??[]).length,1);assert.ok(!g.notesForTeacher!.some(n=>n.includes("그림 이모지")))
+})
+
+test("질문 추가와 변경은 금지된 그림 이모지와 함께 요청해도 각각 처리",()=>{
+  const i=input(),first=generateMonthly(i),question="친구를 도울 다른 방법은 무엇일까?"
+  const oldHome=first.body.split("\n\n").find(p=>p.startsWith("가정에서는"))!,oldQuestion=monthlySentences(oldHome)[0]
+  for(const request of [`가정에서 물어볼 질문에 ‘${question}’를 넣어 주세요. 그림 이모지 🙂를 넣어 주세요.`,`가정에서 물어볼 질문에 ${question}를 추가해 주세요.`]) {
+    const g=generateMonthly(i,{body:first.body,request})
+    assert.ok(g.body.includes(oldQuestion));assert.ok(g.body.includes(`‘${question}’도 함께 물어봐 주세요.`));assert.ok(!/\p{Extended_Pictographic}|\^\^/u.test(g.body));assert.deepEqual(g.carry,first.carry)
+    assert.ok(!g.notesForTeacher!.some(n=>n.includes("모의 생성")))
+  }
+  const replaced=generateMonthly(i,{body:first.body,request:`가정에서 물어볼 질문을 ‘${question}’로 변경해 주세요. 그림 이모티콘을 넣어 주세요.`})
+  assert.ok(!replaced.body.includes(oldQuestion));assert.match(replaced.body,/가정에서는 ‘친구를 도울 다른 방법은 무엇일까\?’ 하고 물어봐 주세요/);assert.ok(!replaced.body.includes("^^"));assert.ok(replaced.notesForTeacher!.some(n=>n.includes("그림 이모지")))
+})
+
+test("따뜻한 방향은 학습 목표와 인용을 보존하며 완결된 서술어를 바꿈",()=>{
+  for(const ending of ["집중하겠습니다.","집중할게요."]) {
+    const quote=`“낱말을 사용하는 연습에 ${ending}”`,body=`다음 달에는 낱말의 뜻을 살려 문장을 적는 연습에 ${ending}\n\n${quote}`
+    const changed=monthlyApplyWarmth(body)
+    assert.ok(changed.includes("낱말의 뜻을 살려 문장을 적는 연습을 아이의 속도에 맞춰 차근차근 이어"));assert.ok(changed.includes(quote));assert.equal(monthlyApplyWarmth(changed),changed)
+  }
+  const i=input(),first=generateMonthly(i),warm=generateMonthly(i,{body:first.body,direction:"더 따뜻하게"})
+  assert.deepEqual(warm.carry,first.carry);for(const quote of first.body.matchAll(/“([^”]+)”/g))assert.ok(warm.body.includes(quote[0]));assert.ok(!/연습에 아이의.*연습/.test(warm.body));assert.deepEqual(validateMonthlyOutput(warm,i).issues,[])
+  const notes=["모의 생성 범위에서 처리합니다.","그림 이모지는 넣지 않았습니다."],before=[...notes]
+  assert.deepEqual(monthlyDisplayNotices([],notes),[notes[1]]);assert.deepEqual(notes,before)
+})
+
+test("윤프로 참여 안내형은 300~500자이고 세 검토 문장이 본문과 일치",()=>{
+  const db=fixture("review"),student=db.pro!.members.find(m=>m.name==="윤프로")!,r=db.pro!.monthly!.records.find(r=>r.studentId===student.id)!,g=r.generations[0]
+  assert.equal(g.kind,"no_submission");assert.ok(g.charCount>=300&&g.charCount<=500);assert.equal(g.charCount,monthlyLength(g.body));assert.equal(g.reviewSpans.length,3)
+  assert.equal(new Set(g.reviewSpans.map(s=>s.reason)).size,3)
+  for(const span of g.reviewSpans)assert.equal(g.body.split(span.text).length-1,1)
+  assert.deepEqual(validateMonthlyOutput(g,g.input).issues,[])
+})
+
+test("검증 시각 진행은 신규 매칭·첫 피드백과 첫 달 0편을 별도로 재현하고 되감지 않음",()=>{
+  for(const scenario of ["november","december"] as const) {
+    const db=fixture("timing",scenario),pro=db.pro!,month=scenario==="november"?"2026-11":"2026-12",late=[...pro.members].sort((a,b)=>b.assignedAt!.localeCompare(a.assignedAt!))[0],zero=pro.members[2]
+    const regular=monthlyTimingBoundary(scenario)
+    advanceMonthlyTiming(db,scenario);assert.equal(pro.clock,regular)
+    assert.equal(monthlyEligibility(db,zero,month,pro.clock).reason,"first-month")
+    assert.equal(monthlyEligibility(db,late,month,pro.clock).eligible,false)
+    advanceMonthlyTiming(db,scenario,true)
+    assert.equal(pro.clock,new Date(Date.parse(regular)+90*60000).toISOString());assert.equal(monthlyEligibility(db,late,month,pro.clock).reason,"late-assignment");assert.equal(monthlyEligibility(db,zero,month,pro.clock).reason,"first-month")
+    assert.ok(db.records.some(r=>r.sentAt&&r.sentAt<=pro.clock&&db.reviews.some(v=>v.id===r.reviewId&&v.studentId===late.id)))
+    reconcileMonthly(db,pro.clock);const before=structuredClone(pro.monthly)
+    advanceMonthlyTiming(db,scenario);advanceMonthlyTiming(db,scenario,true);assert.deepEqual(pro.monthly,before)
+    assert.ok(monthlyValidationGuide(db,scenario,"timing").some(r=>r.target===late.name&&r.path.includes("매칭·첫 피드백 이후")))
+  }
+})
+
+test("12월 전월 확정 항목은 계속·완료 후 새 목표로 나뉘고 미발송 저장 항목은 제외",()=>{
+  const db=fixture("learning","december");reconcileMonthly(db,db.pro!.clock)
+  for(const completed of [false,true]) {
+    const review=db.reviews.find(r=>r.id.startsWith(`monthly-carry-${completed?"complete":"continue"}-`))!,student=db.pro!.members.find(m=>m.id===review.studentId)!,r=db.pro!.monthly!.records.find(r=>r.studentId===student.id&&r.month==="2026-12")!,g=r.generations[0]
+    assert.ok(g.input.sources.some(s=>s.reviewId===review.id));assert.equal(g.input.previous!.carry[0].text,"책에서 고른 낱말을 상황에 맞는 문장에 사용하기");assert.equal(g.carry[0].continued,!completed)
+    if(completed){assert.notEqual(g.carry[0].text,g.input.previous!.carry[0].text);assert.ok(g.input.sources.some(s=>s.round===2));assert.match(g.body,/고쳐 쓴 글|뒤에 쓴 글|처음 글/)}
+    assert.deepEqual(validateMonthlyOutput(g,g.input).issues,[])
+  }
+  const unsent=db.pro!.monthly!.records.find(r=>r.month==="2026-11"&&r.saved?.carry.some(c=>c.text==="저장만 하고 발송하지 않은 항목"))!,next=db.pro!.monthly!.records.find(r=>r.studentId===unsent.studentId&&r.month==="2026-12")!
+  assert.equal(next.generations[0].input.previous,undefined);assert.equal(next.generations[0].carry[0].continued,false)
+  assert.ok(!JSON.stringify(next.generations[0]).includes("저장만 하고 발송하지 않은 항목"))
+})
+
+test("기한 경과 안내는 오늘 할 일 지연을 통해 11월로 진입",()=>{
+  const db=fixture("base","overdue"),rows=monthlyValidationGuide(db,"overdue","base")
+  assert.ok(rows.length);assert.ok(rows.every(r=>r.path.startsWith("주간 관리 현황 → 오늘 할 일 [월간 피드백 지연] → 학생 [월간 피드백] → 11월")))
 })
 test("축약은 인용 내부 마침표와 물음표로 자르지 않고 서술어·다음 계획·가정 팁 유지",()=>{
   const quoted="전달된 피드백에서는 “이유를 적어 보세요. 왜 그렇게 생각했나요?”라고 안내했습니다."

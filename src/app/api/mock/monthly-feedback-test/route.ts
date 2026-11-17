@@ -6,7 +6,7 @@ import { initializePro } from "@/lib/pro-seeds"
 import { refreshProDemoLabels } from "@/lib/pro-demo-labels"
 import { reviewActor, visibleReviewState } from "@/lib/review-server"
 import { reconcileMonthly } from "@/lib/pro-monthly"
-import { monthlyRegularAt } from "@/lib/pro-monthly"
+import { advanceMonthlyTiming } from "@/lib/pro-monthly-fixture-details"
 import { monthlyDetailCase, monthlyDetailCases } from "@/lib/monthly-test-context"
 import { buildMonthlyValidation, monthlyValidationCases, type MonthlyValidationCase } from "@/lib/pro-monthly-fixtures"
 import { applyProCommand, applyManagedReviewCommand } from "@/lib/pro-domain"
@@ -35,9 +35,9 @@ async function response(request:Request){
       fixture=await studentTestWorkspaceStore.update<Fixture|null>(key,()=>null,old=>{
         if(!old)throw new Error("검증 도구에서 월간 피드백 예시를 먼저 열어 주세요.")
         let db=reconcileMonthly(refreshProDemoLabels(structuredClone(old.db),{studentNamesOnly:true}),old.db.pro!.clock)
-        if(body?.action==="advance-regular"&&detail==="timing") {
-          const boundary=scenario==="december"?monthlyRegularAt("2026-12"):"2026-11-25T00:00:00.000Z"
-          db.pro!.clock=boundary;reconcileMonthly(db,boundary);return {...old,db}
+        if(["advance-regular","advance-after-matching"].includes(body?.action)&&detail==="timing") {
+          if(body.action==="advance-after-matching"&&(db.pro!.monthly!.validation?.version??0)<4)throw new Error("[이 예시만 초기화]로 최신 매칭·첫 피드백 자료를 준비해 주세요.")
+          db=advanceMonthlyTiming(db,scenario,body.action==="advance-after-matching");return {...old,db}
         }
         if(body?.action==="arm-failure"&&detail==="failures") {
           const r=db.pro!.monthly!.records.find(r=>r.id===body.recordId&&!r.sent)

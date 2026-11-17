@@ -4,7 +4,7 @@ import type { MonthlyInput, MonthlyOutput, MonthlyRecord, MonthlyDirection, Mont
 // @ts-expect-error Node tests load TypeScript directly.
 import { weekStart } from "./pro-calendar.ts"
 // @ts-expect-error Node tests load TypeScript directly.
-import { monthlyApplyEnding, monthlyEnding, monthlyExpressionKey, monthlyExpressionRequests, monthlyGivenName, monthlyNameWithParticle, monthlySentences } from "./pro-monthly-language.ts"
+import { monthlyApplyEnding, monthlyApplyWarmth, monthlyQuestionRequest, monthlyEnding, monthlyExpressionKey, monthlyExpressionRequests, monthlyGivenName, monthlyNameWithParticle, monthlySentences } from "./pro-monthly-language.ts"
 
 export const monthlyKinds = { general: "일반형", feedback_pending: "제출 글 기반 짧은 일반형", no_submission: "참여 안내형" }
 export const monthlyCompositions = ["강점 집중형", "성장 이야기형", "솔직 진단형", "한 편 깊이 읽기형", "균형형"]
@@ -212,23 +212,26 @@ export function mockMonthlyOutput(input: MonthlyInput, options: GenerateOptions 
   if(exampleEnding) preferences.set("ending",exampleEnding==="casual"?"부드러운 해요체로 안내합니다.":"정중한 습니다체로 안내합니다.")
   for(const item of input.style) { const key=monthlyExpressionKey(item);if(key)preferences.set(key,item) }
   for(const item of requestExpressions)preferences.set(item.key,item.text)
-  if(options.direction==="더 따뜻하게") body=body.replace(/집중하겠습니다\./g,"아이의 속도에 맞춰 차근차근 연습하겠습니다.").replace(/아직 부족합니다\./g,"아직은 함께 연습하며 익혀 가는 중입니다.")
-  const requestedQuestion=request.match(/(?:질문|물어볼 말)[\s\S]*?[‘“"']([^‘’“”"']+)[’”"'](?:로|으로)/)?.[1]
-  if(requestedQuestion && !forbiddenMonthly(requestedQuestion).length) {
-    body=body.replace(/(?:가정에서는|댁에서는)[^\n]+/,`가정에서는 ‘${requestedQuestion}’ 하고 물어봐 주세요. 아이의 답을 충분히 들은 뒤, 말한 생각을 한 문장으로 직접 적어 보도록 도와주세요.`)
+  const requestedQuestion=monthlyQuestionRequest(request)
+  if(requestedQuestion && !forbiddenMonthly(requestedQuestion.question).length) {
+    body=body.replace(/(?:가정에서는|댁에서는)[^\n]+/, paragraph => {
+      if (!requestedQuestion.append) return `가정에서는 ‘${requestedQuestion.question}’ 하고 물어봐 주세요. 아이의 답을 충분히 들은 뒤, 말한 생각을 한 문장으로 직접 적어 보도록 도와주세요.`
+      if (paragraph.includes(requestedQuestion.question)) return paragraph
+      const [first, ...rest] = monthlySentences(paragraph)
+      return [first, `‘${requestedQuestion.question}’도 함께 물어봐 주세요.`, ...rest].join(" ")
+    })
   }
   const replacements=[...request.matchAll(/[‘“"']([^‘’“”"']+)[’”"'](?:을|를)\s*[‘“"']([^‘’“”"']+)[’”"'](?:로|으로)/g)]
   for(const match of replacements) {
     if(!forbiddenMonthly(match[2]).length && body.includes(match[1]) && !input.sources.some(s=>s.body.includes(match[1]))) body=body.replaceAll(match[1],match[2])
     else notes.push("입력 자료의 인용이나 본사 작성 기준과 충돌하는 교체 요청은 반영하지 않았습니다.")
   }
-  if(request && !requestedQuestion && !replacements.length && !requestExpressions.length && !forbiddenMonthly(request).length) notes.push("직접 요청을 자동으로 반영할 수 있는 모의 생성 범위를 벗어났습니다. 요청 내용을 본문에서 확인해 주세요.")
-  if(/그림 이모지|이모지|이모티콘/.test(request) && !/빼|없이|사용하지|넣지|제외/.test(request)) notes.push("그림 이모지는 본사 기준에 따라 넣지 않았습니다. 문자 이모티콘은 한 번만 사용할 수 있습니다.")
+  if(/그림 이모(?:지|티콘)|이모지|\p{Extended_Pictographic}/u.test(request) && !/빼|없이|사용하지|넣지|제외/.test(request)) notes.push("그림 이모지는 본사 기준에 따라 넣지 않았습니다. 문자 이모티콘은 한 번만 사용할 수 있습니다.")
   if(forbiddenMonthly(request).length) notes.push("본사 작성 기준과 충돌하는 요청은 반영하지 않았습니다.")
   body=body.replace(/^.*?책글섬 독도 관리 선생님입니다\./,greeting).replaceAll("《","『").replaceAll("》","』")
   if(full!==name) body=body.replaceAll(`${full} 학생`,`${name} 학생`)
   body=monthlyApplyEnding(body,/해요체/.test(preferences.get("ending")??""))
-  if(preferences.get("warmth")?.includes("따뜻")) body=body.replace(/집중하겠습니다\./g,"아이의 속도에 맞춰 차근차근 연습하겠습니다.").replace(/집중할게요\./g,"아이의 속도에 맞춰 차근차근 연습할게요.")
+  if(preferences.get("warmth")?.includes("따뜻")) body=monthlyApplyWarmth(body)
   body=body.replace(/\p{Extended_Pictographic}[\uFE0F\u200D]?/gu,"").replace(/\^\^/g,"").trim()
   if(preferences.get("emoticon")?.includes("한 번")) body+=" ^^"
   if(options.direction==="더 간결하게" || preferences.get("length")?.includes("간결")) body=shortenMonthly(body,input.kind)

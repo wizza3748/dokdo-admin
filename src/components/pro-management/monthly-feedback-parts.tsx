@@ -7,6 +7,7 @@ import { StudentDetailDialog } from "./student-detail-dialog"
 import { ProBadge } from "./pro-common"
 import { academyName, monthlyDateTime, monthlyLate, monthlyPeriod, monthlyStatus } from "@/lib/pro-monthly"
 import { monthlyKinds, monthlyLength } from "@/lib/pro-monthly-generation"
+import { monthlyDisplayNotices } from "@/lib/pro-monthly-language"
 import type { MonthlyGeneration, MonthlyRecord, AcademyStyle } from "@/lib/pro-monthly-types"
 import type { ReviewDatabase } from "@/lib/review-domain"
 import { demoIdentityQuery } from "@/lib/review-client"
@@ -33,7 +34,7 @@ export function MonthlyEvidenceBasis({ generation }: { generation: MonthlyGenera
   return <span className={ui.help}>생성 당시 담당 학원 기준 · {monthlyDateTime(generation.at)}</span>
 }
 export function MonthlyEvidence({ generation, db, query = "role=agency" }: { generation: MonthlyGeneration; db: ReviewDatabase; query?: string }) {
-  const notices=[...new Set([...generation.warnings,...(generation.notesForTeacher??[])])]
+  const notices=monthlyDisplayNotices(generation.warnings,generation.notesForTeacher)
   return <div className={ui.evidence}>
     <section className={ui.evidenceFocus}><h3>중심 내용</h3><p>{generation.focus}</p></section>
     {!!generation.evidence?.length && <section><h3>생성 근거</h3><ul className={ui.evidenceList}>{generation.evidence.map((e,i)=><li key={i} className={ui.source}>

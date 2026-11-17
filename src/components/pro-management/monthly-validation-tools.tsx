@@ -35,7 +35,7 @@ export function MonthlyValidationTools({ db, children }: { db: ReviewDatabase; c
       const agency=new URLSearchParams(window.location.search).get("demoAgency");if(agency)params.set("demoAgency",agency)
       const response=await fetch(`/api/mock/monthly-feedback-test?${params}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,fault,recordId:faultRecord||available[0]?.id})})
       if(!response.ok)throw new Error((await response.json()).message)
-      notifyReviewChange();setNotice(action==="arm-failure"?"해당 학생의 다음 처리에서 한 번 실패합니다.":"정기 생성 시각으로 진행했습니다.")
+      notifyReviewChange();setNotice(action==="arm-failure"?"해당 학생의 다음 처리에서 한 번 실패합니다.":"예시 시각을 진행했습니다. 현재 기준 시각과 학생 상태를 확인해 주세요.")
     } catch(e){setError(e instanceof Error?e.message:"검증 처리를 완료하지 못했습니다.")}
     finally{setBusy(false)}
   }
@@ -69,9 +69,10 @@ export function MonthlyValidationTools({ db, children }: { db: ReviewDatabase; c
             <div className="min-w-0"><p><span className="font-medium">확인 경로</span> · {item.path}</p><p><span className="font-medium">기대 결과</span> · {item.expected}</p></div>
           </li>)}
         </ul>
-        {(db.pro?.monthly?.validation?.version??0)<MONTHLY_FIXTURE_VERSION&&<p className="text-xs text-amber-800">이전 버전 예시입니다. 기존 생성 이력과 테스트 결과를 보존합니다. [이 예시만 초기화]하면 이름과 자료를 최신 예시로 다시 구성합니다.</p>}
+        {context.detail==="requests"&&<p className="text-xs text-slate-500">모의 생성은 따옴표로 지정한 질문 추가·변경과 문구 교체, 선택한 표현 방향을 재현합니다. 그림 이모지는 반영하지 않으며 실제 모델에 요청하지 않습니다.</p>}
+        {(db.pro?.monthly?.validation?.version??0)<MONTHLY_FIXTURE_VERSION&&<p className="text-xs text-amber-800">이전 버전 예시입니다. 기존 생성 이력과 테스트 결과를 보존합니다. [이 예시만 초기화]하면 자료와 기준 시각을 최신 예시로 다시 구성합니다.</p>}
       </>}
-      {current&&context.detail==="timing"&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>requestMonthlyNavigation(()=>void control("advance-regular"))}>정기 생성 시각으로 진행</Button>}
+      {current&&context.detail==="timing"&&<div className="flex flex-wrap gap-2"><Button size="sm" variant="outline" disabled={busy} onClick={()=>requestMonthlyNavigation(()=>void control("advance-regular"))}>정기 생성 시각으로 진행</Button><Button size="sm" variant="outline" disabled={busy||(db.pro?.monthly?.validation?.version??0)<4} onClick={()=>requestMonthlyNavigation(()=>void control("advance-after-matching"))}>매칭·첫 피드백 이후로 진행</Button></div>}
       {current&&context.detail==="failures"&&<div className="flex flex-wrap items-center gap-2"><select aria-label="실패 확인 학생" value={faultRecord||available[0]?.id||""} onChange={e=>setFaultRecord(e.target.value)} className="h-9 rounded border px-2">{available.map(r=><option key={r.id} value={r.id}>{db.pro?.members.find(m=>m.id===r.studentId)?.name}</option>)}</select><select aria-label="실패할 처리" value={fault} onChange={e=>setFault(e.target.value)} className="h-9 rounded border px-2">{[["monthly-save","본문 저장"],["monthly-copy","문구 복사"],["monthly-send","발송 기록"],["generation","다시 만들기"],["style","발송 후 말투 갱신"]].map(([id,label])=><option key={id} value={id}>{label}</option>)}</select><Button size="sm" variant="outline" disabled={busy||!available.length} onClick={()=>void control("arm-failure")}>다음 처리 한 번 실패</Button></div>}
       {notice&&<p className="text-xs text-slate-600" role="status">{notice}</p>}
       {error && <p role="alert" className="text-rose-700">{error}</p>}

@@ -8,6 +8,7 @@ import { field, ProBadge, type useProManagement } from "./pro-common"
 import { MonthlyBadge, MonthlyDialog, MonthlyEvidence, MonthlyEvidenceBasis, MonthlyHistory, monthlyGenerationLabel, monthlyGenerationTitle } from "./monthly-feedback-parts"
 import { monthlyDateTime, monthlyId, monthlyPeriod, monthlyRegularAt, monthlyScheduleAt } from "@/lib/pro-monthly"
 import { monthlyDirections, monthlyLength, canShortenMonthly } from "@/lib/pro-monthly-generation"
+import { monthlyDisplayNotices } from "@/lib/pro-monthly-language"
 import { localDateTime, consultationResultLabel, dayNames, regularConsultationLabel } from "@/lib/pro-student-detail"
 import type { MonthlyCarry, MonthlyDirection, MonthlyGeneration } from "@/lib/pro-monthly-types"
 import { monthlyMessages, monthlyActionFailures } from "@/lib/pro-monthly-messages"
@@ -157,7 +158,7 @@ export function MonthlyFeedbackEditor({ hook, member, month, navigationRef }: Pr
         {!record.sent&&source&&source.institutionId!==owner&&<p className={`${ui.notice} bg-amber-50 text-amber-900`}>{monthlyMessages.beforeTransfer}</p>}
         <div className={ui.bodyHeading}><h3>월간 피드백 본문</h3><span className={ui.bodyMeta}><span>{monthlyGenerationLabel(source)}</span><span>{monthlyLength(record.sent?.body??body)}자</span></span></div>
         {readOnly?<p className={`${ui.bodyInput} ${ui.readOnlyBody}`} tabIndex={0} aria-label="월간 피드백 본문">{record.sent?.body??body}</p>:<MessageEditor value={body} onChange={setBody} generation={source} disabled={busy}/>}
-        {!!source && !![...source.warnings,...(source.notesForTeacher??[])].length&&<div className="text-amber-800">{[...new Set([...source.warnings,...(source.notesForTeacher??[])])].map(w=><p key={w}>{w}</p>)}</div>}
+        {!!source && !!monthlyDisplayNotices(source.warnings,source.notesForTeacher).length&&<div className="text-amber-800">{monthlyDisplayNotices(source.warnings,source.notesForTeacher).map(w=><p key={w}>{w}</p>)}</div>}
         {!readOnly && <div className={ui.editTools}><Button type="button" size="sm" variant="outline" disabled={busy||record.regenerationCount>=2} onClick={()=>{setDirection(undefined);setRequest("");setModal("regenerate")}}><RefreshCw className="size-3.5"/>다시 만들기</Button><span className={ui.help}>{record.regenerationCount>=2?monthlyMessages.exhausted:`남은 다시 만들기 횟수 ${2-record.regenerationCount}/2`}</span></div>}
         <section className={ui.carry}><h3 className={ui.sectionTitle}>다음 달 이어 볼 항목</h3>{(record.sent?.carry??carry).map((c,i)=><label key={i} className={ui.carryRow}><span>{c.continued?"이어서 확인":"새 항목"}</span>{readOnly?<span>{c.text}</span>:<Input aria-label={`다음 달 이어 볼 항목 ${i+1}`} value={c.text} disabled={busy} onChange={e=>setCarry(carry.map((item,n)=>n===i?{...item,text:e.target.value}:item))}/>}</label>)}</section>
         <div className={ui.workflow}>

@@ -7,9 +7,10 @@ export const monthlyValidationCases = {
   december: { label: "12월 정기 생성·이전 달 지연", at: "2026-12-21T01:00:00.000Z", month: "2026-12", tone: "저장된 말투 사용 안 함" },
 } as const
 export type MonthlyValidationCase = keyof typeof monthlyValidationCases
-export const MONTHLY_FIXTURE_VERSION = 3
+export const MONTHLY_FIXTURE_VERSION = 4
 export const monthlyDetailCases = {
   base: {group:"기본",label:"작성·발송 기본 흐름",check:"학생 상세에서 저장 → 문구 복사 → 보냈어요. 본사 발송 현황에 같은 기록이 반영됩니다."},
+  requests: {group:"자료·생성",label:"직접 요청·따뜻한 표현",check:"질문 추가·변경과 그림 이모지 제외를 나누어 확인합니다. 더 따뜻하게 실행 후 학습 사실과 목표가 유지되는지 확인합니다."},
   learning: {group:"자료·생성",label:"여러 글·고쳐 쓴 글·전월 항목",check:"첫 학생의 생성 근거에서 처음 쓴 글과 고쳐 쓴 글을 비교합니다. 12월에는 발송 확정한 항목과 미발송 저장 항목을 구분합니다."},
   consultations: {group:"대상·집계",label:"상담 완료·정정·전환 이후",check:"앞의 다섯 학생은 유선 완료, 카톡 대체, 미진행, 완료 후 정정, 전환 뒤 완료 순입니다. 앞의 두 학생만 11월 발송 선택입니다."},
   timing: {group:"대상·집계",label:"생성 시각·신규 매칭·종료",check:"생성 시각 직전부터 시작합니다. 아래 버튼으로 정기 생성 시각까지 진행하고, 신규·종료 학생의 대상 여부를 확인합니다."},
