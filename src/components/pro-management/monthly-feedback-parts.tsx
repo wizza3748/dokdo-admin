@@ -25,9 +25,9 @@ export function MonthlyBadge({ record, now, generating = false }: { record?: Mon
   return <span className="inline-flex flex-wrap items-center gap-1.5"><ProBadge tone={record?.sent ? "green" : status === "생성 실패" ? "red" : record?.saved && !generating ? "blue" : "slate"}>{status}</ProBadge>{record && monthlyLate(record, now) && <ProBadge tone="red">지연</ProBadge>}</span>
 }
 type MonthlyDialogProps = Omit<React.ComponentProps<typeof StudentDetailDialog>, "triggerRef" | "maxWidth"> & { size?: "form" | "reading" | "confirm" }
-export function MonthlyDialog({ size = "form", ...props }: MonthlyDialogProps) {
+export function MonthlyDialog({ size = "form", className, ...props }: MonthlyDialogProps) {
   const trigger = React.useRef<HTMLElement | null>(typeof document === "undefined" ? null : document.activeElement as HTMLElement)
-  return <StudentDetailDialog headerLayout="stacked" focusContentOnOpen={size === "reading"} {...props} maxWidth={size === "reading" ? 800 : size === "confirm" ? 520 : 640} triggerRef={trigger}/>
+  return <StudentDetailDialog headerLayout="stacked" focusContentOnOpen={size === "reading"} {...props} className={`${ui.monthlyDialog} ${className ?? ""}`} maxWidth={size === "reading" ? 800 : size === "confirm" ? 520 : 640} triggerRef={trigger}/>
 }
 export function MonthlyEvidenceBasis({ generation }: { generation: MonthlyGeneration }) {
   return <span className={ui.help}>생성 당시 담당 학원 기준 · {monthlyDateTime(generation.at)}</span>
@@ -35,21 +35,21 @@ export function MonthlyEvidenceBasis({ generation }: { generation: MonthlyGenera
 export function MonthlyEvidence({ generation, db, query = "role=agency" }: { generation: MonthlyGeneration; db: ReviewDatabase; query?: string }) {
   const notices=[...new Set([...generation.warnings,...(generation.notesForTeacher??[])])]
   return <div className={ui.evidence}>
-    <section><h3>중심 내용</h3><p>{generation.focus}</p></section>
-    {!!generation.evidence?.length && <section><h3>생성 근거</h3><ul>{generation.evidence.map((e,i)=><li key={i} className={ui.source}>
+    <section className={ui.evidenceFocus}><h3>중심 내용</h3><p>{generation.focus}</p></section>
+    {!!generation.evidence?.length && <section><h3>생성 근거</h3><ul className={ui.evidenceList}>{generation.evidence.map((e,i)=><li key={i} className={ui.source}>
       <p className="font-medium text-slate-900">{e.point}</p><p className={ui.help}>{e.source}</p>
-      <details><summary className="cursor-pointer py-1 text-xs text-blue-700">근거 위치</summary><div className={ui.sourceQuotes}>{e.references.map((ref,j)=><p key={j}><span className={ui.help}>{generation.input.sources.find(s=>s.recordId===ref.recordId)?.title} · {ref.field==="body"?"학생 글":"선생님 피드백"}</span><br/>{ref.quote}</p>)}{e.criterion&&<p><span className={ui.help}>또래 서술 기준</span><br/>{e.criterion}</p>}</div></details>
+      <details className={ui.sourceDisclosure}><summary>근거 위치</summary><div className={ui.sourceQuotes}>{e.references.map((ref,j)=><p key={j}><span className={ui.help}>{generation.input.sources.find(s=>s.recordId===ref.recordId)?.title} · {ref.field==="body"?"학생 글":"선생님 피드백"}</span><br/>{ref.quote}</p>)}{e.criterion&&<p><span className={ui.help}>또래 서술 기준</span><br/>{e.criterion}</p>}</div></details>
     </li>)}</ul></section>}
-    <section><h3>학습 자료</h3>{generation.input.sources.length ? <ul>{generation.input.sources.map(source => <li key={source.recordId} className={ui.source}>
+    <section className={!generation.input.sources.length ? ui.emptyEvidence : undefined}><h3>학습 자료</h3>{generation.input.sources.length ? <ul className={ui.evidenceList}>{generation.input.sources.map(source => <li key={source.recordId} className={ui.source}>
       <div className={ui.sourceHeading}><strong className="text-slate-900">{source.title}</strong><span className={ui.help}>{source.round}차 · {source.level}레벨</span><ProBadge>{source.is_current_academy === null ? "피드백 전 제출 글" : source.is_current_academy ? "현재 학원 자료" : "이전 학원 자료"}</ProBadge></div>
       <p className={`${ui.help} mt-1`}>제출 {monthlyDateTime(source.submittedAt)} · 피드백 전송 {monthlyDateTime(source.sentAt)}</p>
       <div className={ui.sourceActions}>
-        <details className="min-w-0 flex-1"><summary className="cursor-pointer py-1 text-xs text-blue-700">근거 위치</summary><div className={`${ui.sourceQuotes} mt-2`}><p><span className={ui.help}>학생 글</span><br/>{source.body}</p>{source.feedback && <p><span className={ui.help}>선생님 피드백</span><br/>{source.feedback}</p>}{source.itemFeedback.map((text, i) => <p key={i}><span className={ui.help}>항목별 의견</span><br/>{text}</p>)}</div></details>
+        <details className={`${ui.sourceDisclosure} min-w-0 flex-1`}><summary>근거 위치</summary><div className={ui.sourceQuotes}><p><span className={ui.help}>학생 글</span><br/>{source.body}</p>{source.feedback && <p><span className={ui.help}>선생님 피드백</span><br/>{source.feedback}</p>}{source.itemFeedback.map((text, i) => <p key={i}><span className={ui.help}>항목별 의견</span><br/>{text}</p>)}</div></details>
         {db.records.some(r => r.id === source.recordId) ? <Button asChild size="sm" variant="outline"><Link href={`/agency/online-workbooks/${source.recordId}?${query}`} target="_blank" rel="noopener noreferrer">근거 보기<ExternalLink className="size-3.5" aria-label="새 탭"/></Link></Button> : <Button size="sm" variant="outline" disabled>근거 보기<ExternalLink className="size-3.5" aria-hidden="true"/></Button>}
       </div>
     </li>)}</ul> : <p className={ui.help}>-</p>}</section>
-    <section className={!generation.input.previous?ui.emptyEvidence:undefined}><h3>이전 발송본</h3><p className={generation.input.previous ? ui.prose : ui.help}>{generation.input.previous?.body || "-"}</p></section>
-    <section className={!notices.length?ui.emptyEvidence:undefined}><h3>검토 안내</h3>{notices.length ? notices.map(w => <p key={w} className="text-amber-800">{w}</p>) : <p className={ui.help}>-</p>}</section>
+    <section className={!generation.input.previous?ui.emptyEvidence:ui.evidencePanel}><h3>이전 발송본</h3><p className={generation.input.previous ? ui.prose : ui.help}>{generation.input.previous?.body || "-"}</p></section>
+    <section className={!notices.length?ui.emptyEvidence:ui.evidenceNotes}><h3>검토 안내</h3>{notices.length ? notices.map(w => <p key={w} className="text-amber-800">{w}</p>) : <p className={ui.help}>-</p>}</section>
   </div>
 }
 export function MonthlyHistory({ record, selectedId, onSelect, db, query }: { record: MonthlyRecord; selectedId?: string; onSelect?: (id: string) => void; db?: ReviewDatabase; query?: string }) {
@@ -65,14 +65,16 @@ export function MonthlyHistory({ record, selectedId, onSelect, db, query }: { re
       </button>
     </li>)}</ol>
     <section className={ui.historyBody} aria-label="선택한 생성본">
-      <h3 className={ui.sectionTitle}>{monthlyGenerationTitle(record, selected)}</h3>
-      <p className={`${ui.help} mt-1`}>{monthlyDateTime(selected.at)}</p>
-      <p className={ui.help}>{monthlyGenerationLabel(selected)}</p>
-      {(selected.direction || selected.request) && <dl className={`${ui.facts} mt-3`}>{selected.direction && <><dt>요청 방향</dt><dd>{selected.direction}</dd></>}{selected.request && <><dt>직접 요청</dt><dd className="whitespace-pre-wrap">{selected.request}</dd></>}</dl>}
-      <p className={ui.prose}>{selected.body}</p>
-      <h3 className={ui.sectionTitle}>다음 달 이어 볼 항목</h3>
-      <ul className="mt-2 space-y-1">{selected.carry.map((c, i) => <li key={i}><span className={ui.help}>{c.continued ? "이어서 확인" : "새 항목"}</span> · {c.text}</li>)}</ul>
-      {db&&<details className="mt-4"><summary className="cursor-pointer text-sm font-medium">생성에 사용한 자료</summary><div className="mt-3"><MonthlyEvidenceBasis generation={selected}/><MonthlyEvidence generation={selected} db={db} query={query}/></div></details>}
+      <div className={ui.historySummary}>
+        <div className={ui.historySummaryHeading}><h3 className={ui.sectionTitle}>{monthlyGenerationTitle(record, selected)}</h3><span className={ui.help}>{monthlyDateTime(selected.at)}</span></div>
+        <p className={ui.help}>{monthlyGenerationLabel(selected)}</p>
+        {(selected.direction || selected.request) && <dl className={`${ui.facts} ${ui.historyRequest}`}>{selected.direction && <><dt>요청 방향</dt><dd>{selected.direction}</dd></>}{selected.request && <><dt>직접 요청</dt><dd className="whitespace-pre-wrap">{selected.request}</dd></>}</dl>}
+      </div>
+      <div className={ui.readMessage}><p className={ui.prose}>{selected.body}</p></div>
+      <div className={ui.historyCarry}><h3 className={ui.sectionTitle}>다음 달 이어 볼 항목</h3>
+        <ul className="mt-2 space-y-1">{selected.carry.map((c, i) => <li key={i}><span className={ui.help}>{c.continued ? "이어서 확인" : "새 항목"}</span> · {c.text}</li>)}</ul>
+      </div>
+      {db&&<details className={ui.evidenceDisclosure}><summary>생성에 사용한 자료</summary><div><p className="mb-4"><MonthlyEvidenceBasis generation={selected}/></p><MonthlyEvidence generation={selected} db={db} query={query}/></div></details>}
     </section>
   </div>
 }
@@ -114,7 +116,7 @@ export function MonthlyReadOnly({ record, db }: { record: MonthlyRecord; db: Rev
     <div className={ui.readDisclosureGroup}>
     {source && <details><summary>생성에 사용한 자료</summary><div><p className="mb-4"><MonthlyEvidenceBasis generation={source}/></p><MonthlyEvidence generation={source} db={db} query={`role=admin${demoIdentityQuery("admin")}`}/></div></details>}
     {!!record.generations.length && <details><summary>생성 이력</summary><div><MonthlyHistory record={record} db={db} query={`role=admin${demoIdentityQuery("admin")}`}/></div></details>}
-    <details><summary>처리 이력</summary><div><ol className="divide-y divide-slate-200">{record.audit.slice().reverse().map(a => <li className="py-2" key={a.id}><p>{a.action}</p><p className={ui.help}>{monthlyDateTime(a.at)} · {academyName(db, a.institutionId)} · {a.actor}</p></li>)}</ol></div></details>
+    <details><summary>처리 이력</summary><div><ol className={ui.auditList}>{record.audit.slice().reverse().map(a => <li key={a.id}><p>{a.action}</p><p className={ui.help}>{monthlyDateTime(a.at)} · {academyName(db, a.institutionId)} · {a.actor}</p></li>)}</ol></div></details>
     </div>
   </div>
 }

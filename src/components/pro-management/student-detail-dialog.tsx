@@ -4,11 +4,11 @@ import { Dialog } from "radix-ui"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
-export function StudentDetailDialog({ title, children, onClose, onConfirm, confirmLabel = "저장", closeLabel = "닫기", disabled, busy, triggerRef, subtitle, maxWidth, busyLabel = "저장 중…", bodyRef, footerStart, headerLayout, focusContentOnOpen = false }: {
+export function StudentDetailDialog({ title, children, onClose, onConfirm, confirmLabel = "저장", closeLabel = "닫기", disabled, busy, triggerRef, subtitle, maxWidth, busyLabel = "저장 중…", bodyRef, footerStart, headerLayout, focusContentOnOpen = false, className }: {
   title: string; children: ReactNode; onClose: () => void; onConfirm?: () => void; confirmLabel?: string; closeLabel?: string;
   disabled?: boolean; busy?: boolean; triggerRef: RefObject<HTMLElement | null>;
   subtitle?: ReactNode; maxWidth?: number; busyLabel?: string; bodyRef?: RefObject<HTMLDivElement | null>; footerStart?: ReactNode;
-  headerLayout?: "stacked"; focusContentOnOpen?: boolean;
+  headerLayout?: "stacked"; focusContentOnOpen?: boolean; className?: string;
 }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const closeButton = <Dialog.Close asChild><Button variant="ghost" size="icon" disabled={busy} aria-label="창 닫기"><X className="size-4"/></Button></Dialog.Close>
@@ -18,7 +18,7 @@ export function StudentDetailDialog({ title, children, onClose, onConfirm, confi
       onOpenAutoFocus={e => { if (focusContentOnOpen) { e.preventDefault(); contentRef.current?.focus({ preventScroll: true }) } }}
       onCloseAutoFocus={e => { e.preventDefault(); triggerRef.current?.focus() }}
       style={maxWidth ? { maxWidth } : undefined}
-      className="fixed top-1/2 left-1/2 z-[151] flex max-h-[90dvh] w-[calc(100%-32px)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-slate-200 bg-white text-sm text-slate-700 shadow-xl outline-none">
+      className={`fixed top-1/2 left-1/2 z-[151] flex max-h-[90dvh] w-[calc(100%-32px)] max-w-xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-slate-200 bg-white text-sm text-slate-700 shadow-xl outline-none ${className ?? ""}`}>
       <header className={`shrink-0 border-b border-slate-200 px-5 py-4 ${headerLayout === "stacked" ? "" : "flex items-center justify-between gap-3"}`}>
         {headerLayout === "stacked" ? <>
           <div className="flex items-center justify-between gap-3"><Dialog.Title className="text-lg font-semibold text-slate-900">{title}</Dialog.Title>{closeButton}</div>

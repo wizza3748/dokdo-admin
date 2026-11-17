@@ -6,6 +6,7 @@ import { monthlyDateTime } from "@/lib/pro-monthly"
 import { MONTHLY_FIXTURE_VERSION, monthlyContextHref, monthlyDetailCases, monthlyDetailCase, monthlyTestCase, monthlyValidationCases, type MonthlyValidationCase, type MonthlyDetailCase } from "@/lib/monthly-test-context"
 import { notifyReviewChange } from "@/lib/review-client"
 import type { ReviewDatabase } from "@/lib/review-domain"
+import { monthlyValidationGuide } from "@/lib/monthly-validation-guide"
 import { requestMonthlyNavigation, useMonthlyTest } from "./monthly-test-provider"
 
 export function MonthlyValidationTools({ db, children }: { db: ReviewDatabase; children?: React.ReactNode }) {
@@ -39,6 +40,11 @@ export function MonthlyValidationTools({ db, children }: { db: ReviewDatabase; c
     finally{setBusy(false)}
   }
   const available=db.pro?.monthly?.records.filter(r=>!r.sent&&r.month===monthlyValidationCases[current??"november"].month)??[]
+  const guide = current ? monthlyValidationGuide(db, current, context.detail, {
+    admin: typeof window !== "undefined" && window.location.pathname.startsWith("/admin/"),
+    failureRecordId: faultRecord || available[0]?.id,
+    failureType: fault,
+  }) : []
   const select = (value: string) => {
     const selected = monthlyTestCase(value)
     if (selected === current) return
@@ -56,7 +62,15 @@ export function MonthlyValidationTools({ db, children }: { db: ReviewDatabase; c
         {current && <><Button size="sm" variant="outline" disabled={busy} onClick={() => requestMonthlyNavigation(() => setReset(true))}>이 예시만 초기화</Button><Button size="sm" variant="outline" disabled={busy} onClick={() => select("")}>공용 화면으로 돌아가기</Button></>}
       </div>
       <p role="status" className="text-xs text-slate-500">{busy ? "예시 적용 중…" : `현재 기준 시각 ${monthlyDateTime(db.pro?.clock)} · ${current ? "전용 예시 · 테스트 결과 유지" : db.pro?.clockMode === "test" ? "공용 날짜 검증 중" : "실제 날짜"}`}</p>
-      {current&&<><p className="text-xs text-slate-600">{monthlyDetailCases[context.detail].check}</p><p className="text-xs text-slate-500">확인 학생: {db.pro?.members.slice(0,context.detail==="consultations"?5:3).map(m=>m.name).join(", ")}</p>{(db.pro?.monthly?.validation?.version??0)<MONTHLY_FIXTURE_VERSION&&<p className="text-xs text-amber-800">이전 버전 예시입니다. 기존 생성 이력과 테스트 결과를 보존합니다. [이 예시만 초기화]하면 이름과 자료를 최신 예시로 다시 구성합니다.</p>}</>}
+      {current&&<>
+        <ul aria-label="선택한 예시 확인 안내" className="space-y-2 text-xs leading-5 text-slate-600">
+          {guide.map((item, index) => <li key={index} className="grid gap-x-4 sm:grid-cols-[8rem_minmax(0,1fr)]">
+            <strong className="text-slate-700">{item.target}</strong>
+            <div className="min-w-0"><p><span className="font-medium">확인 경로</span> · {item.path}</p><p><span className="font-medium">기대 결과</span> · {item.expected}</p></div>
+          </li>)}
+        </ul>
+        {(db.pro?.monthly?.validation?.version??0)<MONTHLY_FIXTURE_VERSION&&<p className="text-xs text-amber-800">이전 버전 예시입니다. 기존 생성 이력과 테스트 결과를 보존합니다. [이 예시만 초기화]하면 이름과 자료를 최신 예시로 다시 구성합니다.</p>}
+      </>}
       {current&&context.detail==="timing"&&<Button size="sm" variant="outline" disabled={busy} onClick={()=>requestMonthlyNavigation(()=>void control("advance-regular"))}>정기 생성 시각으로 진행</Button>}
       {current&&context.detail==="failures"&&<div className="flex flex-wrap items-center gap-2"><select aria-label="실패 확인 학생" value={faultRecord||available[0]?.id||""} onChange={e=>setFaultRecord(e.target.value)} className="h-9 rounded border px-2">{available.map(r=><option key={r.id} value={r.id}>{db.pro?.members.find(m=>m.id===r.studentId)?.name}</option>)}</select><select aria-label="실패할 처리" value={fault} onChange={e=>setFault(e.target.value)} className="h-9 rounded border px-2">{[["monthly-save","본문 저장"],["monthly-copy","문구 복사"],["monthly-send","발송 기록"],["generation","다시 만들기"],["style","발송 후 말투 갱신"]].map(([id,label])=><option key={id} value={id}>{label}</option>)}</select><Button size="sm" variant="outline" disabled={busy||!available.length} onClick={()=>void control("arm-failure")}>다음 처리 한 번 실패</Button></div>}
       {notice&&<p className="text-xs text-slate-600" role="status">{notice}</p>}

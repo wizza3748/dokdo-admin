@@ -55,7 +55,7 @@ export function AcademyStyleSettings() {
       </section>
       <div className={ui.styleSaveBar}><Button disabled={hook.busy||values.items.some(i=>!i.text.trim())} onClick={async()=>{if(await hook.runPro({type:"monthly-style-save",...values,items:values.items.map(i=>i.text)}))setDraft(null)}}>{hook.busy?"저장 중…":"저장"}</Button></div>
     </div>
-    <section className={`${panel} ${ui.styleSettings}`} aria-label="말투 변경 이력"><h2 className={`${ui.tableTitle} mb-3`}>말투 변경 이력</h2><details><summary className="cursor-pointer text-sm font-medium text-slate-600">변경 이력 보기</summary><div className="mt-4"><AcademyStyleHistory style={style}/></div></details></section>
+    <section className={`${panel} ${ui.styleSettings}`} aria-label="말투 변경 이력"><h2 className={`${ui.tableTitle} mb-3`}>말투 변경 이력</h2><details className={ui.styleHistoryDisclosure}><summary>변경 이력 보기</summary><div className="mt-4"><AcademyStyleHistory style={style}/></div></details></section>
     <MonthlyValidationTools db={hook.db}/>
     {navigation.pending && <MonthlyDialog size="confirm" title={monthlyMessages.leaveTitle} confirmLabel={monthlyMessages.leaveTitle} closeLabel="계속 작성" onClose={navigation.cancel} onConfirm={navigation.confirm}><p className="leading-7">{monthlyMessages.leaveConfirm}</p></MonthlyDialog>}
     {reset && <MonthlyDialog size="confirm" title="저장된 말투 초기화" closeLabel="취소" confirmLabel="초기화" busy={hook.busy} busyLabel="처리 중…" onClose={()=>setReset(false)} onConfirm={async()=>{if(await hook.runPro({type:"monthly-style-reset",revision:style.revision})){setReset(false);setDraft(null)}}}><div className="space-y-2 leading-7"><p>{monthlyMessages.resetStyleConfirm}</p><p>발송본과 이전 변경 이력은 유지됩니다.</p></div></MonthlyDialog>}
