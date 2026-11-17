@@ -3,11 +3,13 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useMonthlyTest } from "@/components/pro-management/monthly-test-provider"
 import { ChevronRight } from "lucide-react"
 import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE, ADMIN_MONTHLY_PATH, ADMIN_MONTHLY_TITLE } from "@/lib/admin-navigation"
 
 export function BreadcrumbHeader() {
     const pathname = usePathname()
+    const monthlyTest = useMonthlyTest()
 
     const getBreadcrumbs = () => {
         if (pathname === "/agency/pro-management/student-front-test") return [{ label: "일감보드", href: "/" }, { label: "학생프론트 테스트", href: "#" }]
@@ -139,7 +141,7 @@ export function BreadcrumbHeader() {
                     <React.Fragment key={index}>
                         {index > 0 && <ChevronRight className="w-3.5 h-3.5 text-slate-300" />}
                         {!isLast && crumb.href !== "#" ? (
-                            <Link href={crumb.href}>{content}</Link>
+                            <Link href={monthlyTest.href(crumb.href)}>{content}</Link>
                         ) : (
                             content
                         )}

@@ -144,11 +144,11 @@ test("2차 작성 여부는 저장된 선택값이며 진행 상태나 완료 �
   assert.equal(read(), "2차 작성 요청")
 })
 
-test("학생 상세 양쪽 박스는 같은 높이로 늘어나고 좁은 화면은 내용 높이를 사용", () => {
+test("학생 상세는 기존 2열과 이용 내역을 유지하고 왼쪽 카드를 오른쪽 높이로 늘리지 않음", () => {
   const css = readFileSync(new URL("../src/components/pro-management/pro-management.module.css",import.meta.url),"utf8")
-  assert.match(css, /\.studentDetailLayout \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[^}]*align-items: stretch;/)
-  assert.match(css, /\.studentDetailLayout > section \{ min-height: 400px; \}/)
-  assert.match(css, /@container student-detail \(max-width: 1100px\) \{[^}]*\}[^}]*\.studentDetailLayout > section \{ min-height: 0; \}/)
+  assert.match(css, /\.studentDetailLayout \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[^}]*align-items: start;/)
+  assert.doesNotMatch(css, /\.studentDetailLayout > section \{ min-height: 400px; \}/)
+  assert.match(css, /@container student-detail \(max-width: 900px\) \{[^}]*\}[^}]*\.studentDetailLayout > section \{ min-height: 0; \}/)
 })
 
 test("전환 전 상담 기록과 변경 이력은 월간 편집 영역에서 읽기 전용 조회", () => {

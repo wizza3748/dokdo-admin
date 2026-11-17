@@ -9,6 +9,7 @@ export const monthlyMessages = {
   requestHelp: "직접 수정한 내용과 입력한 요청을 참고해 다시 만듭니다.",
   beforeTransfer: "학원 변경 전에 생성된 AI초안입니다. 이전 학원의 지도 내용이 현재 학원의 지도 내용처럼 표현되지 않았는지 확인해 주세요.",
   improvementReview: "학생이 보완할 점을 직접 언급한 문장입니다. 발송 전에 표현을 확인해 주세요.",
+  generationFailed: "월간 피드백 AI초안을 만들지 못했습니다. 다시 시도해 주세요.",
   notGenerated: "조회한 달의 월간 피드백 AI초안이 아직 생성되지 않았습니다.",
   noTargets: "조회한 달에는 월간 피드백 대상 학생이 없습니다.",
 } as const

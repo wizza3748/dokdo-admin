@@ -3,12 +3,9 @@ import type { ReviewDatabase } from "./review-domain"
 import { emptyMonthly, reconcileMonthly, applyMonthlyCommand } from "./pro-monthly.ts"
 // @ts-expect-error Node tests load TypeScript directly.
 import { midnight, weekStart, weekSchedule } from "./pro-calendar.ts"
-export const monthlyValidationCases = {
-  november: { label:"11월 전환·작성·발송 선택", at:"2026-11-25T03:00:00.000Z", month:"2026-11" },
-  overdue: { label:"11월 기한 경과·이전 달 지연", at:"2026-11-30T00:00:00.000Z", month:"2026-11" },
-  december: { label:"12월 정기 생성·기간 연결", at:"2026-12-21T01:00:00.000Z", month:"2026-12" },
-} as const
-export type MonthlyValidationCase = keyof typeof monthlyValidationCases
+// @ts-expect-error Node tests load TypeScript sources directly.
+import { monthlyValidationCases, type MonthlyValidationCase } from "./monthly-test-context.ts"
+export { monthlyValidationCases, type MonthlyValidationCase }
 /** Copies existing local identities/books into a cookie-owned workspace. The source aggregate is untouched. */
 export function buildMonthlyValidation(source: ReviewDatabase, scenario: MonthlyValidationCase) {
   let db=structuredClone(source)
@@ -43,11 +40,15 @@ export function buildMonthlyValidation(source: ReviewDatabase, scenario: Monthly
     if(!record?.generations[0])continue
     const g=record.generations[0]
     db=applyMonthlyCommand(db,{type:"monthly-save",id:record.id,revision:record.revision,body:g.body+"\n함께 확인해요.",carry:g.carry,sourceId:g.id},teacher,`${record.id}:fixture-save`,"2026-11-25T01:00:00.000Z")
-    if(index!==3){const r=db.pro!.monthly!.records.find(r=>r.id===record.id)!;db=applyMonthlyCommand(db,{type:"monthly-send",id:r.id,revision:r.revision,actualAt:"2026-11-25T01:10:00.000Z"},teacher,`${r.id}:fixture-sent`,"2026-11-25T01:15:00.000Z")}
+    if(index!==3 && (scenario!=="overdue" || index===4)){const r=db.pro!.monthly!.records.find(r=>r.id===record.id)!;db=applyMonthlyCommand(db,{type:"monthly-send",id:r.id,revision:r.revision,actualAt:"2026-11-25T01:10:00.000Z"},teacher,`${r.id}:fixture-sent`,"2026-11-25T01:15:00.000Z")}
   }
   if(candidates[6]){const m=db.pro!.members.find(m=>m.id===candidates[6].id)!;m.institutionId="dokdo";m.matchingHistory!.push({at:"2026-11-25T02:00:00.000Z",institutionId:"dokdo"})}
   const styleFailure=db.pro!.monthly!.records.find(r=>r.studentId===candidates[3]?.id)
   if(styleFailure)styleFailure.simulateStyleFailureOnce=true
+  if(scenario==="december"){
+    const style=db.pro!.monthly!.styles.find(s=>s.institutionId==="dokdo")!
+    db=applyMonthlyCommand(db,{type:"monthly-style-save",enabled:false,items:style.items.map(i=>i.text),revision:style.revision},teacher,"fixture-style-disabled","2026-11-25T02:30:00.000Z")
+  }
   db.pro!.clock=monthlyValidationCases[scenario].at
   db=reconcileMonthly(db,db.pro!.clock)
   return db

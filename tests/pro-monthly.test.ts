@@ -185,3 +185,75 @@ test("저장·복사·발송 기록 실패는 입력 명령과 기존 본문·�
     assert.deepEqual(db,before)
   }
 })
+
+test("정기 생성 시각 직전에는 생성하지 않고 경계 시각부터 한 번만 생성",()=>{
+  const db=fixture(),boundary=monthlyRegularAt("2026-12")
+  reconcileMonthly(db,new Date(Date.parse(boundary)-1).toISOString())
+  assert.equal(db.pro!.monthly!.records.filter(r=>r.month==="2026-12").length,0)
+  reconcileMonthly(db,boundary)
+  const december=db.pro!.monthly!.records.filter(r=>r.month==="2026-12")
+  assert.ok(december.length>0)
+  assert.ok(december.every(r=>r.job&&r.generations.length===0))
+  reconcileMonthly(db,boundary)
+  const generated=structuredClone(db.pro!.monthly!.records.filter(r=>r.month==="2026-12"))
+  assert.ok(generated.every(r=>!r.job&&r.generations.length===1))
+  reconcileMonthly(db,new Date(Date.parse(boundary)+1000).toISOString())
+  assert.deepEqual(db.pro!.monthly!.records.filter(r=>r.month==="2026-12"),generated)
+})
+
+test("학원 변경 뒤 다시 만들기는 현재 학원 자료 구분·말투를 쓰고 이전 근거는 보존",()=>{
+  let db=fixture(),r=first(db)
+  const original=structuredClone(r.generations),member=db.pro!.members.find(m=>m.id===r.studentId)!
+  assert.ok(original[0].input.sources.some(s=>s.is_current_academy===true))
+  member.institutionId="other-agency"
+  member.matchingHistory!.push({at:now,institutionId:"other-agency"})
+  db.pro!.monthly!.styles.push({institutionId:"other-agency",enabled:true,revision:0,items:[{text:"현재 학원의 간결한 표현",observations:3}],sentIds:["a","b","c"],handledIds:[],history:[]})
+  reconcileMonthly(db,now);r=first(db)
+  const command={type:"monthly-regenerate" as const,id:r.id,revision:r.revision,body:original[0].body,direction:"더 따뜻하게" as const}
+  assert.equal(monthlyCanRead(db.pro!,r,teacher),false)
+  assert.throws(()=>applyMonthlyCommand(db,command,teacher,"old-academy",now),/권한/)
+  const current={...teacher,institutionId:"other-agency"}
+  assert.equal(monthlyCanRead(db.pro!,r,current),true)
+  db=applyMonthlyCommand(db,command,current,"new-academy",now)
+  assert.equal(first(db).job!.institutionId,"other-agency")
+  assert.deepEqual(first(db).job!.input.style,["현재 학원의 간결한 표현"])
+  assert.ok(first(db).job!.input.sources.filter(s=>s.sentAt).every(s=>s.is_current_academy===false))
+  reconcileMonthly(db,now)
+  assert.deepEqual(first(db).generations.slice(0,original.length),original)
+  assert.equal(first(db).generations.at(-1)!.institutionId,"other-agency")
+})
+
+test("다중 학원 집계는 미발송의 현재 담당과 발송본의 담당 학원을 구분",()=>{
+  const db=send(save(fixture()))
+  let sent=first(db)
+  const sentSnapshot=structuredClone(sent.sent)
+  const unsent=db.pro!.monthly!.records.find(r=>r.studentId!==sent.studentId&&!r.sent&&r.required)!
+  for(const r of [sent,unsent])db.pro!.members.find(m=>m.id===r.studentId)!.institutionId="other-agency"
+  reconcileMonthly(db,now)
+  sent=first(db)
+  assert.deepEqual(sent.sent,sentSnapshot)
+  assert.equal(sent.institutionId,"dokdo")
+  assert.equal(unsent.institutionId,"other-agency")
+  const filters={month:"2026-11",institution:"",required:"",status:"",student:""},summary=summarizeMonthly(db,filters)
+  assert.ok(summary.academies.length>=2)
+  for(const academy of summary.academies){
+    const owned=summary.all.filter(r=>(r.sent?.institutionId??r.institutionId)===academy.id)
+    assert.equal(academy.target,owned.filter(r=>r.required).length)
+    assert.equal(academy.sent,owned.filter(r=>r.required&&r.sent).length)
+    assert.equal(academy.unsent,academy.target-academy.sent)
+    assert.equal(academy.optional,owned.filter(r=>!r.required).length)
+  }
+  const selected=summarizeMonthly(db,{...filters,institution:"other-agency"})
+  assert.ok(selected.students.some(r=>r.id===unsent.id))
+  assert.ok(selected.students.every(r=>r.id!==sent.id))
+})
+
+test("최초 생성 재시도는 실패 상태를 지우고 생성 중을 거쳐 횟수 차감 없이 완료",()=>{
+  let db=fixture(),r=first(db)
+  r.generations=[];r.error="월간 피드백 AI초안을 만들지 못했습니다. 다시 시도해 주세요."
+  db=applyMonthlyCommand(db,{type:"monthly-retry",id:r.id,revision:r.revision},teacher,"retry-first",now)
+  r=db.pro!.monthly!.records.find(s=>s.id===r.id)!
+  assert.ok(r.job);assert.equal(r.error,undefined);assert.equal(monthlyStatus(r),"생성 중")
+  reconcileMonthly(db,now)
+  assert.equal(r.job,undefined);assert.equal(r.error,undefined);assert.equal(r.generations.length,1);assert.equal(r.regenerationCount,0)
+})

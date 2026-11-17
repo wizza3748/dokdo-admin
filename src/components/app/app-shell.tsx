@@ -1,6 +1,8 @@
 "use client"
 
 import { usePathname } from "next/navigation"
+import { Suspense } from "react"
+import { MonthlyTestProvider } from "@/components/pro-management/monthly-test-provider"
 import { RefreshCw } from "lucide-react"
 
 import { AppSidebar } from "@/components/app-sidebar"
@@ -11,6 +13,9 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { cn } from "@/lib/utils"
 
 export function AppShell({ children, canViewAdminWeekly = true }: { children: React.ReactNode; canViewAdminWeekly?: boolean }) {
+  return <Suspense><MonthlyTestProvider><AppShellContent canViewAdminWeekly={canViewAdminWeekly}>{children}</AppShellContent></MonthlyTestProvider></Suspense>
+}
+function AppShellContent({ children, canViewAdminWeekly }: { children: React.ReactNode; canViewAdminWeekly: boolean }) {
   const pathname = usePathname()
   const isStudentFront = pathname === "/student" || pathname.startsWith("/student/")
   const isReadingFront = pathname === "/reading/index" || pathname.startsWith("/reading/")
@@ -19,7 +24,7 @@ export function AppShell({ children, canViewAdminWeekly = true }: { children: Re
   const isAgency = pathname === "/agency" || pathname.startsWith("/agency/")
   const isOnlineWorkbookReviewDetail = /^\/agency\/online-workbooks\/review-[^/]+$/.test(pathname)
   const isTaskBoard = pathname === "/"
-  const isProManagement = ["/agency/pro-management", "/agency/pro-management/feedback-day", "/agency/pro-management/academy-style", "/admin/b2c/pro-management", "/admin/b2c/monthly-feedback"].includes(pathname)
+  const isProManagement = ["/agency/pro-management", "/agency/pro-management/feedback-day", "/agency/pro-management/academy-style", "/admin/b2c/pro-management", "/admin/b2c/monthly-feedback"].includes(pathname) || /^\/agency\/pro-management\/students\/[^/]+$/.test(pathname)
 
   if (isStudentFront || isReadingFront || isWorkbookPreview || isReviewDocument) {
     return <main className="min-h-screen w-full bg-white">{children}</main>

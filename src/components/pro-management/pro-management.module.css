@@ -64,12 +64,11 @@
 .studentFeedbackTable { min-width: 560px; font-size: 14px; }
 .studentFeedbackTable th { white-space: nowrap; }
 .studentPage { container: student-detail / inline-size; }
-.studentDetailLayout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 20px; }
-.studentDetailLayout > section { min-height: 400px; }
+.studentDetailLayout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 20px; }
 .studentDetailRight { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .studentConsultationSection { flex: 1; }
 .managementMemoBody { padding: 16px 24px 20px; }
-@container student-detail (max-width: 1100px) {
+@container student-detail (max-width: 900px) {
   .studentDetailLayout { grid-template-columns: minmax(0, 1fr); }
   .studentDetailLayout > section { min-height: 0; }
 }

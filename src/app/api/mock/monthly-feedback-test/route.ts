@@ -3,6 +3,7 @@ import { studentTestWorkspace, studentTestWorkspaceStore, studentTestResponseHea
 import { prototypeStore } from "@/lib/prototype-store"
 import { getDefaultReviewDatabase } from "@/lib/review-seeds"
 import { initializePro } from "@/lib/pro-seeds"
+import { refreshProDemoLabels } from "@/lib/pro-demo-labels"
 import { reviewActor, visibleReviewState } from "@/lib/review-server"
 import { reconcileMonthly } from "@/lib/pro-monthly"
 import { buildMonthlyValidation, monthlyValidationCases, type MonthlyValidationCase } from "@/lib/pro-monthly-fixtures"
@@ -24,11 +25,11 @@ async function response(request:Request){
     let fixture:Fixture|null
     if(body?.action==="prepare"||body?.action==="reset"){
       const original=await prototypeStore.read("online-reviews",getDefaultReviewDatabase)
-      fixture=await studentTestWorkspaceStore.update<Fixture|null>(key,()=>null,old=>old&&body.action!=="reset"?old:{db:buildMonthlyValidation(initializePro(original),scenario),createdAt:new Date().toISOString()})
+      fixture=await studentTestWorkspaceStore.update<Fixture|null>(key,()=>null,old=>old&&body.action!=="reset"?{...old,db:refreshProDemoLabels(old.db,{studentNamesOnly:true})}:{db:buildMonthlyValidation(initializePro(original),scenario),createdAt:new Date().toISOString()})
     }else{
       fixture=await studentTestWorkspaceStore.update<Fixture|null>(key,()=>null,old=>{
         if(!old)throw new Error("검증 도구에서 월간 피드백 예시를 먼저 열어 주세요.")
-        let db=reconcileMonthly(structuredClone(old.db),old.db.pro!.clock)
+        let db=reconcileMonthly(refreshProDemoLabels(structuredClone(old.db),{studentNamesOnly:true}),old.db.pro!.clock)
         if(body){
           if(!body.requestId||!body.command?.type)throw new Error("잘못된 요청입니다.")
           const actor=reviewActor(request,db)

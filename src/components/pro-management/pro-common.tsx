@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useReviews, type ReviewRole } from "@/lib/review-client"
 import { commandPro, resetProDemo } from "@/lib/pro-client"
 import { STUDENT_FRONT_TEST_PATH } from "@/lib/pro-demo-navigation"
-import { addDays, dateLabel, kstDate, weekStart } from "@/lib/pro-calendar"
+import { addDays, kstDate, weekStart } from "@/lib/pro-calendar"
 import { monthlyActionFailure } from "@/lib/pro-monthly-messages"
 import type { ProCommand } from "@/lib/pro-types"
 import { Button } from "@/components/ui/button"
@@ -22,14 +22,14 @@ export function ProStatusBadge({ status }: { status: string }) {
   const tone = status === "지연" || status === "미제출" ? "red" : status === "피드백 필요" ? "amber" : status === "2차 대기" ? "blue" : status === "관리 완료" ? "green" : "slate"
   return <ProBadge tone={tone}>{status}</ProBadge>
 }
-export function ExternalBadge() { return <span className="ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-normal text-slate-600">외부</span> }
+export function ExternalBadge({ className }: { className?: string } = {}) { return <span className={cn("ml-1 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-normal text-slate-600", className)}>외부</span> }
 export function useProManagement() {
   const [role, setRole] = React.useState<ReviewRole>("agency")
   React.useEffect(() => { if (new URLSearchParams(window.location.search).get("role") === "admin") setRole("admin") }, [])
   const hook = useReviews(role), [busy, setBusy] = React.useState(false), [message, setMessage] = React.useState("")
   const [messageKind, setMessageKind] = React.useState<"success" | "error">("success")
   const pending = React.useRef(false)
-  const run = async (command: ProCommand) => { if (pending.current) return false; pending.current = true; setBusy(true); setMessage(""); try { await commandPro(command, role); await hook.refresh(); setMessageKind("success"); setMessage(command.type === "monthly-regenerate" || command.type === "monthly-retry" ? "월간 피드백 AI초안을 만들고 있습니다." : command.type === "reminder" ? "독려 발송 기록을 저장했습니다." : command.type === "cancel-reminder" ? "독려 발송 기록을 취소했습니다." : command.type === "clock" ? "테스트 시각을 적용했습니다." : command.type === "clock-real" ? "실제 시각으로 돌아왔습니다." : "저장했습니다."); return true } catch (e) { setMessageKind("error"); setMessage(monthlyActionFailure(command.type) ?? (e instanceof Error ? e.message : "처리에 실패했습니다.")); return false } finally { pending.current = false; setBusy(false) } }
+  const run = async (command: ProCommand) => { if (pending.current) return false; pending.current = true; setBusy(true); setMessage(""); try { await commandPro(command, role); await hook.refresh(); setMessageKind("success"); setMessage(command.type === "monthly-regenerate" || command.type === "monthly-retry" ? "월간 피드백 AI초안을 만들고 있습니다." : command.type.startsWith("monthly-") ? "" : command.type === "reminder" ? "독려 발송 기록을 저장했습니다." : command.type === "cancel-reminder" ? "독려 발송 기록을 취소했습니다." : command.type === "clock" ? "테스트 시각을 적용했습니다." : command.type === "clock-real" ? "실제 시각으로 돌아왔습니다." : "저장했습니다."); return true } catch (e) { setMessageKind("error"); setMessage(monthlyActionFailure(command.type) ?? (e instanceof Error ? e.message : "처리에 실패했습니다.")); return false } finally { pending.current = false; setBusy(false) } }
   const resetDemo = async () => {
     if (pending.current || role !== "agency") return false
     pending.current = true; setBusy(true); setMessage("")
@@ -58,7 +58,7 @@ export function ProDemoTools({ hook, onClockChange, onReset }: { hook: ReturnTyp
   const [time, setTime] = React.useState("")
   const [confirmReset, setConfirmReset] = React.useState(false)
   const pro = hook.db.pro
-  const changeClock = async (command: ProCommand) => { if (await hook.runPro(command)) onClockChange?.() }
+  const changeClock = async (command: ProCommand) => { const url=new URL(window.location.href);url.searchParams.delete("monthlyLive");window.history.replaceState(window.history.state,"",url);if (await hook.runPro(command)) onClockChange?.() }
   const reset = async () => {
     if (await hook.resetDemo()) { setConfirmReset(false); setTime(""); onReset?.() }
   }
@@ -67,8 +67,9 @@ export function ProDemoTools({ hook, onClockChange, onReset }: { hook: ReturnTyp
   const identity = new URLSearchParams(window.location.search).get("demoAgency")
   const testHref = identity ? `${STUDENT_FRONT_TEST_PATH}?demoAgency=${encodeURIComponent(identity)}` : STUDENT_FRONT_TEST_PATH
   return <>
-    <details className="rounded border border-dashed border-slate-300 bg-slate-50 p-3 text-sm">
-      <summary className="cursor-pointer font-medium">프로토타입 검증 도구 · {pro.clockMode === "test" ? "테스트 시각" : "실제 시각"} (한국 시간) {dateLabel(pro.clock)}</summary>
+    <MonthlyValidationTools db={hook.db}>
+    <details className="mt-3 border-t border-slate-200 pt-3 text-sm">
+      <summary className="cursor-pointer text-xs font-medium text-slate-500">기타 검증 설정</summary>
       <div className="mt-3 space-y-3">
         <p>예시 데이터 적용 기준: {kstDate(pro.effectiveAt)} · 관리월: {pro.effectiveMonth}. 실제 문자 발송 없이 발송 결과를 모의 처리합니다.</p>
         <div className="flex flex-wrap gap-2">
@@ -85,7 +86,7 @@ export function ProDemoTools({ hook, onClockChange, onReset }: { hook: ReturnTyp
         </div>}
       </div>
     </details>
-    <MonthlyValidationTools db={hook.db}/>
+    </MonthlyValidationTools>
     {confirmReset && <AgencyConfirmDialog title="예시 데이터 초기화" confirmLabel="초기화" onClose={() => setConfirmReset(false)} onConfirm={() => void reset()} busy={hook.busy}>
       <p>지정된 프로 예시 학생의 테스트 기록을 지우고, 실제 오늘 기준 초기 상태로 되돌립니다. 일반 학생 기록은 유지됩니다.</p>
       <p className="mt-2">테스트 시각도 실제 시각으로 돌아갑니다. 공용 예시 데이터이므로 다른 테스트 사용자에게도 반영됩니다.</p>

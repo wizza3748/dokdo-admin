@@ -12,6 +12,9 @@ import { adjustmentValues, detailDateTime, regularConsultationLabel, studentFeed
 import type { ProAudit, ProCommand } from "@/lib/pro-types"
 import { ExternalBadge, field, ProBadge, ProNotice, useProManagement } from "./pro-common"
 import { MonthlyFeedbackEditor } from "./monthly-feedback-editor"
+import { MonthlyValidationTools } from "./monthly-validation-tools"
+import { useMonthlyTest } from "./monthly-test-provider"
+import { monthlyValidationCases } from "@/lib/monthly-test-context"
 import { isActivePro } from "@/lib/pro-domain"
 import { StudentManagementMemo } from "./student-management-memo"
 import styles from "./pro-management.module.css"
@@ -23,6 +26,7 @@ const inputLabel = "block space-y-1.5 text-sm font-medium"
 const memoClass = "min-h-24 w-full resize-y rounded-md border border-slate-300 bg-white p-3 text-sm font-normal leading-6 outline-blue-600"
 
 export function StudentManagementDetail({ id }: { id: string }) {
+  const monthlyContext = useMonthlyTest()
   const hook = useProManagement(), pro = hook.db.pro
   const [month, setMonth] = React.useState(""), [returnTo, setReturnTo] = React.useState("")
   const [editor, setEditor] = React.useState<Editor>(null), [history, setHistory] = React.useState<History>(null)
@@ -31,15 +35,17 @@ export function StudentManagementDetail({ id }: { id: string }) {
   const navigation = React.useRef<(go: () => void) => void>(go => go())
   React.useEffect(() => {
     const params = new URLSearchParams(window.location.search)
-    setMonth(params.get("month") ?? ""); setReturnTo(safeAgencyReturn(params.get("returnTo"), ""))
-  }, [])
+    setMonth(params.get("month") ?? (monthlyContext.scenario ? monthlyValidationCases[monthlyContext.scenario].month : "")); setReturnTo(safeAgencyReturn(params.get("returnTo"), ""))
+  }, [monthlyContext.scenario])
   if (!hook.loaded) return <p className="p-6">학생 관리 내역을 불러오는 중…</p>
   const member = pro?.members.find(m => m.id === id && (m.product === "pro" || !!m.endedAt || !!m.caseOnly))
   if (!pro || !member) return <p className="p-6">{hook.error || "조회 권한이 없거나 매칭된 프로 학생이 아닙니다."}</p>
   const currentMonth = managementMonth(pro.clock), selectedMonth = month || currentMonth, monthName = `${Number(selectedMonth.slice(5))}월`
   const studentTest = agencyStudentTestToken()
   const monthlyTest = new URLSearchParams(window.location.search).get("monthlyTest")
-  const testQuery = monthlyTest ? `&monthlyTest=${encodeURIComponent(monthlyTest)}` : studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : ""
+  const identity = new URLSearchParams(window.location.search).get("demoAgency")
+  const live = new URLSearchParams(window.location.search).get("monthlyLive") === "1" ? "&monthlyLive=1" : ""
+  const testQuery = (monthlyTest ? `&monthlyTest=${encodeURIComponent(monthlyTest)}` : studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : live) + (identity ? `&demoAgency=${encodeURIComponent(identity)}` : "")
   const usage = proUsage(pro, member, pro.clock, selectedMonth)
   const rows = studentFeedbackRows(hook.db, id, selectedMonth)
   const audit = pro.audit.filter(a => a.studentId === id && a.kind !== "management-memo" && (!a.month || a.month === selectedMonth)).slice().sort((a, b) => b.at.localeCompare(a.at))
@@ -66,7 +72,7 @@ export function StudentManagementDetail({ id }: { id: string }) {
     </div>
   </li>)}</ol> : <p className="py-4 text-sm text-slate-500">기록된 이력이 없습니다.</p>
   return <div className={`${styles.page} ${styles.studentPage} space-y-5`}>
-    <header className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold text-slate-900">{member.name}</h1><span className="text-sm text-slate-500">{member.level}레벨</span>{member.external && <ExternalBadge/>}{(member.caseOnly || !isActivePro(member,pro.clock)) && <ProBadge>이전 담당</ProBadge>}{member.status === "ended" && <ProBadge>이용 종료</ProBadge>}</div><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-sm">조회 월<Input className="w-40 bg-white" type="month" value={selectedMonth} disabled={hook.busy} onInput={e => { const value=e.currentTarget.value; if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value)||value===selectedMonth)return; e.currentTarget.value=selectedMonth; navigation.current(() => changeMonth(value)) }} onChange={e => { const value=e.target.value; if(value!==selectedMonth)navigation.current(() => changeMonth(value)) }}/></label><Button asChild variant="outline"><Link href={`/agency/online-workbooks?role=${hook.role}&audience=pro&studentId=${encodeURIComponent(id)}${testQuery}`}>온라인 독후감 목록</Link></Button><Button asChild variant="outline"><Link href={returnTo || `/agency/pro-management?role=${hook.role}${testQuery}`}>주간 관리 현황</Link></Button></div></header>
+    <header className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-semibold text-slate-900">{member.name}</h1><span className="text-sm text-slate-500">{member.level}레벨</span>{member.external && <ExternalBadge className="ml-0 inline-flex items-center border border-violet-200 bg-violet-50 px-2 py-0.5 leading-4 text-violet-700"/>}{(member.caseOnly || !isActivePro(member,pro.clock)) && <ProBadge>이전 담당</ProBadge>}{member.status === "ended" && <ProBadge>이용 종료</ProBadge>}</div><div className="flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-sm">조회 월<Input className="w-40 bg-white" type="month" value={selectedMonth} disabled={hook.busy} onInput={e => { const value=e.currentTarget.value; if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(value)||value===selectedMonth)return; e.currentTarget.value=selectedMonth; navigation.current(() => changeMonth(value)) }} onChange={e => { const value=e.target.value; if(value!==selectedMonth)navigation.current(() => changeMonth(value)) }}/></label><Button asChild variant="outline"><Link href={`/agency/online-workbooks?role=${hook.role}&audience=pro&studentId=${encodeURIComponent(id)}${testQuery}`}>온라인 독후감 목록</Link></Button><Button asChild variant="outline"><Link href={returnTo || `/agency/pro-management?role=${hook.role}${testQuery}`}>주간 관리 현황</Link></Button></div></header>
     {!cancelId && <ProNotice hook={hook} transient/>}
     <div className={styles.studentDetailLayout}>
     <section className={styles.studentSection} aria-label="월별 피드백 내역">
@@ -103,5 +109,6 @@ export function StudentManagementDetail({ id }: { id: string }) {
     {!member.caseOnly && <StudentManagementMemo key={member.id} hook={hook} member={member}/>}
     </div>
     </div>
+    {monthlyContext.scenario && <MonthlyValidationTools db={hook.db}/>}
   </div>
 }

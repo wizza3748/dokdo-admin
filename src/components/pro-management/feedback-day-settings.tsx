@@ -7,10 +7,12 @@ import { addDays, weekdayNames, weekStart } from "@/lib/pro-calendar"
 import { weekdayFor } from "@/lib/pro-domain"
 import { feedbackDaySchedule } from "@/lib/pro-feedback-day-presentation"
 import { panel, ProNotice, useProManagement } from "./pro-common"
+import { useMonthlyTest } from "./monthly-test-provider"
 import styles from "./pro-management.module.css"
 
 export function FeedbackDaySettings() {
   const hook = useProManagement()
+  const monthlyTest = useMonthlyTest()
   const [selectedDay, setWeekday] = React.useState<number | null>(null)
   const pro = hook.db.pro
   if (!hook.loaded) return <p className="p-6">불러오는 중…</p>
@@ -22,7 +24,7 @@ export function FeedbackDaySettings() {
   const weekday = selectedDay ?? pending?.weekday ?? current
   const preview = feedbackDaySchedule(nextWeek, weekday)
   return <div className={`${styles.page} space-y-5`}>
-    <div className="flex flex-wrap items-center justify-start gap-3"><h1 className="sr-only">피드백 요일 설정</h1><Button asChild variant="outline"><Link href={`/agency/pro-management?role=${hook.role}`}>주간 관리 현황</Link></Button></div>
+    <div className="flex flex-wrap items-center justify-start gap-3"><h1 className="sr-only">피드백 요일 설정</h1><Button asChild variant="outline"><Link href={monthlyTest.href(`/agency/pro-management?role=${hook.role}`)}>주간 관리 현황</Link></Button></div>
     <ProNotice hook={hook} transient/>
     <section className={`${panel} space-y-5`} aria-label="피드백 요일 설정">
       <div>

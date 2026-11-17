@@ -10,11 +10,11 @@ const demoNames: Record<string, readonly [string, ...string[]]> = {
   "pro-demo-6": ["김프로", "프로 기록승계", "김프로(기록승계)", "김프로(전송대기)"],
   "pro-demo-7": ["윤프로", "프로 배정대기", "윤프로(배정대기)"],
   "pro-demo-8": ["장프로", "프로 종료예시", "장프로(종료예시)"],
-  "pro-demo-10": ["강프로", "타기관 프로예시", "강프로(타기관)"],
+  "pro-demo-10": ["강민준", "강프로", "타기관 프로예시", "강프로(타기관)"],
   "pro-demo-attention": ["오프로", "프로 집중관리 예시", "오프로(집중관리)"],
   "pro-demo-hq-check": ["임프로", "프로 본사확인 예시", "임프로(본사확인)"],
   "pro-demo-complete": ["서프로", "서프로(관리완료)"],
-  "pro-demo-second": ["강프로", "강프로(2차피드백)"],
+  "pro-demo-second": ["강지호", "강프로", "강프로(2차피드백)"],
 }
 
 export function proDemoStudentName(id: string) {
@@ -26,7 +26,7 @@ const demoBooks: Record<string, readonly [string, string]> = {
 }
 
 /** Rename only the original synthetic labels. Never reset user edits or learning history. */
-function refreshCurrentLabels(db: ReviewDatabase): ReviewDatabase {
+function refreshCurrentLabels(db: ReviewDatabase, studentNamesOnly = false): ReviewDatabase {
   if (!db.pro) return db
   const names = new Map(db.pro.members.flatMap(member => {
     const label = demoNames[member.id]
@@ -41,7 +41,7 @@ function refreshCurrentLabels(db: ReviewDatabase): ReviewDatabase {
   })
   const reviews = db.reviews.map(review => {
     const name = names.get(review.studentId)
-    const book = review.studentId === "pro-demo-6" ? demoBooks[review.id] : undefined
+    const book = !studentNamesOnly && review.studentId === "pro-demo-6" ? demoBooks[review.id] : undefined
     const studentName = name?.includes(review.studentName) ? name[0] : review.studentName
     const bookTitle = book && review.bookTitle === book[0] ? book[1] : review.bookTitle
     if (studentName === review.studentName && bookTitle === review.bookTitle) return review
@@ -51,12 +51,12 @@ function refreshCurrentLabels(db: ReviewDatabase): ReviewDatabase {
   return changed ? { ...db, reviews, pro: { ...db.pro, members } } : db
 }
 
-export function refreshProDemoLabels(db: ReviewDatabase): ReviewDatabase {
-  const current = refreshCurrentLabels(db)
+export function refreshProDemoLabels(db: ReviewDatabase, options: { studentNamesOnly?: boolean } = {}): ReviewDatabase {
+  const current = refreshCurrentLabels(db, options.studentNamesOnly)
   const baseline = db.proTestBaseline
   if (!baseline) return current
   // Returning from date-test mode must not restore the former fixture names.
-  const refreshed = refreshCurrentLabels({ version: 1, ...baseline })
+  const refreshed = refreshCurrentLabels({ version: 1, ...baseline }, options.studentNamesOnly)
   if (refreshed.pro === baseline.pro && refreshed.reviews === baseline.reviews) return current
   return { ...current, proTestBaseline: { ...baseline, pro: refreshed.pro!, reviews: refreshed.reviews } }
 }

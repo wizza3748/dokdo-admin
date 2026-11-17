@@ -18,7 +18,7 @@ export function demoIdentityQuery(role: ReviewRole) {
   }
   if (params.has("monthlyTest")) return `&monthlyTest=${encodeURIComponent(params.get("monthlyTest") || "")}${params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""}`
   const testToken = role === "agency" ? agencyStudentTestToken() : ""
-  return (params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : "") + (testToken ? `&studentTest=${encodeURIComponent(testToken)}` : "")
+  return (params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : "") + (testToken ? `&studentTest=${encodeURIComponent(testToken)}` : "") + (params.get("monthlyLive") === "1" && !testToken ? "&monthlyLive=1" : "")
 }
 export async function reviewSharePath(recordId: string, role: ReviewRole = "student") {
   if (role === "student" && studentTestToken()) throw new Error("전용 테스트 데이터는 외부 공유하지 않습니다.")

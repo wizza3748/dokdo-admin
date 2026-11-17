@@ -1,3 +1,4 @@
+import { monthlyLiveState, preserveSharedClock } from "@/lib/monthly-live-context"
 import { NextResponse } from "next/server"
 import { prototypeStore } from "@/lib/prototype-store"
 import { getDefaultReviewDatabase } from "@/lib/review-seeds"
@@ -15,8 +16,8 @@ export async function POST(request: Request) {
     let serverNow = ""
     const db = await prototypeStore.update<ReviewDatabase>("online-reviews", getDefaultReviewDatabase, state => {
       serverNow = new Date().toISOString()
-      return updateReviewState(state, serverNow, current => applyProCommand(current, command, reviewActor(request, current), requestId, serverNow))
+      return preserveSharedClock(state, updateReviewState(monthlyLiveState(state, request), serverNow, current => applyProCommand(current, command, reviewActor(request, current), requestId, serverNow)), request)
     })
-    return NextResponse.json(visibleReviewState(db, reviewActor(request, db), undefined, serverNow), { headers: { "Cache-Control": "no-store" } })
+    return NextResponse.json(visibleReviewState(monthlyLiveState(db, request), reviewActor(request, db), undefined, serverNow), { headers: { "Cache-Control": "no-store" } })
   } catch (error) { return NextResponse.json({ message: error instanceof Error ? error.message : "프로 관리 처리 실패" }, { status: 400 }) }
 }

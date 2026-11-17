@@ -44,7 +44,8 @@ export function WeeklyManagement() {
   const identity = new URLSearchParams(window.location.search).get("demoAgency")
   const studentTest = agencyStudentTestToken()
   const monthlyTest = new URLSearchParams(window.location.search).get("monthlyTest")
-  const agencyQuery = (monthlyTest ? `&monthlyTest=${encodeURIComponent(monthlyTest)}` : "") + (identity ? `&demoAgency=${encodeURIComponent(identity)}` : "") + (studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : "")
+  const live = new URLSearchParams(window.location.search).get("monthlyLive") === "1" ? "&monthlyLive=1" : ""
+  const agencyQuery = (monthlyTest ? `&monthlyTest=${encodeURIComponent(monthlyTest)}` : live) + (identity ? `&demoAgency=${encodeURIComponent(identity)}` : "") + (studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : "")
   const returnUrl = `/agency/pro-management?week=${encodeURIComponent(week)}&status=${encodeURIComponent(filter)}${activeTask === null ? "" : `&task=${activeTask}`}${ended ? "&ended=1" : ""}${openedBooks.map(id => `&books=${encodeURIComponent(id)}`).join("")}${hook.readOnly ? "&role=admin" : ""}${agencyQuery}`
   const keepUrl = (w: string, status: string, t: number | null) => {
     const p = new URLSearchParams(window.location.search)

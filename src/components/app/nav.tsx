@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useMonthlyTest } from "@/components/pro-management/monthly-test-provider"
 import { useReviews } from "@/lib/review-client"
 import { proTasks } from "@/lib/pro-selectors"
 import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE, ADMIN_MONTHLY_PATH, ADMIN_MONTHLY_TITLE } from "@/lib/admin-navigation"
@@ -119,6 +120,7 @@ const navConfig: NavItem[] = [
 
 export function AppNav({ canViewAdminWeekly = true }: { canViewAdminWeekly?: boolean }) {
   const pathname = usePathname()
+  const monthlyTest = useMonthlyTest()
   const { db } = useReviews("agency")
   const proVisible = !!db.pro?.members.some(m => m.product === "pro") || !!db.pro?.cases.length
   const proBadge = proTasks(db).badge
@@ -161,7 +163,7 @@ export function AppNav({ canViewAdminWeekly = true }: { canViewAdminWeekly?: boo
     const content = <span>{child.title}</span>
     return <SidebarMenuSubItem key={child.title}>
       <SidebarMenuSubButton isActive={active} asChild={Boolean(child.href && child.href !== "#")} className={`h-11 rounded-xl text-sm font-semibold text-slate-600 hover:bg-blue-50 hover:text-blue-600 data-[active=true]:bg-blue-100/70 data-[active=true]:text-blue-600 ${depth ? "px-12" : "px-9"}`}>
-        {child.href && child.href !== "#" ? <Link href={child.href}>{content}</Link> : <button type="button" className="w-full cursor-default text-left">{content}</button>}
+        {child.href && child.href !== "#" ? <Link href={monthlyTest.href(child.href)}>{content}</Link> : <button type="button" className="w-full cursor-default text-left">{content}</button>}
       </SidebarMenuSubButton>
     </SidebarMenuSubItem>
   }

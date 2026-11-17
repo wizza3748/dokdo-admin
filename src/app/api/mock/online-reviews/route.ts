@@ -1,3 +1,4 @@
+import { monthlyLiveState, preserveSharedClock } from "@/lib/monthly-live-context"
 import { NextResponse } from "next/server"
 import { type ReviewCommand, type ReviewDatabase } from "@/lib/review-domain"
 import { getDefaultReviewDatabase } from "@/lib/review-seeds"
@@ -20,10 +21,10 @@ export async function GET(request: Request) {
     let serverNow = ""
     const db = await prototypeStore.update<ReviewDatabase>("online-reviews", getDefaultReviewDatabase, state => {
       serverNow = new Date().toISOString()
-      return updateReviewState(state, serverNow)
+      return preserveSharedClock(state, updateReviewState(monthlyLiveState(state, request), serverNow), request)
     })
     const actor = reviewActor(request, db)
-    let visible = visibleReviewState(db, actor, new URL(request.url).searchParams.get("recordId"), serverNow)
+    let visible = visibleReviewState(monthlyLiveState(db, request), actor, new URL(request.url).searchParams.get("recordId"), serverNow)
     if (["agency", "class", "admin"].includes(actor.role)) {
       const submissions = await prototypeStore.read<OnlineWorkbook[]>("student-workbook-submissions", () => [])
       const reserved = [...AGENCY_ONLINE_WORKBOOKS.map(row => row.id), ...submissions.map(row => normalizeStudentSubmittedRecord(row).id)]
@@ -44,22 +45,22 @@ export async function POST(request: Request) {
       if (scheduler.enabled) {
         const snapshot = await prototypeStore.read("online-reviews", getDefaultReviewDatabase)
         const at = new Date().toISOString()
-        const proposed = updateReviewState(snapshot, at, current => applyManagedReviewCommand(current, scheduleCommand, reviewActor(request, current), payload.requestId, at))
+        const proposed = updateReviewState(monthlyLiveState(snapshot, request), at, current => applyManagedReviewCommand(current, scheduleCommand, reviewActor(request, current), payload.requestId, at))
         prepared = await scheduler.prepare(proposed, { kind: "shared" }, scheduleCommand.recordId, payload.requestId)
       }
     }
     let serverNow = ""
     const db = await prototypeStore.update<ReviewDatabase>("online-reviews", getDefaultReviewDatabase, state => {
       serverNow = new Date().toISOString()
-      return updateReviewState(state, serverNow, current => {
+      return preserveSharedClock(state, updateReviewState(monthlyLiveState(state, request), serverNow, current => {
         const actor = reviewActor(request, current)
         const member = current.pro?.members.find(m => m.id === actor.studentId)
         const command = payload.command.type === "create" && member ? { ...payload.command, common: { ...payload.command.common, id: payload.command.common.id + "-" + member.id, studentId: member.id, studentName: member.name, institutionId: member.institutionId ?? "unassigned", institution: "독도학원", classId: "external" } } : payload.command
         const next = applyManagedReviewCommand(current, command, actor, payload.requestId, serverNow)
         return scheduleCommand ? bindCloudFeedbackSchedule(next, scheduleCommand.recordId, payload.requestId, prepared) : next
-      })
+      }), request)
     })
-    return NextResponse.json(visibleReviewState(db, reviewActor(request, db), undefined, serverNow), { headers: { "Cache-Control": "no-store" } })
+    return NextResponse.json(visibleReviewState(monthlyLiveState(db, request), reviewActor(request, db), undefined, serverNow), { headers: { "Cache-Control": "no-store" } })
   } catch (error) { return NextResponse.json({ message: error instanceof Error ? error.message : "처리에 실패했습니다." }, { status: 400 }) }
 }
 export async function DELETE() {

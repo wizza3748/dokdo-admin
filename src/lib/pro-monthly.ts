@@ -181,7 +181,7 @@ export function applyMonthlyCommand(input: ReviewDatabase, command: MonthlyComma
     assert(style.revision === command.revision, "학원 말투가 다른 화면에서 변경되었습니다. 다시 확인해 주세요.")
     const before = JSON.stringify({ enabled: style.enabled, items: style.items })
     if (command.type === "monthly-style-save") {
-      assert(typeof command.enabled === "boolean" && Array.isArray(command.items) && command.items.length <= 10 && command.items.every(t => typeof t === "string" && t.trim()), "말투 항목은 공백 없이 최대 10개까지 입력해 주세요.")
+      assert(typeof command.enabled === "boolean" && Array.isArray(command.items) && command.items.length <= 10 && command.items.every(t => typeof t === "string" && t.trim()), "말투 항목: 최대 10개 / 공백 항목 저장 불가")
       assert(command.items.every(t => !/\d{2,}|학생.*(이름|성적)|전화번호|개인정보|본사.*(무시|변경)|재등록/.test(t)), "개인정보와 내용 지침을 제외하고 표현 방식만 입력해 주세요.")
       const previous = style.items
       style.items = command.items.map(text => ({ text: text.trim(), observations: previous.find(item => item.text === text.trim())?.observations ?? 1 })); style.enabled = command.enabled

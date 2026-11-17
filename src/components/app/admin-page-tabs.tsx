@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { Grid2X2, Pin, RefreshCw, X } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
+import { useMonthlyTest } from "@/components/pro-management/monthly-test-provider"
 import { ADMIN_PRO_WEEKLY_PATH, ADMIN_PRO_WEEKLY_TITLE, ADMIN_MONTHLY_PATH, ADMIN_MONTHLY_TITLE } from "@/lib/admin-navigation"
 
 type AdminTab = { href: string; title: string }
@@ -57,6 +58,7 @@ function restoreTabs(storageKey: string, scope: "admin" | "agency"): AdminTab[] 
 export function AdminPageTabs({ scope = "admin" }: { scope?: "admin" | "agency" }) {
   const pathname = usePathname()
   const router = useRouter()
+  const monthlyTest = useMonthlyTest()
   const [tabs, setTabs] = React.useState<AdminTab[]>([DASHBOARD_TAB])
   const [ready, setReady] = React.useState(false)
   const storageKey = scope === "agency" ? "dokdo-agency-open-tabs" : STORAGE_KEY
@@ -82,7 +84,7 @@ export function AdminPageTabs({ scope = "admin" }: { scope?: "admin" | "agency" 
     event.stopPropagation()
     const index = tabs.findIndex((tab) => tab.href === href)
     const next = tabs.filter((tab) => tab.href !== href)
-    const nextHref = (next[Math.max(0, index - 1)] ?? DASHBOARD_TAB).href
+    const nextHref = monthlyTest.href((next[Math.max(0, index - 1)] ?? DASHBOARD_TAB).href)
 
     const close = () => { setTabs(next); if (href.split("?")[0] === pathname) router.push(nextHref) }
     if (href.split("?")[0] === pathname) {
@@ -96,7 +98,7 @@ export function AdminPageTabs({ scope = "admin" }: { scope?: "admin" | "agency" 
     <div className="flex min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {tabs.map((tab) => {
         const active = tab.href.split("?")[0] === pathname
-        return <Link key={tab.href} href={tab.href} className={`group flex h-12 shrink-0 cursor-pointer items-center gap-2 border-r border-slate-200 px-4 text-sm transition ${active ? "rounded-t-xl bg-[#dcebff] font-bold text-blue-600" : "text-slate-600 hover:bg-slate-50"}`}>
+        return <Link key={tab.href} href={monthlyTest.href(tab.href)} className={`group flex h-12 shrink-0 cursor-pointer items-center gap-2 border-r border-slate-200 px-4 text-sm transition ${active ? "rounded-t-xl bg-[#dcebff] font-bold text-blue-600" : "text-slate-600 hover:bg-slate-50"}`}>
           {tab.href === "/" && <Grid2X2 className="size-4" />}
           <span>{tab.title}</span>
           {tab.href === "/" ? <Pin className="size-3.5 text-slate-500" /> : <button type="button" onClick={(event) => closeTab(event, tab.href)} aria-label={`${tab.title} 탭 닫기`} className="grid size-6 cursor-pointer place-items-center rounded text-slate-400 hover:bg-white/80 hover:text-slate-700"><X className="size-3.5" /></button>}
