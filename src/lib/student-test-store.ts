@@ -9,7 +9,7 @@ import type { ReviewCommand, ReviewDatabase } from "./review-domain"
 import type { ProCommand } from "./pro-types"
 import { connectStudentTestBooks, studentTestBookPath } from "./student-test-books"
 
-export type StudentTestSession = StudentTestFixture & { token: string; caseId: StudentTestCaseId; day: string; createdAt: string; changedAt?: string; initial: ReturnType<typeof studentTestSummary> }
+export type StudentTestSession = StudentTestFixture & { token: string; boardOnly?: boolean; caseId: StudentTestCaseId; day: string; createdAt: string; changedAt?: string; initial: ReturnType<typeof studentTestSummary> }
 export type StudentTestState = { day: string; sessions: StudentTestSession[] }
 export const emptyStudentTests = (): StudentTestState => ({ day: "", sessions: [] })
 /** Read-only legacy source, copied once into a local browser workspace. Never used on Vercel. */
@@ -45,12 +45,24 @@ export function prepareStudentTests(state: StudentTestState, now: string): Stude
   if (sessions.some((session, index) => session !== state.sessions[index])) state = { ...state, sessions }
   // Add newly implemented examples without resetting any same-day result.
   if (state.day === day) {
-    const missing = studentTestCases.filter(c => !state.sessions.some(s => s.day === day && s.caseId === c.id))
+    const missing = studentTestCases.filter(c => !state.sessions.some(s => !s.boardOnly && s.day === day && s.caseId === c.id))
     return missing.length ? { ...state, sessions: [...state.sessions, ...missing.map(c => newStudentTestSession(c.id, now))] } : state
   }
   const previousDay = kstDate(addDays(now, -1))
   return { day, sessions: [...state.sessions.filter(s => s.day === previousDay), ...studentTestCases.map(c => newStudentTestSession(c.id, now))] }
 }
+export function openStudentRewriteExample(state: StudentTestState, caseId: "draft" | "second-draft", now: string) {
+  const day = kstDate(now)
+  const round = caseId === "draft" ? 1 : 2
+  const today = state.sessions.filter(session => session.day === day && session.caseId === caseId)
+  const existing = today.find(session =>
+    session.db.records.some(record => record.reviewId === session.targetId && record.round === round && record.writingStatus === "writing" && record.stage === "rewrite"))
+  if (existing) return { state, session: existing }
+  // Keep the original catalog result, including submitted or earlier-stage drafts.
+  const session = { ...newStudentTestSession(caseId, now), boardOnly: today.some(item => !item.boardOnly) }
+  return { state: { day, sessions: [...state.sessions, session] }, session }
+}
+
 export function getStudentTest(state: StudentTestState, token: string) {
   const session = state.sessions.find(s => s.token === token)
   if (!session) throw new Error("이 예시는 초기화되었거나 사용 기간이 끝났습니다. 학생프론트 테스트 목록에서 다시 열어 주세요.")
@@ -59,7 +71,7 @@ export function getStudentTest(state: StudentTestState, token: string) {
 export function resetStudentTest(state: StudentTestState, token: string, now: string): StudentTestState {
   const old = getStudentTest(state, token)
   if (old.day !== kstDate(now)) throw new Error("이전 날짜 예시입니다. 테스트 목록을 다시 열어 오늘 예시를 사용해 주세요.")
-  return { ...state, sessions: state.sessions.map(s => s.token === token ? newStudentTestSession(s.caseId, now) : s) }
+  return { ...state, sessions: state.sessions.map(s => s.token === token ? { ...newStudentTestSession(s.caseId, now), boardOnly: s.boardOnly } : s) }
 }
 export function currentStudentTest(session: StudentTestSession, now: string): ReviewDatabase {
   return reconcilePro(atReviewTime(structuredClone(connectSessionMetadata(session).db), now))

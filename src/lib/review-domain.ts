@@ -1,5 +1,5 @@
 // @ts-expect-error Node domain tests load TypeScript sources directly.
-import { legacyAssessmentCriteria, snapshotReviewAssessment, reviewAreaLabel, type ReviewAssessmentSnapshot } from "./review-assessment-config.ts"
+import { commonReviewAssessment, legacyAssessmentCriteria, snapshotReviewAssessment, reviewAreaLabel, type ReviewAssessmentSnapshot } from "./review-assessment-config.ts"
 // @ts-expect-error Node domain tests load TypeScript sources directly.
 import { REVIEW_FEEDBACK_SAMPLES } from "./review-feedback-samples.ts"
 // @ts-expect-error Node domain tests load TypeScript sources directly.
@@ -173,7 +173,7 @@ export type ReviewSeed = {
 }
 
 /** Build fixtures through the same commands as real prototype use: reports are not display-only stubs. */
-export function createSeededReviewDatabase(seeds: ReviewSeed[]): ReviewDatabase {
+export function createSeededReviewDatabase(seeds: ReviewSeed[], initialAssessment = snapshotReviewAssessment): ReviewDatabase {
   let db = emptyReviewDatabase()
   for (const seed of seeds) {
     let sequence = 0
@@ -184,7 +184,7 @@ export function createSeededReviewDatabase(seeds: ReviewSeed[]): ReviewDatabase 
       const at = new Date(Date.parse(seed.at) + sequence * 60_000).toISOString()
       // Historical demo submissions predate the minimum-length rule. Reconstruct
       // them unchanged; interactive submissions always use applyReviewCommand.
-      db = applyReviewCommandInternal(db, command, actor, requestId, at, true)
+      db = applyReviewCommandInternal(db, command, actor, requestId, at, initialAssessment)
       return requestId
     }
     run({ type: "create", common: { ...seed.common, seeded: true } })
@@ -205,7 +205,7 @@ export function createSeededReviewDatabase(seeds: ReviewSeed[]): ReviewDatabase 
       if (common.reportEnabled) {
         const runId = run({ type: "ai-start", recordId }, teacher)
         run({ type: "ai-result", recordId, runId, result: generated }, teacher)
-        scores = Object.fromEntries(assessmentCriteria(common.level).map(c => [c.id, Math.round(c.max * (second ? .9 : .8))]))
+        scores = Object.fromEntries(assessmentCriteria(common.level, record).map(c => [c.id, Math.round(c.max * (second ? .9 : .8))]))
       }
       run({ type: "save-feedback", recordId, feedback: common.reportEnabled ? generated.feedback : feedback, items: generated.items, scores, decision: seed.secondAnswers || seed.secondState ? "request" : "complete" }, teacher)
       const saved = db.records.find(r => r.id === recordId)!
@@ -306,7 +306,7 @@ export function normalizeReviewReportScores(db: ReviewDatabase): ReviewDatabase 
 }
 
 export function assessmentCriteria(level: number, record?: Pick<ReviewRecord, "assessment">) {
-  return (record?.assessment ?? snapshotReviewAssessment(level)).criteria
+  return (record ? record.assessment ?? commonReviewAssessment : snapshotReviewAssessment(level)).criteria
 }
 export function assessmentAreas(level: number, record?: Pick<ReviewRecord, "assessment">) {
   const criteria = assessmentCriteria(level, record)
@@ -327,10 +327,11 @@ export function expandLegacyReviewScores(db: ReviewDatabase): ReviewDatabase {
   const levels = new Map(db.reviews.map(review => [review.id, review.level]))
   const migrate = (record: ReviewRecord, inherited?: ReviewAssessmentSnapshot): ReviewRecord => {
     const level = levels.get(record.reviewId) ?? 6
-    let assessment = record.assessment
+    let assessment = record.assessment ?? inherited
     if (!assessment) {
       const scores = { ...record.aiScores, ...record.teacherScores }
-      if (Object.keys(scores).length > 0) {
+      const hasCommonKeys = "sufficiency" in scores || commonReviewAssessment.criteria.some(c => c.area in scores)
+      if (Object.keys(scores).length > 0 && !hasCommonKeys) {
         let criteria = structuredClone(legacyAssessmentCriteria)
         if ("summary" in scores) {
           criteria = [
@@ -345,7 +346,7 @@ export function expandLegacyReviewScores(db: ReviewDatabase): ReviewDatabase {
           }))
         }
         assessment = { version: "legacy-" + criteria.length, id: "legacy", label: "평가 당시 기준", minLevel: level, maxLevel: level, criteria }
-      } else assessment = structuredClone(inherited ?? snapshotReviewAssessment(level))
+      } else assessment = structuredClone(commonReviewAssessment)
     }
     const next = { ...record, assessment }
     if (record.aiScores && !validAiScores(level, record.aiScores, next) && validScores(level, record.aiScores, next)) {
@@ -360,24 +361,6 @@ export function expandLegacyReviewScores(db: ReviewDatabase): ReviewDatabase {
   return { ...db, records: db.records.map(r => r.round === 1 ? firsts.get(r.reviewId)! : migrate(r, firsts.get(r.reviewId)?.assessment)) }
 }
 export const scoreTotal = (scores: ReviewScores) => Object.values(scores).reduce((sum, value) => sum + value, 0)
-/** Local prototype only: refresh old, unevaluated activities without converting teacher scores. */
-export function upgradeUnscoredMockAssessments(db: ReviewDatabase): ReviewDatabase {
-  const protectedReviews = new Set(db.records.filter(r => r.report || Object.keys(r.teacherScores ?? {}).length > 0).map(r => r.reviewId))
-  return { ...db, records: db.records.map(record => {
-    if (!record.assessment?.version.startsWith("legacy-") || protectedReviews.has(record.reviewId)) return record
-    const review = db.reviews.find(r => r.id === record.reviewId)
-    if (!review) return record
-    const oldSample = sampleReviewAi(review, record).reportFeedback
-    const next: ReviewRecord = { ...record, assessment: snapshotReviewAssessment(review.level), aiScores: undefined }
-    const sample = sampleReviewAi(review, next)
-    if (record.aiScores) next.aiScores = sample.scores
-    if (record.reportFeedback && record.reportFeedback === oldSample) next.reportFeedback = sample.reportFeedback
-    if (record.aiDraft?.reportFeedback && record.aiDraft.reportFeedback === oldSample) {
-      next.aiDraft = { ...record.aiDraft, reportFeedback: sample.reportFeedback }
-    }
-    return next
-  }) }
-}
 /** Fill missing report copy and compact exact old samples only. Never replace teacher edits. */
 export function hydrateLegacyReviewFeedback(db: ReviewDatabase): ReviewDatabase {
   return { ...db, records: db.records.map(record => {
@@ -405,7 +388,7 @@ export function canAccessReview(review: ReviewCommon, actor: ReviewActor, pro?: 
     (actor.role === "agency" && actor.institutionId === review.institutionId) ||
     (actor.role === "class" && actor.institutionId === review.institutionId && actor.classId === review.classId)
 }
-export function canRejectReview(record: ReviewRecord) { return !activeFeedbackSchedule(record) && record.writingStatus === "submitted" && record.feedbackStatus === "작성전" && record.aiHistory.length === 0 }
+export function canRejectReview(record: ReviewRecord) { return !activeFeedbackSchedule(record) && record.writingStatus === "submitted" && record.feedbackStatus === "작성전" && record.aiUsed === 0 && !record.aiHistory.some(run => run.status === "running" || run.status === "success") }
 export function canChangeReviewTemplate(record: ReviewRecord) {
   return record.round === 1 && record.writingStatus === "writing" && record.stage === "items" && record.feedbackStatus === "작성전" && !record.rewriteEdited && !record.history.some(h => h.action === "enter-rewrite" || h.action === "submit")
 }
@@ -427,11 +410,11 @@ type ReviewCommandBase = {
   | { type: "save-feedback"; recordId: string; feedback: string; reportFeedback?: string; items: ItemFeedback[]; scores?: ReviewScores; decision?: "request" | "complete" }
 
 function requireCondition(ok: unknown, message: string): asserts ok { if (!ok) throw new Error(message) }
-function makeRecord(review: ReviewCommon, round: 1 | 2, first?: ReviewRecord): ReviewRecord {
+function makeRecord(review: ReviewCommon, round: 1 | 2, assessment: ReviewAssessmentSnapshot, first?: ReviewRecord): ReviewRecord {
   const direct = !!first?.rewriteEdited
   const itemRewrite = reviewWritingMode(review.template) === "items"
   return {
-    assessment: structuredClone(first?.assessment ?? snapshotReviewAssessment(review.level)),
+    assessment: structuredClone(assessment),
     id: `${review.id}-r${round}`, reviewId: review.id, round, linkedRecordId: first?.id,
     writingStatus: "writing", feedbackStatus: "작성전", answers: first && (!direct || itemRewrite) ? structuredClone(first.answers) : {},
     initialBody: direct ? first!.finalBody : "", body: direct ? first!.finalBody : "", finalBody: "", rewriteEdited: false,
@@ -454,7 +437,7 @@ export function applyReviewCommand(database: ReviewDatabase, command: ReviewComm
   return applyReviewCommandInternal(database, command, actor, requestId, at)
 }
 
-function applyReviewCommandInternal(database: ReviewDatabase, command: ReviewCommand, actor: ReviewActor, requestId: string, at: string, restoringHistoricalSeed = false): ReviewDatabase {
+function applyReviewCommandInternal(database: ReviewDatabase, command: ReviewCommand, actor: ReviewActor, requestId: string, at: string, seedAssessment?: typeof snapshotReviewAssessment): ReviewDatabase {
   const db = normalizeReviewReportScores(normalizeReviewFeedbackScope(structuredClone(database)))
   requireCondition(["create", "switch-template", "start-second", "save-writing", "enter-rewrite", "submit", "seen", "reject", "send", "parent", "ai-start", "ai-result", "flower", "save-feedback"].includes(command.type), "지원하지 않는 작업입니다.")
   if (db.records.some(r => r.history.some(h => h.requestId === requestId))) return db
@@ -465,7 +448,7 @@ function applyReviewCommandInternal(database: ReviewDatabase, command: ReviewCom
     requireCondition(command.common.template.items.length > 0 && new Set(command.common.template.items.map(i => i.id)).size === command.common.template.items.length, "템플릿 항목 ID를 확인해 주세요.")
     const review: ReviewCommon = { ...command.common, reportEnabled: command.common.template.reportEnabled, createdAt: at, progress: "first-writing" }
     db.reviews.push(review)
-    const record = makeRecord(review, 1)
+    const record = makeRecord(review, 1, (seedAssessment ?? snapshotReviewAssessment)(review.level))
     record.history.push({ requestId, action: command.type, actor: actor.name, at })
     db.records.push(record)
     return db
@@ -492,12 +475,12 @@ function applyReviewCommandInternal(database: ReviewDatabase, command: ReviewCom
     }
     const history = record.history
     const parentContact = record.parentContact
-    Object.assign(record, makeRecord(review, 1), { history, parentContact, templateSelectionPending: !command.template })
+    Object.assign(record, makeRecord(review, 1, record.assessment ?? commonReviewAssessment), { history, parentContact, templateSelectionPending: !command.template })
     review.progress = "first-writing"
   } else if (command.type === "start-second") {
     requireCondition(record.round === 1 && record.seenAt && review.secondDecision === "request", "1차 피드백 확인 후 다시 작성할 수 있습니다.")
     if (db.records.some(r => r.reviewId === review.id && r.round === 2)) return db
-    db.records.push(makeRecord(review, 2, first)); review.progress = "second-writing"
+    db.records.push(makeRecord(review, 2, first.assessment ?? commonReviewAssessment, first)); review.progress = "second-writing"
   } else if (command.type === "save-writing") {
     requireCondition(record.writingStatus === "writing", "제출한 글은 수정할 수 없습니다.")
     requireCondition(["items", "rewrite"].includes(command.stage) && Number.isInteger(command.itemIndex) && command.itemIndex >= 0 && command.itemIndex < review.template.items.length && typeof command.body === "string", "작성 단계와 항목 번호를 확인해 주세요.")
@@ -531,13 +514,13 @@ function applyReviewCommandInternal(database: ReviewDatabase, command: ReviewCom
   } else if (command.type === "submit") {
     if (reviewWritingMode(review.template) === "items") record.body = composeReviewBody(review.template, record.answers)
     requireCondition(record.writingStatus === "writing" && record.stage === "rewrite", "고쳐쓰기 본문을 작성해 주세요.")
-    requireCondition(restoringHistoricalSeed || reviewSubmissionLength(review.template, record.answers, record.body) >= REVIEW_MIN_SUBMISSION_LENGTH, REVIEW_SHORT_SUBMISSION_MESSAGE)
+    requireCondition(seedAssessment || reviewSubmissionLength(review.template, record.answers, record.body) >= REVIEW_MIN_SUBMISSION_LENGTH, REVIEW_SHORT_SUBMISSION_MESSAGE)
     record.finalBody = record.body; record.writingStatus = "submitted"; record.submittedAt = at; record.feedbackStatus = "작성전"; review.progress = `${prefix}-submitted`
   } else if (command.type === "seen") {
     requireCondition(record.feedbackStatus === "전송완료", "아직 전송되지 않은 피드백입니다.")
     if (!record.seenAt) { record.seenAt = at; review.progress = record.round === 2 || review.secondDecision === "complete" ? "complete" : "second-available" }
   } else if (command.type === "reject") {
-    requireCondition(canRejectReview(record), "AI 실행 이력이 없고 피드백 작성전인 경우만 반려할 수 있습니다.")
+    requireCondition(canRejectReview(record), "AI 생성에 성공하기 전의 피드백 작성 전 제출물만 반려할 수 있습니다.")
     record.writingStatus = "writing"; record.rejectedAt = at; record.feedback = ""; record.teacherScores = undefined; record.aiDraft = undefined
     // A second round can inherit the first round's rewrite-only entry point.
     record.stage = record.rewriteEdited || record.initialStage === "rewrite" ? "rewrite" : "items"

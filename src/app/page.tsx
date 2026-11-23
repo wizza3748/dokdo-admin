@@ -3,6 +3,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { STUDENT_FRONT_TEST_PATH } from "@/lib/pro-demo-navigation";
 import { ADMIN_PRO_WEEKLY_PATH, ADMIN_MONTHLY_PATH } from "@/lib/admin-navigation";
 
+function WorkbookQaRow({ id, title, href, note, links = [] }: { id: string; title: string; href: string; note?: string; links?: [string, string][] }) {
+  return <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40">
+    <div className="p-5 text-center"><a href={`https://sloop-dev.atlassian.net/browse/${id}`} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:underline">{id}</a></div>
+    <div className="border-l border-slate-50 p-5 text-[15px] font-semibold text-slate-700">
+      <Link href={href} prefetch={false} className="hover:underline">{title}</Link>
+      {note && <span className="ml-2 text-xs font-normal text-slate-500">{note}</span>}
+      {links.length > 0 && <div className="mt-1 flex flex-wrap gap-x-3">{links.map(([label, url]) => <Link key={label} href={url} prefetch={false} className="text-sm font-medium text-blue-600 hover:underline">{label}</Link>)}</div>}
+    </div>
+  </div>
+}
+
 export default function Home() {
   return (
     <div className="flex flex-col gap-8 p-4">
@@ -20,6 +31,7 @@ export default function Home() {
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">일감 ID</div>
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center border-l border-slate-100">제목</div>
               </div>
+              <WorkbookQaRow id="DD-1822" title="[기관-QA42] 도서 레벨별 채점 기준표 조회 개선" href="/agency/online-workbooks/assessment-level-3-r1?role=admin&panel=assessment&assessmentExample=1" note="3레벨 · 조회 전용" links={[["4레벨 · 2차 평가", "/agency/online-workbooks/assessment-level-4-r2?role=admin&panel=assessment&assessmentExample=1"]]} />
 <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group"><div className="p-5 text-center"><a href="https://sloop-dev.atlassian.net/browse/DD-1811" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline">DD-1811</a></div><div className="p-5 text-[15px] font-semibold text-slate-700 border-l border-slate-50"><Link href={ADMIN_MONTHLY_PATH} className="hover:underline">월간 피드백 기능 추가</Link></div></div>
               <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group">
                 <div className="p-5 text-center">
@@ -107,6 +119,11 @@ export default function Home() {
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">일감 ID</div>
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center border-l border-slate-100">제목</div>
               </div>
+              <WorkbookQaRow id="DD-1820" title="[기관-QA29·30·38·39-2] AI 안내 문구 및 사용 횟수 표기 통일" href="/agency/online-workbooks" links={[
+                ["최초 생성", "/agency/online-workbooks/review-seed-new-submitted-r1?dialog=ai"],
+                ["재생성", "/agency/online-workbooks/review-seed-agency-14894-r1?dialog=ai"],
+              ]} />
+              <WorkbookQaRow id="DD-1822" title="[기관-QA42] 도서 레벨별 채점 기준표 조회 개선" href="/agency/online-workbooks/assessment-level-3-r1?role=agency&panel=assessment&assessmentExample=1" note="3레벨 · 1차 평가" links={[["4레벨 · 2차 평가", "/agency/online-workbooks/assessment-level-4-r2?role=agency&panel=assessment&assessmentExample=1"]]} />
 <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group"><div className="p-5 text-center"><a href="https://sloop-dev.atlassian.net/browse/DD-1811" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline">DD-1811</a></div><div className="p-5 text-[15px] font-semibold text-slate-700 border-l border-slate-50"><Link href="/agency/pro-management" className="hover:underline">월간 피드백 기능 추가</Link></div></div>
               <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group">
                 <div className="p-5 text-center">
@@ -168,6 +185,8 @@ export default function Home() {
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">일감 ID</div>
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center border-l border-slate-100">제목</div>
               </div>
+              <WorkbookQaRow id="DD-1819" title="[학생-QA32] 고쳐쓰기 질문 펼침 기능 개선" href="/student/online-workbook/example/draft" links={[["2차 고쳐쓰기", "/student/online-workbook/example/second-draft"]]} />
+              <WorkbookQaRow id="DD-1821" title="[학생-QA25] 완독 도서에서 독후감 바로가기 추가" href="/reading/index?bookId=601&round=1&qa=completed-book&demoStudent=normal&view=book" links={[["마지막 회차 재독 완료", "/reading/index?bookId=601&round=1&qa=completed-book&demoStudent=normal&view=reread-complete"]]} />
               <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group">
                 <div className="p-5 text-center">
                   <a href="https://sloop-dev.atlassian.net/browse/DD-1723" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:text-blue-800 transition-colors underline-offset-4 hover:underline">DD-1723</a>

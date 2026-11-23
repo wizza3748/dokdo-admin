@@ -1,4 +1,11 @@
-export type ReviewAssessmentCriterion = { id: string; area: string; name: string; max: number; description: string }
+// @ts-expect-error Node domain tests load TypeScript sources directly.
+import { lowerBookCriteria, upperBookCriteria } from "./review-assessment-levels.ts"
+
+export type ReviewAssessmentCriterion = {
+  id: string; area: string; name: string; max: number; description: string;
+  bands?: { score: string; description: string }[];
+  levelDescriptions?: { minLevel: number; maxLevel: number; description: string }[];
+}
 
 // Area strings are also persisted score keys. Rename labels without moving or losing marks.
 export const reviewAreaLabel = (area: string) => area === "구성 및 조직력" ? "구성과 조직력" : area === "표현과 전달력" ? "표현력" : area
@@ -82,12 +89,23 @@ const commonCriteria: ReviewAssessmentCriterion[] = [
   }
 ]
 
-/** Add level-specific groups here later. Persisted assessment snapshots are never rewritten. */
+export const commonReviewAssessment: ReviewAssessmentSnapshot = {
+  version: "2026-09-28-common-8", id: "common", label: "전 레벨 공통",
+  minLevel: 1, maxLevel: 6, criteria: commonCriteria,
+}
+
+const bookLevelVersion = "2026-11-19-book-level-8"
 export const REVIEW_ASSESSMENT_CONFIG = {
-  version: "2026-09-28-common-8",
+  version: bookLevelVersion,
   groups: [
-    { id: "common", label: "전 레벨 공통", minLevel: 1, maxLevel: 6, criteria: commonCriteria },
+    { id: "level-1-3", label: "1~3레벨", minLevel: 1, maxLevel: 3, criteria: lowerBookCriteria },
+    { id: "level-4-6", label: "4~6레벨", minLevel: 4, maxLevel: 6, criteria: upperBookCriteria },
   ],
+}
+
+/** The existing family report still publishes the pre-revision guide for these eight scoring keys. */
+export function familyReportCriteria(assessment: ReviewAssessmentSnapshot) {
+  return assessment.version === bookLevelVersion ? commonCriteria : assessment.criteria
 }
 
 export function snapshotReviewAssessment(level: number): ReviewAssessmentSnapshot {

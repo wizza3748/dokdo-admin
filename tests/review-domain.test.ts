@@ -444,13 +444,15 @@ for (const edited of [false, true]) test(`2차 최초 진입 분기: 1차 편집
   assert.equal(f.db.records.length, 2)
 })
 
-test("AI 실패·누락은 차감/입력 변경 없이 반려만 잠금", () => {
+test("첫 성공 전 실패·누락은 차감하지 않고 반려를 허용한다", () => {
   const f = fixture(true, "items"); f.write()
   f.generate("qa-r1", "failure"); f.generate("qa-r1", "missing")
   assert.equal(f.db.records[0].aiUsed, 0); assert.equal(f.db.records[0].aiDraft, undefined)
-  assert.equal(canRejectReview(f.db.records[0]), false)
+  assert.equal(canRejectReview(f.db.records[0]), true)
   assert.equal(f.db.records[0].aiHistory.length, 2)
   assert.throws(() => f.save())
+  f.run({ type: "reject", recordId: "qa-r1" }, teacher)
+  assert.equal(f.db.records[0].writingStatus, "writing")
 })
 
 test("채점 불가는 AI 실패로 기록하고 횟수·점수·피드백 처리 상태를 유지한다", () => {
@@ -463,7 +465,7 @@ test("채점 불가는 AI 실패로 기록하고 횟수·점수·피드백 처�
   assert.equal(record.aiUsed, 0)
   assert.equal(record.aiScores, undefined)
   assert.equal(record.report, undefined)
-  assert.equal(canRejectReview(record), false)
+  assert.equal(canRejectReview(record), true)
   assert.throws(() => f.save("qa-r1", "complete"))
   assert.equal(canSendReview(f.db.reviews[0], f.db.records[0]), false)
   f.generate()
@@ -608,4 +610,16 @@ test("중단된 AI 실행은 시간 초과 후 재실행 가능하고 중복 결
   f.run({ type: "ai-start", recordId: "qa-r1" }, teacher, "retry", "2026-09-07T00:03:00Z")
   assert.equal(f.db.records[0].aiHistory[0].status, "failure")
   assert.throws(() => f.run({ type: "ai-result", recordId: "qa-r1", runId: "stale" }, teacher))
+})
+
+test("첫 성공 이후 재생성 실패에도 해당 차수의 반려 제한과 점수를 유지한다", () => {
+  const f = fixture(true)
+  f.write()
+  f.generate()
+  const scores = structuredClone(f.db.records[0].aiScores)
+  f.generate("qa-r1", "failure")
+  assert.equal(f.db.records[0].aiUsed, 1)
+  assert.deepEqual(f.db.records[0].aiScores, scores)
+  assert.equal(canRejectReview(f.db.records[0]), false)
+  assert.throws(() => f.run({ type: "reject", recordId: "qa-r1" }, teacher))
 })

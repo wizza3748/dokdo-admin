@@ -141,7 +141,7 @@ export function reviewProPresentation(c: ProCase | undefined, round: 1 | 2, sent
   }
 }
 
-export const legacyAgencyReviewColumns = ["선택", "고유번호", "학생 이름", "레벨", "도서명", "학생 제출일", "피드백 작성일", "차수", "진행 상황", "관리 주차", "피드백 대상", "처리 기한", "피드백 상태", "학부모 발송 여부", "피드백 전송", "학부모 발송", "평가 보고서", "섬초롱꽃", "피드백 작성 (AI 잔여횟수)"]
+export const legacyAgencyReviewColumns = ["선택", "고유번호", "학생 이름", "레벨", "도서명", "학생 제출일", "피드백 작성일", "차수", "진행 상황", "관리 주차", "피드백 대상", "처리 기한", "피드백 상태", "학부모 발송 여부", "피드백 전송", "학부모 발송", "평가 보고서", "섬초롱꽃", "피드백 작성"]
 export function agencyReviewColumns(showPro: boolean) {
   return [...legacyAgencyReviewColumns.slice(0, 6), ...(showPro ? legacyAgencyReviewColumns.slice(9, 12) : []), ...legacyAgencyReviewColumns.slice(6, 9), ...legacyAgencyReviewColumns.slice(12)]
 }
@@ -149,5 +149,5 @@ export function agencyReviewColumns(showPro: boolean) {
 /** Preserve column choices by name even when the pro columns appear or move. */
 export function hiddenReviewColumnNames(saved: unknown, legacyColumns: string[]): string[] {
   if (!Array.isArray(saved)) return []
-  return [...new Set(saved.flatMap(value => typeof value === "string" ? [value] : Number.isInteger(value) && legacyColumns[value] ? [legacyColumns[value]] : []))]
+  return [...new Set(saved.flatMap(value => typeof value === "string" ? [value === "피드백 작성 (AI 잔여횟수)" ? "피드백 작성" : value] : Number.isInteger(value) && legacyColumns[value] ? [legacyColumns[value]] : []))]
 }

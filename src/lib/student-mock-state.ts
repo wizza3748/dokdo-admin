@@ -1,3 +1,5 @@
+import { selectedDemoStudent, studentTestToken } from "./student-test-context"
+
 export const STUDENT_MOCK_STORAGE_KEYS = {
   readingFavorites: "dokdo-student-reading-favorites",
   readingCompletedRounds: "dokdo-student-reading-completed-rounds",
@@ -41,100 +43,106 @@ export function getMillisecondsUntilNextKoreanDay(date = new Date()) {
   return Math.max(0, nextMidnight - date.getTime())
 }
 
-function readCompletedReadingRounds() {
-  if (typeof window === "undefined") return new Set<string>()
+type ReadingResults = Record<number, Record<number, ReadingRoundResult>>
+type ReadingProgress = { results: ReadingResults; history: ReadingRoundCompletion[] }
+const progressKey = "dokdo-student-reading-progress"
 
+export function currentReadingOwner() {
+  return { studentId: selectedDemoStudent() || "26142", studentTest: studentTestToken() }
+}
+type ReadingOwner = ReturnType<typeof currentReadingOwner>
+
+export function studentReadingStorageKey(base: string, owner: ReadingOwner) {
+  return `${base}:${encodeURIComponent(owner.studentId)}:${encodeURIComponent(owner.studentTest)}`
+}
+
+export function hasReadingOwner(entry: { studentId?: string; studentTest?: string }, owner: ReadingOwner) {
+  return entry.studentId === owner.studentId && (entry.studentTest ?? "") === owner.studentTest
+}
+
+function readStored<T>(key: string, fallback: T): T {
   try {
-    const stored = window.localStorage.getItem(STUDENT_MOCK_STORAGE_KEYS.readingCompletedRounds)
-    if (!stored) return new Set<string>()
-    const parsed = JSON.parse(stored) as unknown
-    return Array.isArray(parsed)
-      ? new Set(parsed.filter((value): value is string => typeof value === "string"))
-      : new Set<string>()
+    return JSON.parse(window.localStorage.getItem(key) ?? "null") ?? fallback
   } catch {
-    window.localStorage.removeItem(STUDENT_MOCK_STORAGE_KEYS.readingCompletedRounds)
-    return new Set<string>()
+    return fallback
   }
 }
 
-function readReadingCompletionHistory() {
-  if (typeof window === "undefined") return [] as ReadingRoundCompletion[]
+function ownProgress(owner: ReadingOwner): ReadingProgress {
+  return readStored(studentReadingStorageKey(progressKey, owner), { results: {}, history: [] })
+}
 
-  try {
-    const stored = window.localStorage.getItem(STUDENT_MOCK_STORAGE_KEYS.readingCompletionHistory)
-    if (!stored) return [] as ReadingRoundCompletion[]
-    const parsed = JSON.parse(stored) as unknown
-    if (!Array.isArray(parsed)) return [] as ReadingRoundCompletion[]
-    return parsed.filter((value): value is ReadingRoundCompletion => {
-      if (!value || typeof value !== "object") return false
-      const completion = value as Partial<ReadingRoundCompletion>
-      return Number.isInteger(completion.bookId)
-        && Number.isInteger(completion.round)
-        && typeof completion.completedAt === "string"
-        && Number.isFinite(new Date(completion.completedAt).getTime())
-    })
-  } catch {
-    window.localStorage.removeItem(STUDENT_MOCK_STORAGE_KEYS.readingCompletionHistory)
-    return [] as ReadingRoundCompletion[]
+function readingProgress(): ReadingProgress {
+  if (typeof window === "undefined") return { results: {}, history: [] }
+  const owner = currentReadingOwner()
+  const { results, history } = ownProgress(owner)
+  // Older shared keys had no student by default. Only an explicitly attributed entry can be used.
+  const sharedResults = readStored<Record<string, Record<string, ReadingRoundResult & Partial<ReadingOwner>>>>(
+    STUDENT_MOCK_STORAGE_KEYS.readingRoundResults, {})
+  for (const [bookId, rounds] of Object.entries(sharedResults)) {
+    for (const [round, result] of Object.entries(rounds ?? {})) {
+      if (result?.completedAt && hasReadingOwner(result, owner)) {
+        const byRound = results[Number(bookId)] ??= {}
+        byRound[Number(round)] ??= result
+      }
+    }
   }
+  const sharedHistory = readStored<Array<ReadingRoundCompletion & Partial<ReadingOwner>>>(STUDENT_MOCK_STORAGE_KEYS.readingCompletionHistory, [])
+  if (Array.isArray(sharedHistory)) {
+    history.push(...sharedHistory.filter(entry => entry && hasReadingOwner(entry, owner) && Number.isInteger(entry.bookId) && Number.isInteger(entry.round) && Number.isFinite(Date.parse(entry.completedAt))))
+  }
+  return { results, history }
 }
 
 export function getCompletedReadingRoundCount() {
   const today = getKoreanDateValue()
-  return readReadingCompletionHistory().filter((completion) => (
-    getKoreanDateValue(new Date(completion.completedAt)) === today
-  )).length
+  return readingProgress().history.filter(entry => getKoreanDateValue(new Date(entry.completedAt)) === today).length
 }
 
-export function getCompletedReadingRoundsByBook() {
-  const completedByBook: Record<number, number> = {}
+function completedByBook() {
+  const { results, history } = readingProgress()
+  const books = new Map<number, Set<number>>()
+  const add = (book: number, round: number) => {
+    if (!Number.isInteger(book) || !Number.isInteger(round) || round < 1) return
+    const rounds = books.get(book) ?? new Set<number>()
+    rounds.add(round)
+    books.set(book, rounds)
+  }
+  for (const [book, rounds] of Object.entries(results)) {
+    for (const [round, result] of Object.entries(rounds)) if (result?.completedAt) add(Number(book), Number(round))
+  }
+  for (const entry of history) add(entry.bookId, entry.round)
+  return books
+}
 
-  readCompletedReadingRounds().forEach((completedRound) => {
-    const [bookIdValue, roundValue] = completedRound.split(":")
-    const bookId = Number(bookIdValue)
-    const round = Number(roundValue)
-    if (!Number.isInteger(bookId) || !Number.isInteger(round) || round < 1) return
-    completedByBook[bookId] = Math.max(completedByBook[bookId] ?? 0, round)
-  })
+export function getCompletedReadingRoundsByBook(): Record<number, number> {
+  return Object.fromEntries([...completedByBook()].map(([book, rounds]) => [book, consecutiveQuizRounds(rounds, rounds.size)]))
+}
 
-  return completedByBook
+export function completedQuizRounds(bookId: number) {
+  return completedByBook().get(bookId) ?? new Set<number>()
+}
+
+export function consecutiveQuizRounds(completed: ReadonlySet<number>, total: number) {
+  let round = 0
+  while (round < total && completed.has(round + 1)) round++
+  return round
 }
 
 export function getReadingRoundResultsByBook() {
-  if (typeof window === "undefined") return {} as Record<number, Record<number, ReadingRoundResult>>
-
-  try {
-    const stored = window.localStorage.getItem(STUDENT_MOCK_STORAGE_KEYS.readingRoundResults)
-    if (!stored) return {} as Record<number, Record<number, ReadingRoundResult>>
-    return JSON.parse(stored) as Record<number, Record<number, ReadingRoundResult>>
-  } catch {
-    window.localStorage.removeItem(STUDENT_MOCK_STORAGE_KEYS.readingRoundResults)
-    return {} as Record<number, Record<number, ReadingRoundResult>>
-  }
+  return readingProgress().results
 }
 
 export function markReadingRoundCompleted(bookId: number, round: number, result?: Omit<ReadingRoundResult, "completedAt">) {
   if (typeof window === "undefined") return 0
-
-  const completedAt = new Date()
-  const completedRounds = readCompletedReadingRounds()
-  completedRounds.add(`${bookId}:${round}`)
-  window.localStorage.setItem(STUDENT_MOCK_STORAGE_KEYS.readingCompletedRounds, JSON.stringify([...completedRounds]))
-  const roundResults = getReadingRoundResultsByBook()
-  roundResults[bookId] = {
-    ...(roundResults[bookId] ?? {}),
-    [round]: roundResults[bookId]?.[round] ?? {
-      completedAt: getKoreanDateValue(completedAt),
-      correctCount: result?.correctCount ?? 0,
-      totalQuestions: result?.totalQuestions ?? 6,
-      questionAreas: result?.questionAreas,
-      questionResults: result?.questionResults,
-    },
+  const owner = currentReadingOwner(), completedAt = new Date()
+  const progress = ownProgress(owner)
+  const byRound = progress.results[bookId] ??= {}
+  byRound[round] ??= getReadingRoundResultsByBook()[bookId]?.[round] ?? {
+    correctCount: 0, totalQuestions: 6, ...result, completedAt: getKoreanDateValue(completedAt),
   }
-  window.localStorage.setItem(STUDENT_MOCK_STORAGE_KEYS.readingRoundResults, JSON.stringify(roundResults))
-  const completionHistory = readReadingCompletionHistory()
-  completionHistory.push({ bookId, round, completedAt: completedAt.toISOString() })
-  window.localStorage.setItem(STUDENT_MOCK_STORAGE_KEYS.readingCompletionHistory, JSON.stringify(completionHistory))
+  progress.history.push({ bookId, round, completedAt: completedAt.toISOString() })
+  window.localStorage.setItem(studentReadingStorageKey(progressKey, owner), JSON.stringify(progress))
   const dailyCompletedCount = getCompletedReadingRoundCount()
   window.dispatchEvent(new CustomEvent(READING_ROUND_CHANGE_EVENT, { detail: dailyCompletedCount }))
   return dailyCompletedCount
@@ -153,6 +161,9 @@ export function subscribeCompletedReadingRoundCount(listener: () => void) {
 
 export async function resetStudentMockState() {
   if (typeof window === "undefined") return
+  const owner = currentReadingOwner()
+  window.localStorage.removeItem(studentReadingStorageKey(progressKey, owner))
+  window.localStorage.removeItem(studentReadingStorageKey(STUDENT_MOCK_STORAGE_KEYS.explorationRecords, owner))
   Object.values(STUDENT_MOCK_STORAGE_KEYS).forEach((key) => {
     window.localStorage.removeItem(key)
     window.sessionStorage.removeItem(key)

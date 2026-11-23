@@ -86,13 +86,18 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
   const [decisionValue, setDecision] = React.useState(common.secondDecision ?? "")
   const decision = displaySaved ? common.secondDecision ?? "" : decisionValue
   const [modal, setModal] = React.useState<"send" | "parent" | "flower" | "reject" | "leave" | null>(null)
-  const [aiDialogOpen, setAiDialogOpen] = React.useState(false)
+  const [entry] = React.useState(() => new URLSearchParams(typeof window === "undefined" ? "" : window.location.search))
+  const [aiDialogOpen, setAiDialogOpen] = React.useState(() => entry.get("dialog") === "ai" && (!isPro || !!proCase?.selectedAt))
   const [firstReferenceOpen, setFirstReferenceOpen] = React.useState(false)
   const closeFirstReference = React.useCallback(() => setFirstReferenceOpen(false), [])
   const [itemFeedbackOpen, setItemFeedbackOpen] = React.useState(false)
   const [expandedItemIds, setExpandedItemIds] = React.useState<Set<string>>(() => new Set())
   const includeItemFeedback = reviewIncludesItemFeedback(common.template)
-  const [assessmentOpen, setAssessmentOpen] = React.useState(false)
+  const [assessmentOpen, setAssessmentOpen] = React.useState(() => entry.get("panel") === "assessment")
+  const assessmentSection = React.useRef<HTMLDetailsElement>(null)
+  React.useEffect(() => {
+    if (entry.get("panel") === "assessment") assessmentSection.current?.scrollIntoView({ block: "start" })
+  }, [entry])
   const [amount, setAmount] = React.useState<number | null>(null)
   const [busy, setBusy] = React.useState(false)
   const pendingAction = React.useRef(false)
@@ -234,7 +239,7 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
         {reservationLocked && <p role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">수정하거나 즉시 전송하려면 예약을 취소해 주세요.</p>}
         <section aria-label="피드백 작성 안내" className="rounded-lg border border-[#bae7ff] bg-[#e6f7ff] px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2 font-semibold text-[#1890ff]"><Bot className="size-4" />AI 피드백 생성 안내</div><div className="flex items-center gap-2"><div aria-hidden className="h-1.5 w-16 overflow-hidden rounded-full bg-[#d6eaff]"><span className="block h-full bg-[#1890ff]" style={{ width: `${Math.min(record.aiUsed, 2) * 50}%` }} /></div><span className="text-xs font-semibold text-[#1890ff]">사용 {record.aiUsed}/2회</span></div></div>
-          <div className="mt-2 space-y-1 text-sm leading-5 text-[#5f6872]"><p>{includeItemFeedback ? "항목별보기 독후감은 [학생용] 총평과 학생 표시가 켜진 항목별 피드백을 생성합니다." : "이어보기 독후감은 [학생용] 총평만 생성하며, 항목별 피드백은 제공하지 않습니다."} [AI 피드백 생성]을 눌러 주세요.</p>{common.reportEnabled && <p>평가 점수와 [보고서용] 총평도 함께 생성합니다. 선생님 평가 점수는 직접 입력해 주세요.</p>}<p>생성된 내용은 확인·수정한 후 저장해 주세요. {includeItemFeedback ? "각 총평과 학생 표시가 켜진 항목별 피드백은 각각 10자 이상 입력해야 합니다." : "각 총평은 10자 이상 입력해야 합니다."}</p><p>차수별 최대 2회 생성할 수 있으며, 생성 성공 시 1회 차감됩니다. 최초 생성 확인 후에는 학생에게 반려할 수 없습니다.</p></div>
+          <div className="mt-2 space-y-1 text-sm leading-5 text-[#5f6872]"><p>{includeItemFeedback ? "항목별보기 독후감은 [학생용] 총평과 학생 표시가 켜진 항목별 피드백을 생성합니다." : "이어보기 독후감은 [학생용] 총평만 생성하며, 항목별 피드백은 제공하지 않습니다."} [AI 피드백 생성]을 눌러 주세요.</p>{common.reportEnabled && <p>평가 점수와 [보고서용] 총평도 함께 생성합니다. 선생님 평가 점수는 직접 입력해 주세요.</p>}<p>생성된 내용은 확인·수정한 후 저장해 주세요. {includeItemFeedback ? "각 총평과 학생 표시가 켜진 항목별 피드백은 각각 10자 이상 입력해야 합니다." : "각 총평은 10자 이상 입력해야 합니다."}</p><p>차수별 최대 2회 생성할 수 있으며, 생성 성공 시 1회 차감됩니다. 최초 생성에 성공한 후에는 학생에게 반려할 수 없습니다.</p></div>
         </section>
         {record.round === 1 && <fieldset disabled={locked} className="min-w-0 rounded-lg border border-[#b9ddf5] bg-[#f3faff] px-4 py-3 text-sm">
           <legend className="sr-only">2차 작성 여부 (필수)</legend>
@@ -301,7 +306,7 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
           </section>
         </details>
         </section> : null}
-    {common.reportEnabled ? <details open={assessmentOpen} onToggle={event => setAssessmentOpen(event.currentTarget.open)} className="group/assessment border-t border-[#e8e8e8] pt-4">
+    {common.reportEnabled ? <details ref={assessmentSection} open={assessmentOpen} onToggle={event => setAssessmentOpen(event.currentTarget.open)} className="group/assessment border-t border-[#e8e8e8] pt-4">
       <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md py-2 font-bold focus-visible:outline-2 focus-visible:outline-[#1890ff] [&::-webkit-details-marker]:hidden"><ChevronDown aria-hidden className="size-4 shrink-0 -rotate-90 transition-transform group-open/assessment:rotate-0" />[보고서용] {record.round}차 평가</summary>
       <div className="mt-3"><ReviewAssessment common={common} record={record} scores={scores} onChange={setScores} readOnly={locked} hideHeading /></div>
     </details> : null}
@@ -331,7 +336,7 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
     {scheduleDialog && <ReviewScheduleDialog common={common} record={record} schedule={scheduleDialog === "new" ? undefined : record.feedbackSchedules?.find(value => value.id === scheduleDialog)} role={role} due={record.round === 1 ? proCase?.due : proCase?.secondDue} now={hook.db.currentTime ?? new Date().toISOString()} fixedClock={hook.db.pro?.clockMode === "test"} onClose={() => setScheduleDialog(null)} onRefresh={hook.refresh} onSuccess={setNotice}/>}
     {record.round === 2 && firstReferenceOpen && <TeacherReferencePanel onClose={closeFirstReference}><FirstRoundReference common={common} record={first} role={role} /></TeacherReferencePanel>}
     {designation && <ReviewDialog title={designation.issue ? reviewDesignationCopy.blockedTitle : reviewDesignationCopy.title} confirmLabel="대상으로 지정하고 계속" closeLabel={designation.issue ? "확인" : "취소"} busy={busy} onClose={() => setDesignation(null)} onConfirm={designation.issue ? undefined : () => { const action = designation.action; setDesignation(null); if (action === "ai") void generate(true); else void save(true) }}><ReviewDesignationDetails preview={designation} /></ReviewDialog>}
-    {aiDialogOpen && <ReviewDialog title={aiDialog.title} onClose={() => setAiDialogOpen(false)} onConfirm={aiDialog.confirmable ? () => void generate() : undefined} disabled={busy}><div>{aiDialog.lines.map(line => <p key={line}>{line}</p>)}</div></ReviewDialog>}
+    {aiDialogOpen && !locked && !record.aiHistory.some(run => run.status === "running") && <ReviewDialog title={aiDialog.title} onClose={() => setAiDialogOpen(false)} onConfirm={aiDialog.confirmable ? () => void generate() : undefined} disabled={busy}><div className="whitespace-pre-line">{aiDialog.lines.join("\n")}</div></ReviewDialog>}
     {modal && <ReviewDialog variant={modal === "flower" ? "form" : "confirmation"} busy={busy} title={({ send: "학생 전송", parent: "학부모 발송", flower: "섬초롱꽃을 지급할까요?", reject: "학생 반려", leave: "이동 확인" })[modal]} onClose={() => setModal(null)} onConfirm={() => void confirm()} confirmLabel={modal === "reject" ? "반려하기" : modal === "send" && isPro && record.round === 1 && common.secondDecision === "complete" ? "전송하기" : "확인"} disabled={busy || (modal === "flower" && !amount)}>{modal === "flower" ? <><p>지급된 섬초롱꽃은 되돌릴 수 없습니다. 지급 개수를 확인해 주세요.</p><div className="my-4 flex gap-2">{[5, 10, 15, 20].map(n => <Button key={n} variant={amount === n ? "default" : "outline"} onClick={() => setAmount(n)}>🌻 {n}개</Button>)}</div><div className="space-y-2 rounded-xl bg-blue-50 p-4"><strong>권장 기준 안내</strong><p>🥉 5개: 작성 내용이 단순하고, 구체적인 감상 표현이 부족한 글</p><p>🥈 10개: 독서록 양식에 따라 충실히 작성했으나, 의견이나 생각이 부족한 글</p><p>🥇 15개: 인상 깊은 내용을 구체적으로 쓰고, 경험이나 생각과 연결해 감상을 풍부하게 적은 글</p><p>🏆 20개: 주제에 대한 깊이 있는 분석, 창의적 해석과 독창적인 표현이 돋보이는 글</p></div></> : modal === "parent" ? `${common.studentName} 학부모에게 발송하시겠습니까?` : modal === "reject" ? "반려 처리하면 해당 온라인 독후감이 기관관리자 목록에서 사라집니다. 학생이 작성한 내용은 유지되며, 학생은 내용을 수정하여 다시 제출할 수 있습니다. 계속 진행하시겠어요?" : modal === "leave" ? "저장하지 않은 변경 내용을 버리고 목록으로 이동할까요?" : isPro && record.round === 1 && common.secondDecision === "complete" ? PRO_SEND_CONFIRM : "학생에게 피드백을 전송할까요? 전송 후 수정하거나 반려할 수 없습니다."}</ReviewDialog>}
   </div>
 }

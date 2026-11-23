@@ -13,13 +13,26 @@ Module._resolveFilename = function (name, ...args) {
   return originalResolve.call(this, name.startsWith('@/') ? path.join(root, 'src', name.slice(2)) : name, ...args)
 }
 require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText, filename)
-const { getDefaultReviewDatabase } = require('../src/lib/review-seeds.ts')
+const { getAssessmentExampleDatabase, getDefaultReviewDatabase } = require('../src/lib/review-seeds.ts')
 const { mergeReviewSeeds, studentReviewNotices, studentReviewRecordStatus } = require('../src/lib/review-domain.ts')
 const { studentWorkbooks } = require('../src/lib/student-workbooks.ts')
 const { WORKBOOK_TEMPLATE_LIVE_DETAILS } = require('../src/lib/workbook-template-live-data.ts')
 const { READING_BOOKS } = require('../src/lib/reading-books.ts')
 const { getConfiguredTemplates } = require('../src/lib/workbook-template-settings.ts')
 const { initializePro } = require('../src/lib/pro-seeds.ts')
+
+test('일감보드 3·4레벨 예시는 공용 독후감과 분리되고 4레벨의 전송된 1차와 입력할 2차는 같은 버전을 쓴다', () => {
+  const shared = getDefaultReviewDatabase(), example = getAssessmentExampleDatabase()
+  assert.ok(shared.records.every(record => record.assessment.version === '2026-09-28-common-8'))
+  assert.ok(shared.reviews.every(review => !example.reviews.some(item => item.id === review.id)))
+  assert.deepEqual(example.reviews.map(review => review.level), [3, 4])
+  const [low, first, second] = example.records
+  assert.equal(low.assessment.id, 'level-1-3')
+  assert.equal(first.assessment.id, 'level-4-6')
+  assert.deepEqual(first.assessment, second.assessment)
+  assert.deepEqual([low.feedbackStatus, first.feedbackStatus, second.feedbackStatus], ['작성전', '전송완료', '작성전'])
+  assert.equal(second.linkedRecordId, first.id)
+})
 
 test('초기화 기본값은 9월 미확인 피드백 2건이며 이전 피드백은 읽음이다', () => {
   const db = getDefaultReviewDatabase()

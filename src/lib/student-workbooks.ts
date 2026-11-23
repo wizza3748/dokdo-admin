@@ -50,6 +50,8 @@ export interface WorkbookRuntimeState {
   selectedTemplateId?: string
   answers: string[]
   feedbackSeen: boolean
+  stage?: "write" | "rewrite"
+  questionIndex?: number
 }
 
 const kwlTemplate: WorkbookTemplate = {
@@ -252,7 +254,6 @@ export const studentWorkbooks: StudentWorkbook[] = [
 ]
 
 const runtimeStates: Record<string, Partial<WorkbookRuntimeState>> = {}
-const dynamicWorkbooks: Record<string, StudentWorkbook> = {}
 let runtimeStatesLoaded = false
 
 function ensureRuntimeStatesLoaded() {
@@ -277,8 +278,10 @@ export function getWorkbookRuntime(workbook: StudentWorkbook): WorkbookRuntimeSt
   const sourceAnswers = stored?.answers ?? workbook.answers
   return {
     status: stored?.status ?? workbook.status,
-    selectedTemplateId: template.id,
-    answers: template.questions.map((_, index) => sourceAnswers[index] ?? ""),
+    stage: stored?.stage,
+    questionIndex: stored?.questionIndex,
+    selectedTemplateId: template?.id,
+    answers: (template?.questions ?? []).map((_, index) => sourceAnswers[index] ?? ""),
     feedbackSeen: stored?.feedbackSeen ?? workbook.feedback?.seen ?? true,
   }
 }
@@ -295,9 +298,6 @@ export function getWorkbookById(id: string) {
   const stored = studentWorkbooks.find((workbook) => workbook.id === id)
   if (stored) return stored
   const explorationRecord = getTransientReadingExplorationRecords().find(record => record.workbookId === id)
-  if (dynamicWorkbooks[id]) return explorationRecord
-    ? { ...dynamicWorkbooks[id], year: explorationRecord.year, month: explorationRecord.month, day: explorationRecord.day, weekday: explorationRecord.weekday }
-    : dynamicWorkbooks[id]
 
   const match = /^reading-(\d+)-round-(\d+)$/.exec(id)
   if (!match) return undefined
@@ -337,7 +337,6 @@ export function getWorkbookById(id: string) {
     selectedTemplateId: String(setting.priorityTemplateId),
     answers: templates[0]?.questions.map(() => "") ?? [],
   }
-  dynamicWorkbooks[id] = dynamicWorkbook
   return dynamicWorkbook
 }
 

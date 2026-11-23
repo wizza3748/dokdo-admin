@@ -65,6 +65,16 @@ test("foreign origins, missing write origins, invalid cookies and unsafe cloud c
   assert.throws(() => studentTestWorkspace(new Request("http://dokdo-admin.vercel.app/api/mock/student-front-tests"), false, env))
 })
 
+test("a local rewrite shortcut uses the browser's actual loopback origin even when Next normalizes its URL", () => {
+  const local = { NODE_ENV: "development" }
+  const localRequest = (origin: string) => new Request("http://localhost:3000/api/mock/student-front-tests", {
+    method: "POST", headers: { host: "127.0.0.1:3000", origin, "sec-fetch-site": "same-origin" },
+  })
+  assert.ok(studentTestWorkspace(localRequest("http://127.0.0.1:3000"), true, local)?.cookie)
+  assert.throws(() => studentTestWorkspace(localRequest("http://localhost:3000"), true, local))
+  assert.throws(() => studentTestWorkspace(localRequest("http://127.0.0.1:3001"), true, local))
+})
+
 test("Neon namespaces isolate production, preview and shared data across browser actions, reset and races", async () => {
   const f = database(), shared = new PrototypeStore({ env, sql: f.sql })
   await shared.update("online-reviews", () => ({ preserved: "writing, feedback, reports, quota, history" }), s => s)

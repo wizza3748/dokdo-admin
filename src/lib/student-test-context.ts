@@ -2,6 +2,12 @@
 
 const contextKey = "dokdo-student-test-session"
 const screenKey = "dokdo-student-test-screen"
+export function selectedDemoStudent() {
+  if (typeof window === "undefined") return ""
+  const id = new URLSearchParams(window.location.search).get("demoStudent")
+  if (id !== null) sessionStorage.setItem("dokdo-demo-student", id === "normal" ? "" : id)
+  return sessionStorage.getItem("dokdo-demo-student") || ""
+}
 export const studentTestScreenEvent = "dokdo-student-test-screen-change"
 export type StudentTestScreen = "normal" | "loading" | "error"
 /** Test-list launch option only; ordinary student links are never modified. */
@@ -36,6 +42,8 @@ export function agencyStudentTestToken() {
   } catch { return "" }
 }
 export function studentTestApi(kind: "reviews" | "pro", normal: string, role: string) {
+  if (kind === "reviews" && (role === "agency" || role === "admin") && typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("assessmentExample") === "1") return "/api/mock/assessment-examples"
   if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("monthlyTest") && (role === "agency" || role === "admin")) return "/api/mock/monthly-feedback-test"
   return (role === "student" && studentTestToken() || role === "agency" && agencyStudentTestToken()) ? `/api/mock/student-front-tests/${kind}` : normal
 }

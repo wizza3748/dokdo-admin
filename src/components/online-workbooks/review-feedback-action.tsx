@@ -25,8 +25,8 @@ export function FeedbackAction({ record, role, returnTo }: { record: OnlineWorkb
   const studentTest = returnParams.get("studentTest")
   const href = `/agency/online-workbooks/${record.id}?role=${role}${returnParams.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""}${studentTest ? `&studentTest=${encodeURIComponent(studentTest)}` : ""}&returnTo=${encodeURIComponent(returnTo)}`
   const label = `${record.studentName} 피드백 ${action}, AI 사용 ${record.aiUsed}/2회`
-  const className = "inline-flex items-center gap-2 font-medium text-blue-600 hover:underline"
-  const contents = <><Pencil className={cn("size-4", record.status !== "전송완료" ? "text-blue-600" : "text-slate-400")} /><span className="tabular-nums">({record.aiUsed}/2)</span></>
+  const className = "inline-flex flex-col items-center gap-1 font-medium text-blue-600 hover:underline"
+  const contents = <><Pencil className={cn("size-4", record.status !== "전송완료" ? "text-blue-600" : "text-slate-400")} /><span className="tabular-nums">AI {record.aiUsed}/2회 사용</span></>
   const close = React.useCallback(() => { if (!pending.current) { setDialog(null); trigger.current?.focus() } }, [])
   const enter = async () => {
     if (pending.current) return

@@ -3,20 +3,19 @@ import * as React from "react"
 import { reviewReads, subscribeReviewRefresh } from "@/lib/review-refresh"
 import { STUDENT_MOCK_STORAGE_KEYS } from "@/lib/student-mock-state"
 import { emptyReviewDatabase, type ReviewActor, type ReviewCommand, type ReviewDatabase } from "@/lib/review-domain"
-import { agencyStudentTestToken, studentTestApi, studentTestScreen, studentTestScreenEvent, studentTestToken } from "./student-test-context"
+import { agencyStudentTestToken, selectedDemoStudent, studentTestApi, studentTestScreen, studentTestScreenEvent, studentTestToken } from "./student-test-context"
 export type ReviewRole = ReviewActor["role"]
 const eventName = "dokdo-review-change"
 export function demoIdentityQuery(role: ReviewRole) {
   if (typeof window === "undefined") return ""
   const params = new URLSearchParams(window.location.search)
   if (role === "student") {
-    const id = params.get("demoStudent")
-    if (id !== null) sessionStorage.setItem("dokdo-demo-student", id === "normal" ? "" : id)
-    const current = sessionStorage.getItem("dokdo-demo-student")
+    const current = selectedDemoStudent()
     const token = studentTestToken()
     return (current ? `&demoStudent=${encodeURIComponent(current)}` : "") + (token ? `&studentTest=${encodeURIComponent(token)}` : "")
   }
   if (params.has("monthlyTest")) return `&monthlyTest=${encodeURIComponent(params.get("monthlyTest") || "")}${params.has("monthlyCase")?`&monthlyCase=${encodeURIComponent(params.get("monthlyCase")!)}`:""}${params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : ""}`
+  if ((role === "agency" || role === "admin") && params.get("assessmentExample") === "1") return "&assessmentExample=1"
   const testToken = role === "agency" ? agencyStudentTestToken() : ""
   return (params.get("demoAgency") === "other-agency" ? "&demoAgency=other-agency" : "") + (testToken ? `&studentTest=${encodeURIComponent(testToken)}` : "") + (params.get("monthlyLive") === "1" && !testToken ? "&monthlyLive=1" : "")
 }

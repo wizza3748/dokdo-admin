@@ -4,6 +4,7 @@ import { studentWorkbooks } from "@/lib/student-workbooks"
 import { getConfiguredTemplates } from "@/lib/workbook-template-settings"
 import { WORKBOOK_TEMPLATE_LIVE_DETAILS } from "@/lib/workbook-template-live-data"
 import { createSeededReviewDatabase, type ReviewSeed, type ReviewTemplate } from "@/lib/review-domain"
+import { commonReviewAssessment } from "@/lib/review-assessment-config"
 import { READING_BOOKS } from "@/lib/reading-books"
 
 // Keep the installed historical cohort stable. Fixing a connection must not
@@ -20,7 +21,7 @@ const HISTORICAL_REVIEW_IDS = new Set([
 ])
 
 /** Stable base fixtures shared by all roles. User-created progress is never built from these. */
-export function getDefaultReviewDatabase() {
+function historicalReviewSeeds() {
   // Historical demo snapshots include report-enabled examples even if HQ later disables
   // that template. These fixture-only values never set policy for newly started reviews.
   const templates = getConfiguredTemplates().map(t => ({ ...t, reportEnabled: t.name.includes("통합형 독서록") }))
@@ -188,7 +189,28 @@ export function getDefaultReviewDatabase() {
     secondAnswers: twoRoundsAnswers.map((answer, index) => index === 0 ? `${answer} 선생님의 질문을 읽고 인물의 선택을 더 자세히 살펴보았습니다.` : `${answer} 책에서 찾은 근거를 덧붙여 생각을 발전시켰습니다.`),
     secondFeedback: "첫 번째 글에서 더 나아가 인물의 선택과 의미를 구체적인 근거로 설명했어요. 책의 내용을 자신의 생각과 연결하며 글을 발전시킨 점이 돋보입니다.",
   })
-  // Keep the installation version: correct fresh fixtures without migrating saved
-  // template snapshots, writing, feedback, reports or histories in existing stores.
-  return { ...createSeededReviewDatabase(seeds), seedVersion: 14 }
+  return seeds
+}
+
+export function getDefaultReviewDatabase() {
+  return { ...createSeededReviewDatabase(historicalReviewSeeds(), () => commonReviewAssessment), seedVersion: 14 }
+}
+
+/** Separate from the shared seed cohort, including its lists, notices and saved scores. */
+export function getAssessmentExampleDatabase() {
+  const seeds = historicalReviewSeeds()
+  function example(sourceId: string, id: string, second: boolean): ReviewSeed {
+    const source = seeds.find(seed => seed.common.id === sourceId)
+    if (!source?.common.template.reportEnabled) throw new Error("보고서 제공 채점 예시를 찾을 수 없습니다.")
+    return {
+      common: { ...source.common, id, sourceWorkbookId: id, legacyRecordId: undefined, month: "2026-11" },
+      at: "2026-11-19T01:00:00Z", answers: source.answers,
+      status: second ? "전송완료" : "작성전",
+      ...(second && { seen: true, secondState: "submitted" as const }),
+    }
+  }
+  return createSeededReviewDatabase([
+    example("review-seed-second-submitted", "assessment-level-3", false),
+    example("review-seed-agency-37335", "assessment-level-4", true),
+  ])
 }

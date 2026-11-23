@@ -28,18 +28,22 @@ export function createStudentTestWorkspaceStore(env: Environment = process.env, 
 export const studentTestWorkspaceStore = createStudentTestWorkspaceStore()
 
 /** The URL's case token is NOT authority: an HttpOnly, host-only browser cookie owns the workspace. */
-export function studentTestWorkspace(request: Request, create = false, env: Environment = process.env) {
+export function studentTestWorkspace(request: Request, create = false, env: Environment = process.env, scope: "student-tests" | "assessment-examples" = "student-tests") {
   const url = new URL(request.url), local = isLocalStudentTestEnvironment(env)
   if (local ? !localHosts.includes(url.hostname) : env.DOKDO_STATE_PROVIDER !== "neon" || !env.DOKDO_STATE_NAMESPACE) {
     throw new Error("전용 테스트 저장소 설정을 확인해 주세요.")
   }
   const origin = request.headers.get("origin"), site = request.headers.get("sec-fetch-site")
-  if ((origin && origin !== url.origin) || site === "cross-site" || site === "same-site" || (request.method !== "GET" && origin !== url.origin)) {
+  // Next dev can normalize a loopback IP in the request URL to localhost.
+  const host = request.headers.get("host")
+  const loopbackHost = local && localHosts.some(name => host === (url.port ? `${name}:${url.port}` : name))
+  const expectedOrigin = loopbackHost ? `${url.protocol}//${host}` : url.origin
+  if ((origin && origin !== expectedOrigin) || site === "cross-site" || site === "same-site" || (request.method !== "GET" && origin !== expectedOrigin)) {
     throw new Error("같은 사이트의 테스트 화면에서만 실행할 수 있습니다.")
   }
   const secure = url.protocol === "https:"
   if (!local && !secure) throw new Error("전용 테스트는 HTTPS에서만 사용할 수 있습니다.")
-  const cookieName = secure ? "__Host-dokdo-student-tests" : "dokdo-student-tests"
+  const cookieName = `${secure ? "__Host-" : ""}dokdo-${scope}`
   const cookies = (request.headers.get("cookie") || "").split(";").map(item => item.trim()).filter(item => item.startsWith(`${cookieName}=`))
   if (cookies.length > 1) throw new Error("테스트 브라우저 정보가 올바르지 않습니다.")
   const existing = cookies[0]?.slice(cookieName.length + 1)

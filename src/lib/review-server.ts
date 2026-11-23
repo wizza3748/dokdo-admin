@@ -1,4 +1,4 @@
-import { expandLegacyReviewScores, upgradeUnscoredMockAssessments, hydrateLegacyReviewFeedback, mergeReviewSeeds, normalizeReviewFeedbackScope, normalizeReviewReportScores, type ReviewActor, type ReviewDatabase } from "./review-domain"
+import { expandLegacyReviewScores, hydrateLegacyReviewFeedback, mergeReviewSeeds, normalizeReviewFeedbackScope, normalizeReviewReportScores, type ReviewActor, type ReviewDatabase } from "./review-domain"
 import { getDefaultReviewDatabase } from "./review-seeds"
 import { initializePro } from "./pro-seeds"
 import { ensureProAttentionExamples } from "./pro-attention-seeds"
@@ -8,7 +8,7 @@ import { ensureFeedbackScheduleExamples, localFeedbackScheduleExamplesEnabled } 
 import { reconcileMonthly } from "./pro-monthly"
 export { visibleReviewState } from "./review-visibility"
 export function normalizedReviewState(db: ReviewDatabase, serverNow: string) {
-  const normalized = normalizeReviewReportScores(normalizeReviewFeedbackScope(hydrateLegacyReviewFeedback(upgradeUnscoredMockAssessments(expandLegacyReviewScores(mergeReviewSeeds(db, getDefaultReviewDatabase()))))))
+  const normalized = normalizeReviewReportScores(normalizeReviewFeedbackScope(hydrateLegacyReviewFeedback(expandLegacyReviewScores(mergeReviewSeeds(db, getDefaultReviewDatabase())))))
   const attention = ensureProAttentionExamples(initializePro(normalized), serverNow)
   // Production seeds must be queued before commit by the shared example server helper.
   const examples = localFeedbackScheduleExamplesEnabled(process.env) ? ensureFeedbackScheduleExamples(attention, serverNow, process.env) : attention

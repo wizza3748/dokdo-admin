@@ -214,7 +214,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
   const [reportFilter, setReportFilter] = React.useState("all")
   const [level, setLevel] = React.useState("all")
   const [status, setStatus] = React.useState("all")
-  const [aiRemaining, setAiRemaining] = React.useState("all")
+  const [aiUsedFilter, setAiUsedFilter] = React.useState("all")
   const [flower, setFlower] = React.useState("all")
   const [keyword, setKeyword] = React.useState("")
   const [query, setQuery] = React.useState("")
@@ -239,7 +239,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     setAudience(nextAudience); setSelectionFilter(nextSelection); setStudentId(p.get("studentId") ?? "")
     setScheduleFilter(reviewScheduleFilter(p.get("schedule"), nextAudience, nextSelection))
     setWritingFilter(p.get("writing") ?? "all"); setReportFilter(p.get("report") ?? "all"); setLevel(p.get("level") ?? "all")
-    setStatus(reviewStatusForSelection(p.get("status") ?? "all", nextSelection)); setAiRemaining(p.get("ai") ?? "all"); setFlower(p.get("flower") ?? "all")
+    setStatus(reviewStatusForSelection(p.get("status") ?? "all", nextSelection)); setAiUsedFilter(p.get("ai") ?? "all"); setFlower(p.get("flower") ?? "all")
     setKeyword(p.get("q") ?? ""); setQuery(p.get("q") ?? ""); setPage(Math.max(1, Number(p.get("page")) || 1))
     setPageSize([10,20,50,100].includes(Number(p.get("size"))) ? Number(p.get("size")) : 50)
     setSort({ key: p.get("sort") === "id" ? "id" : "submittedAt", direction: p.get("direction") === "asc" ? "asc" : "desc" })
@@ -252,7 +252,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     setFilterOpen(nextOpen)
     try { window.localStorage.setItem(filterPreferenceKey, nextOpen ? "open" : "closed") } catch { /* Keep the current view usable without storage. */ }
   }
-  const listParams = new URLSearchParams({ role, audience, studentId, writing: writingFilter, report: reportFilter, level, status, ai: aiRemaining, flower, q: query, page: String(page), size: String(pageSize), sort: sort.key, direction: sort.direction, filters: filterOpen ? "open" : "closed" })
+  const listParams = new URLSearchParams({ role, audience, studentId, writing: writingFilter, report: reportFilter, level, status, ai: aiUsedFilter, flower, q: query, page: String(page), size: String(pageSize), sort: sort.key, direction: sort.direction, filters: filterOpen ? "open" : "closed" })
   if (showPro) { listParams.set("selection", selectionFilter); listParams.set("schedule", scheduleFilter) }
   if (originReturn) listParams.set("returnTo", originReturn)
   if (demoAgency) listParams.set("demoAgency", demoAgency)
@@ -279,10 +279,10 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
 
   React.useEffect(() => {
     if (!restored) return
-    const value = JSON.stringify([writingFilter, reportFilter, level, status, selectionFilter, scheduleFilter, aiRemaining, flower, query, pageSize, audience, studentId])
+    const value = JSON.stringify([writingFilter, reportFilter, level, status, selectionFilter, scheduleFilter, aiUsedFilter, flower, query, pageSize, audience, studentId])
     if (previousFilters.current !== null && previousFilters.current !== value) { setPage(1); setSelectedIds([]) }
     previousFilters.current = value
-  }, [restored, writingFilter, reportFilter, level, status, selectionFilter, scheduleFilter, aiRemaining, flower, query, pageSize, audience, studentId])
+  }, [restored, writingFilter, reportFilter, level, status, selectionFilter, scheduleFilter, aiUsedFilter, flower, query, pageSize, audience, studentId])
 
   const audienceRecords = React.useMemo(() => records.filter(record => matchesReviewAudience(record, audience) && (!studentId || record.studentId === studentId)), [records, audience, studentId])
 
@@ -308,11 +308,11 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
       })
       .filter((record) => level === "all" || record.level === Number(level))
       .filter((record) => status === "all" || (!record.pro || record.pro.selected) && record.status === status)
-      .filter((record) => aiRemaining === "all" || 2 - record.aiUsed === Number(aiRemaining))
+      .filter((record) => aiUsedFilter === "all" || record.aiUsed === Number(aiUsedFilter))
       .filter((record) => flower === "all" || record.flowers === Number(flower))
       .filter((record) => !normalizedQuery || `${record.studentName} ${record.bookTitle}`.toLowerCase().includes(normalizedQuery))
       .sort((a, b) => compareAgencyWorkbooks(a, b, sort))
-  }, [audienceRecords, level, status, selectionFilter, scheduleFilter, aiRemaining, flower, query, sort, writingFilter, reportFilter])
+  }, [audienceRecords, level, status, selectionFilter, scheduleFilter, aiUsedFilter, flower, query, sort, writingFilter, reportFilter])
 
   const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -330,7 +330,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
     setReportFilter("all")
     setLevel("all")
     setStatus("all")
-    setAiRemaining("all")
+    setAiUsedFilter("all")
     setFlower("all")
     setKeyword("")
     setQuery("")
@@ -412,7 +412,11 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
       <SummaryCards records={audienceRecords.filter(r => !r.pro || r.pro.selected)} status={status} onSelect={setStatus} disabled={statusLocked} />
 
       <details open className="rounded border border-[#bae7ff] bg-[#e6f7ff] px-6 py-4 text-[13px] leading-[22px] text-[#1890ff]"><summary className="mb-2 cursor-pointer font-semibold">온라인 독후감 관리 안내</summary>
-        <ul className="list-disc pl-4"><li>피드백 작성전인 온라인 독후감을 우선적으로 처리해 주세요.</li><li>일괄 AI 피드백 생성 후에도 상태는 피드백 작성전으로 유지되니, 내용을 확인 후 저장해 주세요.</li><li>AI 피드백 생성은 차수별 최대 2회까지 사용 가능해요.</li><li>피드백 저장 후, 꼭 학생에게 전송해 주세요.</li><li>학부모 발송은 1회만 가능하니 신중히 진행해 주세요.</li></ul>
+        <ul className="list-none"><li>· 피드백 작성 전인 온라인 독후감을 먼저 처리해 주세요.</li>
+          <li>· AI 피드백은 차수별로 최대 2회 생성할 수 있어요. 생성하면 해당 차수는 학생에게 반려할 수 없어요.</li>
+          <li>· AI 피드백을 생성해도 상태는 &apos;피드백 작성 전&apos;으로 유지돼요. 내용을 확인한 뒤 저장해 주세요.</li>
+          <li>· 저장한 피드백은 꼭 학생에게 전송해 주세요.</li>
+          <li>· 학부모 발송은 1회만 할 수 있으니 신중하게 진행해 주세요.</li></ul>
         {audienceRecords.some(record => record.external) && <p className="mt-3 font-semibold text-blue-800">프로 학생은 피드백 대상으로 선정된 글만 집계합니다.</p>}
       </details>
       <section aria-label="검색 조건" className="rounded-xl border border-slate-200 bg-white px-5 py-4">
@@ -431,7 +435,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
           {filterOpen && <div id="review-search-details" className="mt-4 grid gap-x-5 gap-y-3 border-t border-slate-100 pt-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
               <FilterMenu label="책읽기 레벨" value={level} onValueChange={setLevel} options={[{value:"all",label:"전체"},...[1,2,3,4,5,6].map(i=>({value:String(i),label:`${i}레벨`}))]} />
               <FilterMenu label="차수" value={writingFilter} onValueChange={setWritingFilter} options={writingFilterOptions} />
-              <FilterMenu label="AI 잔여 횟수" value={aiRemaining} onValueChange={setAiRemaining} options={[{value:"all",label:"전체"},{value:"0",label:"0회 남음"},{value:"1",label:"1회 남음"},{value:"2",label:"2회 남음"}]} />
+              <FilterMenu label="AI 사용 횟수" value={aiUsedFilter} onValueChange={setAiUsedFilter} options={[{value:"all",label:"전체"},{value:"0",label:"0회 사용"},{value:"1",label:"1회 사용"},{value:"2",label:"2회 사용"}]} />
               <FilterMenu label="평가 보고서" value={reportFilter} onValueChange={setReportFilter} options={reportFilterOptions} />
               <FilterMenu label="섬초롱꽃" value={flower} onValueChange={setFlower} options={[{value:"all",label:"전체"},{value:"0",label:"미지급"},...[5,10,15,20].map(i=>({value:String(i),label:`${i}개 지급`}))]} />
           </div>}
@@ -486,7 +490,7 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
                 <TableHead className="text-center font-semibold">평가 보고서</TableHead>
                 <TableHead className="text-center font-semibold">섬초롱꽃</TableHead>
                 <TableHead className="text-center font-semibold">
-                  피드백 작성<br />(AI 잔여횟수)
+                  피드백 작성
                   <HeaderHint label="AI 피드백 생성 횟수 안내">온라인 독후감별 최대 2회까지 생성할 수 있으며, 생성에 성공한 경우에만 1회 차감됩니다.</HeaderHint>
                 </TableHead>
               </TableRow>

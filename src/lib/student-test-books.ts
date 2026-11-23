@@ -28,7 +28,10 @@ export function studentTestBook(role: string) {
   const book = READING_BOOKS.find(book => book.id === roleBookIds[role])
   const cover = book && READING_BOOK_COVERS[book.id]
   if (!book || !cover) throw new Error(`전용 예시에 연결할 도서·표지가 없습니다: ${role}`)
-  return { sourceBookId: book.id, bookTitle: book.title, bookCoverSrc: cover, level: book.level }
+  return {
+    sourceBookId: book.id, bookTitle: book.title, bookCoverSrc: cover, level: book.level,
+    sourceReadingRound: book.rounds, sourceReadingWorkbookId: `reading-${book.id}-round-${book.rounds}`,
+  }
 }
 
 export function studentTestBookPath(path: string) {
@@ -39,9 +42,17 @@ export function studentTestBookPath(path: string) {
 export function connectStudentTestBooks(db: ReviewDatabase, caseId: string) {
   let changed = false
   const reviews = db.reviews.map(review => {
-    if (!review.id.startsWith(`test-${caseId}-`) || !roleBookIds[review.bookTitle]) return review
+    if (!review.id.startsWith(`test-${caseId}-`)) return review
+    if (roleBookIds[review.bookTitle]) {
+      changed = true
+      return { ...review, ...studentTestBook(review.bookTitle) }
+    }
+    if (!review.sourceBookId || (review.sourceReadingRound && review.sourceReadingWorkbookId)) return review
+    const book = READING_BOOKS.find(item => item.id === review.sourceBookId)
+    if (!book) return review
+    const round = review.sourceReadingRound ?? book.rounds
     changed = true
-    return { ...review, ...studentTestBook(review.bookTitle) }
+    return { ...review, sourceReadingRound: round, sourceReadingWorkbookId: review.sourceReadingWorkbookId ?? `reading-${book.id}-round-${round}` }
   })
   return changed ? { ...db, reviews } : db
 }

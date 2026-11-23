@@ -6,8 +6,8 @@ import Link from "next/link"
 import Image from "next/image"
 import ui from "./review-test-server.module.css"
 import { SecondReviewStartModal } from "./second-review-start-modal"
-import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, BookOpen, FileText, Pencil, LockKeyhole, RefreshCw, Save, Smartphone } from "lucide-react"
-import { BookPanel, StartConfirmModal, ConfirmModal, OutlineModal, PreviewModal, SelectionScreen, SelectionTitle } from "./student-workbook-ui"
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, BookOpen, FileText, Pencil, LockKeyhole, RefreshCw, Save, Smartphone } from "lucide-react"
+import { BookPanel, StartConfirmModal, ConfirmModal, NotFound, OutlineModal, PreviewModal, SelectionScreen, SelectionTitle } from "./student-workbook-ui"
 import { getWorkbookForReview, type WorkbookTemplate } from "@/lib/student-workbooks"
 import { StudentHeader } from "@/components/student/student-header"
 import { ReviewIcon } from "./review-design-icons"
@@ -100,6 +100,7 @@ export function StudentReviewFlow({ workbook }: { workbook: StudentWorkbook }) {
   const records = hook.db.records.filter(r => r.reviewId === common?.id)
   const record = records.find(r => r.round === round) ?? records.at(-1)
   const selecting = !common || !!record?.templateSelectionPending
+  if (selecting && !displayTemplate) return <NotFound />
   const expiredDraft = record?.round === 2 && record.writingStatus === "writing" && hook.db.studentPro?.cases.some(c => c.reviewId === common?.id && c.expired)
   const start = async () => {
     if (busy || !template) return
@@ -130,6 +131,7 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
   const [answers, setAnswers] = React.useState(record.answers)
   const [body, setBody] = React.useState(record.body)
   const [index, setIndex] = React.useState(record.itemIndex)
+  const [openRewriteQuestion, setOpenRewriteQuestion] = React.useState<string | null>(null)
   const [editingRewriteItem, setEditingRewriteItem] = React.useState<string | null>(null)
   const [modal, setModal] = React.useState<"save" | "rewrite" | "submit" | "short-submit" | "previous-blocked" | null>(null)
   const [pendingMove, setPendingMove] = React.useState<number | "rewrite" | null>(null)
@@ -171,6 +173,7 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
     finally { setBusy(false) }
   }
   const enterRewrite = async () => {
+    setOpenRewriteQuestion(null)
     const result = await hook.run({ type: "enter-rewrite", recordId: record.id })
     return Boolean(result)
   }
@@ -258,7 +261,19 @@ function ReviewWriting({ common, record, first, hook }: { common: ReviewCommon; 
     {record.round === 2 && <ProSecondDeadline db={hook.db} reviewId={common.id}/>}
     <main className={ui.writing}>
       <aside className={ui.questions}><header>질문 <small>{common.template.items.filter(q => plainReviewText(answers[q.id])).length}/{common.template.items.length} 작성</small></header>
-        {common.template.items.map((question, qi) => <section key={question.id} data-active={qi === index}><button type="button" onClick={() => rewrite ? setIndex(qi) : requestMove(qi)}><span>{plainReviewText(answers[question.id]) ? <Check size={15} /> : qi + 1}</span>{question.title}</button>{qi === index && <div><p>{question.description}</p>{question.example && <p className={ui.example}><strong>예시</strong>{question.example}</p>}</div>}</section>)}
+        {common.template.items.map((question, qi) => {
+          const expanded = rewrite ? openRewriteQuestion === question.id : qi === index
+          const panelId = `question-guide-${record.id}-${question.id}`
+          return <section key={question.id} data-active={expanded}>
+            <button type="button" aria-expanded={rewrite ? expanded : undefined} aria-controls={rewrite ? panelId : undefined}
+              onClick={() => rewrite ? setOpenRewriteQuestion(expanded ? null : question.id) : requestMove(qi)}>
+              <span>{plainReviewText(answers[question.id]) ? <Check size={15} /> : qi + 1}</span>
+              {question.title}
+              {rewrite && <ChevronDown aria-hidden="true" size={16} className={cn("ml-auto shrink-0", expanded && "rotate-180")} />}
+            </button>
+            {expanded && <div id={panelId}><p>{question.description}</p>{question.example && <p className={ui.example}><strong>예시</strong>{question.example}</p>}</div>}
+          </section>
+        })}
       </aside>
       <section className={ui.editorCard}><header><h2>{rewrite ? common.template.title : <><span>{index + 1}</span>{item.title}</>}</h2>{!rewrite && <button type="button" disabled={busy || !dirty} onClick={() => void saveCurrent()}>저장</button>}</header>
         <div className={cn(ui.editorBody, itemRewrite && ui.itemRewriteBody)}>{!rewrite ? <ReviewEditor student label={`질문 항목별 작성 내용 ${index + 1}번 ${item.title}`} value={answers[item.id] ?? ""} onChange={value => setAnswers(a => ({ ...a, [item.id]: value }))} /> : itemRewrite ? common.template.items.map((q, qi) => <section key={q.id} className={ui.rewriteItem}>

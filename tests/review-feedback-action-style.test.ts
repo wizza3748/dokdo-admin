@@ -6,7 +6,7 @@ test("피드백 작성 열은 연필과 AI 횟수만 표시하며 동작별 접�
   const source = readFileSync("src/components/online-workbooks/review-feedback-action.tsx", "utf8")
   const contents = source.slice(source.indexOf("const contents ="), source.indexOf("const close ="))
   assert.match(contents, /<Pencil/)
-  assert.match(contents, /\(\{record\.aiUsed\}\/2\)/)
+  assert.match(contents, /AI \{record\.aiUsed\}\/2회 사용/)
   assert.doesNotMatch(contents, /\{action\}|보기|수정|작성/)
   assert.match(source, /피드백 \$\{action\}, AI 사용 \$\{record\.aiUsed\}\/2회/)
   assert.match(source, /<Link href=\{href\} aria-label=\{label\}/)

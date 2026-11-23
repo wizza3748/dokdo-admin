@@ -1,4 +1,4 @@
-import { STUDENT_MOCK_STORAGE_KEYS } from "@/lib/student-mock-state"
+import { currentReadingOwner, hasReadingOwner, studentReadingStorageKey, STUDENT_MOCK_STORAGE_KEYS } from "@/lib/student-mock-state"
 import { latestDailyReadingRecords } from "@/lib/reading-record-summary"
 
 export interface TransientReadingExplorationRecord {
@@ -62,9 +62,8 @@ export function addTransientReadingExplorationRecord(input: {
   }
 
   // Retain raw attempts; only the list projection is grouped by day/book/round.
-  const records = [record, ...readTransientReadingExplorationRecords()]
-  window.localStorage.setItem(STUDENT_MOCK_STORAGE_KEYS.explorationRecords, JSON.stringify(records))
-  window.sessionStorage.removeItem(STUDENT_MOCK_STORAGE_KEYS.explorationRecords)
+  const key = studentReadingStorageKey(STUDENT_MOCK_STORAGE_KEYS.explorationRecords, currentReadingOwner())
+  window.localStorage.setItem(key, JSON.stringify([record, ...storedReadingRecords(key)]))
   window.dispatchEvent(new CustomEvent("dokdo-exploration-record-change"))
   return record
 }
@@ -73,21 +72,18 @@ export function getTransientReadingExplorationRecords() {
   return latestDailyReadingRecords(readTransientReadingExplorationRecords())
 }
 
-function readTransientReadingExplorationRecords() {
-  if (typeof window !== "undefined") {
-    try {
-      const stored = window.localStorage.getItem(STUDENT_MOCK_STORAGE_KEYS.explorationRecords)
-        ?? window.sessionStorage.getItem(STUDENT_MOCK_STORAGE_KEYS.explorationRecords)
-        ?? "[]"
-      const records = JSON.parse(stored) as TransientReadingExplorationRecord[]
-      if (!window.localStorage.getItem(STUDENT_MOCK_STORAGE_KEYS.explorationRecords) && records.length > 0) {
-        window.localStorage.setItem(STUDENT_MOCK_STORAGE_KEYS.explorationRecords, JSON.stringify(records))
-        window.sessionStorage.removeItem(STUDENT_MOCK_STORAGE_KEYS.explorationRecords)
-      }
-      return records.filter((record) => typeof record.workbookId === "string")
-    } catch {
-      return []
-    }
+function storedReadingRecords(key: string) {
+  try {
+    const stored = window.localStorage.getItem(key) ?? window.sessionStorage.getItem(key) ?? "[]"
+    const records = JSON.parse(stored) as (TransientReadingExplorationRecord & { studentId?: string; studentTest?: string })[]
+    return records.filter(record => typeof record?.workbookId === "string")
+  } catch {
+    return []
   }
-  return [...transientReadingRecords]
+}
+
+function readTransientReadingExplorationRecords() {
+  if (typeof window === "undefined") return [...transientReadingRecords]
+  const owner = currentReadingOwner(), sharedKey = STUDENT_MOCK_STORAGE_KEYS.explorationRecords
+  return [...storedReadingRecords(studentReadingStorageKey(sharedKey, owner)), ...storedReadingRecords(sharedKey).filter(record => hasReadingOwner(record, owner))]
 }

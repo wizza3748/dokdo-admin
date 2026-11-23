@@ -1,0 +1,159 @@
+.overview,
+.detail {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+}
+
+.overview {
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.overview .area {
+  margin-bottom: 12px;
+  overflow: hidden;
+  border: 1px solid #dbe3ed;
+  border-radius: 8px;
+  background: white;
+}
+
+.areaTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 14px;
+  border-bottom: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.areaTitle::before {
+  content: "";
+  flex: 0 0 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: #3b82f6;
+}
+
+.criterion {
+  min-width: 0;
+  margin-inline: 14px;
+  padding-block: 12px;
+}
+
+.criterion + .criterion {
+  border-top: 1px solid #e2e8f0;
+}
+
+.heading,
+.total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.heading h4 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.score {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.description {
+  margin-top: 8px;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.65;
+  word-break: keep-all;
+  white-space: pre-wrap;
+}
+
+.description p + p {
+  margin-top: 4px;
+}
+
+.description .note {
+  display: grid;
+  grid-template-columns: 0.75em minmax(0, 1fr);
+  gap: 4px;
+  padding: 7px 10px;
+  border-left: 2px solid #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+}
+
+.description p + .note {
+  margin-top: 8px;
+}
+
+.description .note + .note {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.total {
+  padding: 4px 8px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.total strong {
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
+.level {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.bands {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.bands th, .bands td {
+  padding: 6px 8px;
+  border-block: 1px solid #e2e8f0;
+  vertical-align: top;
+  text-align: left;
+}
+
+.bands thead th {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.bands th:first-child {
+  width: 4em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.bands td {
+  white-space: pre-line;
+}

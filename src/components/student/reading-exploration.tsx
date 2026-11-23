@@ -2,7 +2,10 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
+import { getConfiguredTemplates } from "@/lib/workbook-template-settings"
+import { canEnterReadingWorkbook, readingWorkbookEntry } from "@/lib/reading-workbook-entry"
 import {
   ArrowLeft,
   ArrowRight,
@@ -25,9 +28,9 @@ import { getReadingBookCover } from "@/lib/reading-book-covers"
 import { READING_BOOKS, type ReadingBookRecord } from "@/lib/reading-books"
 import { COMMON_READING_QUIZ, getBookSummary, getRoundPages, sortStudentReadingBooks } from "@/lib/reading-exploration"
 import { getReadingRoundQuiz } from "@/lib/reading-quiz-settings"
-import { useReviews } from "@/lib/review-client"
+import { demoIdentityQuery, useReviews } from "@/lib/review-client"
 import { addTransientReadingExplorationRecord } from "@/lib/student-exploration-history"
-import { getCompletedReadingRoundsByBook, getReadingRoundResultsByBook, markReadingRoundCompleted, STUDENT_MOCK_STORAGE_KEYS, type ReadingRoundResult } from "@/lib/student-mock-state"
+import { completedQuizRounds, consecutiveQuizRounds, getCompletedReadingRoundsByBook, getReadingRoundResultsByBook, markReadingRoundCompleted, STUDENT_MOCK_STORAGE_KEYS, type ReadingRoundResult } from "@/lib/student-mock-state"
 import { getWorkbookById, getWorkbookRuntime } from "@/lib/student-workbooks"
 import { cn } from "@/lib/utils"
 
@@ -120,6 +123,8 @@ function BookDetailModal({
   onClose,
   onPaper,
   onEbook,
+  onWorkbook,
+  navigating,
 }: {
   book: ReadingBookRecord
   favorite: boolean
@@ -131,6 +136,8 @@ function BookDetailModal({
   onClose: () => void
   onPaper: () => void
   onEbook: () => void
+  onWorkbook?: () => void
+  navigating: boolean
 }) {
   const pages = getRoundPages(book, selectedRound)
   const allRoundsCompleted = completedRound >= book.rounds
@@ -228,6 +235,7 @@ function BookDetailModal({
             <button type="button" onClick={onPaper} className="h-14 cursor-pointer rounded-full border-2 border-[#078bd3] bg-white text-lg font-black text-[#078bd3]">종이책 읽기</button>
             <button type="button" onClick={onEbook} className="h-14 cursor-pointer rounded-full bg-[#078bd3] text-lg font-black text-white">{selectedRoundCompleted ? replayLabel : "전자책 읽기"}</button>
           </div>
+          {onWorkbook && <button type="button" disabled={navigating} onClick={onWorkbook} className="mt-3 h-12 w-full rounded-full border-2 border-[#078bd3] bg-white font-black text-[#078bd3] disabled:opacity-50">독후감 작성하기</button>}
         </section>
       </div>
     </div>
@@ -251,13 +259,15 @@ function ReadingTop({ book, round }: { book: ReadingBookRecord; round: number })
   )
 }
 
-function SolvePrompt({ onSolve }: { onSolve: () => void }) {
+function SolvePrompt({ onSolve, onWorkbook, navigating }: { onSolve: () => void; onWorkbook?: () => void; navigating: boolean }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-5">
       <div className="flex flex-col items-center text-center text-white">
         <h2 className="text-[28px] font-black leading-[1.5] sm:text-[34px]">읽기를 완료했어요!<br />이제 문제를 풀어 볼까요?</h2>
         <Image src="/student-assets/kangchi-reading.svg" width={250} height={205} alt="책을 읽는 강치" className="mt-4 h-[205px] w-[250px] object-contain" priority />
-        <button type="button" onClick={onSolve} className="-mt-2 inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#ff5e94] px-9 py-4 text-2xl font-black shadow-xl"><Flag className="size-7" />문제 풀러 가기</button>
+        <div className="-mt-2 flex flex-wrap justify-center gap-3"><button type="button" onClick={onSolve} className=" inline-flex cursor-pointer items-center gap-2 rounded-full bg-[#ff5e94] px-9 py-4 text-2xl font-black shadow-xl"><Flag className="size-7" />문제 풀러 가기</button>
+          {onWorkbook && <button type="button" disabled={navigating} onClick={onWorkbook} className="rounded-full bg-white px-7 py-4 text-xl font-black text-[#078bd3] shadow-xl disabled:opacity-50">독후감 작성하러 가기</button>}
+        </div>
       </div>
     </div>
   )
@@ -265,6 +275,10 @@ function SolvePrompt({ onSolve }: { onSolve: () => void }) {
 
 export function ReadingExploration() {
   const reviewHook = useReviews()
+  const router = useRouter()
+  const [navigating, startNavigation] = useTransition()
+  const enteringWorkbook = useRef(false)
+  const [completedBookExample, setCompletedBookExample] = useState(false)
   const sortedBooks = useMemo(() => sortStudentReadingBooks(READING_BOOKS), [])
   const [category, setCategory] = useState<Category>("전체")
   const [query, setQuery] = useState("")
@@ -307,7 +321,17 @@ export function ReadingExploration() {
     const round = Number.isInteger(requestedRound) ? Math.min(Math.max(requestedRound, 1), book.rounds) : 1
     setSelectedBook(book)
     setSelectedRound(round)
-    setIsReexploration(true)
+    const example = params.get("qa") === "completed-book" && book.id === 601
+    setCompletedBookExample(example)
+    const completed = completedQuizRounds(book.id)
+    if (example) {
+      completed.add(1)
+      setCompletedRounds(current => ({ ...current, [book.id]: Math.max(current[book.id] ?? 0, 1) }))
+    }
+    const view = params.get("view")
+    setIsReexploration(view ? completed.has(round) : true)
+    if (view === "book") { setStage("catalog"); return }
+    if (view === "reread-complete" && completed.has(round)) setSolvePrompt(true)
     setStage(params.get("mode") === "paper" ? "paper-ready" : "ebook")
   }, [])
 
@@ -353,6 +377,7 @@ export function ReadingExploration() {
   }
 
   const startStage = (next: "paper-ready" | "ebook") => {
+    if (selectedBook) setIsReexploration(selectedCompletions.has(selectedRound))
     setStage(next)
     setSeconds(0)
     setRating(0)
@@ -414,14 +439,31 @@ export function ReadingExploration() {
     setEbookConfirm(false)
   }
 
+  const selectedCompletions = selectedBook ? completedQuizRounds(selectedBook.id) : new Set<number>()
+  const sampleBook = completedBookExample && selectedBook?.id === 601
+  if (sampleBook) selectedCompletions.add(1)
+  const completedThrough = selectedBook ? consecutiveQuizRounds(selectedCompletions, selectedBook.rounds) : 0
+  const available = selectedBook && (stage === "catalog" || solvePrompt)
+    && canEnterReadingWorkbook(selectedBook, completedThrough, getConfiguredTemplates())
+  const openWorkbook = selectedBook && available && reviewHook.loaded && !reviewHook.error ? () => {
+    if (enteringWorkbook.current) return
+    enteringWorkbook.current = true
+    const href = readingWorkbookEntry(reviewHook.db, selectedBook.id, selectedBook.rounds) + demoIdentityQuery("student")
+    startNavigation(() => router.push(href))
+  } : undefined
+  useEffect(() => { if (!navigating) enteringWorkbook.current = false }, [navigating])
+  const roundResults = selectedBook ? getReadingRoundResultsByBook()[selectedBook.id] ?? {} : {}
+  const visibleResults = sampleBook && !roundResults[1]
+    ? { ...roundResults, 1: { completedAt: "2026-09-30", correctCount: 6, totalQuestions: 6 } } : roundResults
+
   if (selectedBook && stage !== "catalog") {
     const pages = getRoundPages(selectedBook, selectedRound)
     const allRoundsComplete = Math.max(completedRounds[selectedBook.id] ?? 0, stage === "rating" || stage === "gift" || stage === "complete" ? selectedRound : 0) >= selectedBook.rounds
     const correctCount = quizAnswers.filter((answer, index) => answer === activeQuiz[index]?.correctOption).length
     const sourceWorkbookId = `reading-${selectedBook.id}-round-${selectedRound}`
-    const legacyWorkbook = getWorkbookById(sourceWorkbookId)
+    const legacyWorkbook = stage === "complete" ? getWorkbookById(sourceWorkbookId) : undefined
     const alreadyStartedReview = reviewHook.db.reviews.some((review) => review.sourceWorkbookId === sourceWorkbookId)
-      || Boolean(legacyWorkbook && getWorkbookRuntime(legacyWorkbook).status !== "before")
+      || Boolean(legacyWorkbook?.templates.length && getWorkbookRuntime(legacyWorkbook).status !== "before")
     const canStartOnlineReview = reviewHook.loaded && allRoundsComplete && selectedBook.activeOnlineCount > 0 && !alreadyStartedReview
 
     if (stage === "quiz") {
@@ -561,7 +603,7 @@ export function ReadingExploration() {
             <div className="relative h-[75vh] w-[45%] overflow-hidden bg-white shadow-2xl"><Cover book={selectedBook} /></div>
           </div>
           {ebookConfirm && <div className="fixed inset-0 z-50 grid place-items-center bg-black/65 p-5"><div role="dialog" aria-modal="true" aria-label="읽기 완료 확인" className="w-full max-w-[700px] overflow-hidden rounded-[30px] bg-white text-center text-[#222] shadow-2xl"><div className="flex h-16 items-center justify-end border-b border-dashed border-slate-300 px-6"><button type="button" onClick={() => setEbookConfirm(false)} className="grid size-10 cursor-pointer place-items-center text-[#555]" aria-label="닫기"><X className="size-8" /></button></div><div className="flex min-h-[325px] flex-col items-center justify-center px-8 py-7"><Image src="/student-assets/kangchi.svg" width={190} height={145} alt="웃고 있는 강치" className="h-[145px] w-[190px] object-contain" priority /><h2 className="mt-7 text-[30px] font-medium">정말로 끝까지 다 읽었나요?</h2></div><div className="grid grid-cols-2 bg-[#ffd51f] text-[24px] font-black"><button type="button" onClick={() => setEbookConfirm(false)} className="h-20 cursor-pointer border-r border-[#e8bd16]">더 읽을게요</button><button type="button" onClick={() => { setEbookConfirm(false); setSolvePrompt(true) }} className="h-20 cursor-pointer">다 읽었어요!</button></div></div></div>}
-          {solvePrompt && <SolvePrompt onSolve={beginQuiz} />}
+          {solvePrompt && <SolvePrompt onSolve={beginQuiz} navigating={navigating} onWorkbook={isReexploration && selectedRound === selectedBook.rounds ? openWorkbook : undefined} />}
         </main>
       )
     }
@@ -576,7 +618,7 @@ export function ReadingExploration() {
           </div>
           <div className="mt-8 flex items-center justify-between"><button type="button" onClick={() => setStage("catalog")} className="inline-flex h-14 cursor-pointer items-center gap-2 rounded-full border border-slate-300 px-7 text-lg font-black text-slate-600"><ArrowLeft />이전 화면</button>{stage === "paper-ready" ? <button type="button" onClick={() => setStage("paper-reading")} className="inline-flex h-14 cursor-pointer items-center gap-2 rounded-full bg-[#50c3b4] px-8 text-xl font-black text-white"><Play />읽기 시작</button> : <button type="button" onClick={() => setSolvePrompt(true)} className="inline-flex h-14 cursor-pointer items-center gap-2 rounded-full bg-[#ff5e94] px-8 text-xl font-black text-white"><BookOpen />다 읽었어요!</button>}</div>
         </section>
-        {solvePrompt && <SolvePrompt onSolve={beginQuiz} />}
+        {solvePrompt && <SolvePrompt onSolve={beginQuiz} navigating={navigating} onWorkbook={isReexploration && selectedRound === selectedBook.rounds ? openWorkbook : undefined} />}
       </main>
     )
   }
@@ -633,7 +675,7 @@ export function ReadingExploration() {
         </section>
       </main>
       <Link href="/student" className="fixed bottom-6 left-6 z-30 grid size-12 place-items-center rounded-full bg-white text-[#078bd3] shadow-xl" aria-label="학생 홈"><Home /></Link>
-      {selectedBook && <BookDetailModal book={selectedBook} favorite={favorites.has(selectedBook.id)} completedRound={completedRounds[selectedBook.id] ?? 0} roundResults={getReadingRoundResultsByBook()[selectedBook.id] ?? {}} selectedRound={selectedRound} onRound={setSelectedRound} onFavorite={() => toggleFavorite(selectedBook.id)} onClose={() => setSelectedBook(null)} onPaper={() => startStage("paper-ready")} onEbook={() => startStage("ebook")} />}
+      {selectedBook && <BookDetailModal book={selectedBook} favorite={favorites.has(selectedBook.id)} completedRound={completedThrough} roundResults={visibleResults} onWorkbook={openWorkbook} navigating={navigating} selectedRound={selectedRound} onRound={setSelectedRound} onFavorite={() => toggleFavorite(selectedBook.id)} onClose={() => setSelectedBook(null)} onPaper={() => startStage("paper-ready")} onEbook={() => startStage("ebook")} />}
     </div>
   )
 }

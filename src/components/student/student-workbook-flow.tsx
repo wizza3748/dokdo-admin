@@ -28,7 +28,8 @@ type ModalMode = "preview" | "start" | "outline" | "switch" | "save" | "content-
 export function StudentWorkbookFlow({ id }: { id: string }) {
   const [modern, setModern] = React.useState<boolean | null>(null)
   const [resolvedWorkbook, setResolvedWorkbook] = React.useState<ReturnType<typeof getWorkbookById>>()
-  const workbook = getWorkbookById(id) ?? resolvedWorkbook
+  const catalogWorkbook = React.useMemo(() => getWorkbookById(id), [id])
+  const workbook = catalogWorkbook ?? resolvedWorkbook
   React.useEffect(() => {
     let active = true
     void readReviews().then(db => {
@@ -45,7 +46,7 @@ export function StudentWorkbookFlow({ id }: { id: string }) {
 
 function LegacyStudentWorkbookFlow({ id }: { id: string }) {
   const router = useRouter()
-  const workbook = getWorkbookById(id)
+  const workbook = React.useMemo(() => getWorkbookById(id), [id])
   const [runtime, setRuntime] = React.useState<WorkbookRuntimeState | null>(null)
   const [view, setView] = React.useState<ViewMode>("select")
   const [selectedId, setSelectedId] = React.useState("")
@@ -61,10 +62,11 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
     if (!workbook) return
     const current = getWorkbookRuntime(workbook)
     setRuntime(current)
-    setSelectedId(current.selectedTemplateId ?? workbook.templates[0].id)
+    setSelectedId(current.selectedTemplateId ?? workbook.templates[0]?.id ?? "")
     setAnswers(current.answers)
     setSavedAnswers(current.answers)
-    setView(current.status === "before" ? "select" : current.status === "writing" ? "write" : "result")
+    setQuestionIndex(current.questionIndex ?? 0)
+    setView(current.status === "before" ? "select" : current.status === "writing" ? current.stage ?? "write" : "result")
     void syncStudentSubmittedAgencyWorkbooks()
   }, [workbook])
 
@@ -72,14 +74,14 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
   if (!runtime) return <div className="min-h-screen bg-[#f5f7f9]"><StudentHeader section="온라인 독후감" /></div>
 
   const template = workbook.templates.find((item) => item.id === selectedId) ?? workbook.templates[0]
+  if (!template) return <NotFound />
   const dirty = answers.join("\n") !== savedAnswers.join("\n")
   const submissionTooShort = reviewWritingLength(template.questions.map((_, index) => answers[index] ?? "")) < REVIEW_MIN_SUBMISSION_LENGTH
   const goToList = () => router.push(`/student/exploration-record?tab=workbook&month=${workbook.year}-${String(workbook.month).padStart(2, "0")}`)
   const listAction = <button type="button" onClick={goToList} className="mb-5 inline-flex items-center gap-2 text-sm font-bold text-[#147fbd] hover:underline focus-visible:outline-2 focus-visible:outline-[#249ce0]"><ArrowLeft aria-hidden="true" className="size-4" />온라인 독후감 목록</button>
 
   const persist = (next: Partial<WorkbookRuntimeState>, message?: string) => {
-    const merged = { ...runtime, ...next }
-    setRuntime(merged)
+    setRuntime(current => ({ ...(current ?? runtime), ...next }))
     saveWorkbookRuntime(workbook.id, next)
     if (message) {
       setToast(message)
@@ -91,7 +93,7 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
     const initialAnswers = template.questions.map(() => "")
     setAnswers(initialAnswers)
     setSavedAnswers(initialAnswers)
-    persist({ status: "writing", selectedTemplateId: template.id, answers: initialAnswers })
+    persist({ status: "writing", selectedTemplateId: template.id, stage: "write", questionIndex: 0, answers: initialAnswers })
     setView("write")
     setQuestionIndex(0)
     setModal(null)
@@ -99,7 +101,7 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
 
   const saveAnswers = () => {
     setSavedAnswers(answers)
-    persist({ status: "writing", selectedTemplateId: template.id, answers }, "저장되었어요.")
+    persist({ status: "writing", selectedTemplateId: template.id, stage: view === "rewrite" ? "rewrite" : "write", questionIndex, answers }, "저장되었어요.")
   }
 
   const completeQuestionMove = (next: number, currentAnswers = answers) => {
@@ -109,9 +111,11 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
         return
       }
       setView("rewrite")
+      persist({ stage: "rewrite", questionIndex })
       return
     }
     setQuestionIndex(next)
+    persist({ stage: "write", questionIndex: next })
   }
 
   const moveQuestion = (next: number) => {
@@ -158,7 +162,7 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
 
   const confirmContentReview = () => {
     setSavedAnswers(answers)
-    persist({ status: "writing", selectedTemplateId: template.id, answers })
+    persist({ status: "writing", selectedTemplateId: template.id, stage: "rewrite", questionIndex, answers })
     setModal(null)
     setView("rewrite")
   }
@@ -245,7 +249,7 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
           answers={answers}
           setAnswers={setAnswers}
           dirty={dirty}
-          onPrevious={() => setView("write")}
+          onPrevious={() => { setView("write"); persist({ stage: "write", questionIndex }) }}
           onSave={saveAnswers}
           submissionTooShort={submissionTooShort}
           onSubmit={() => setModal(submissionTooShort ? "short-submit" : "submit")}

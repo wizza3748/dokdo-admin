@@ -214,14 +214,24 @@ function buildBookSpecificSetting(bookId: number): WorkbookRoundSetting {
   }
 }
 
-export function getWorkbookRoundSetting(bookId: number, round?: number): WorkbookRoundSetting {
+function linkedRoundSetting(bookId: number, round?: number) {
   const imported = buildImportedSetting(bookId, round)
   const targetRound = round ?? imported?.round ?? getReadingBook(bookId)?.rounds ?? 1
   const stored = readStoredSettings()[settingKey(bookId, targetRound)]
   if (stored) return stored
   if (imported) return imported
   const live = LIVE_ROUND_SETTINGS[bookId]
-  return (live && resolveLiveSetting(bookId, live)) || buildBookSpecificSetting(bookId)
+  const linked = live && resolveLiveSetting(bookId, live)
+  return linked?.round === targetRound ? linked : undefined
+}
+
+export function getLinkedWorkbookRoundSetting(bookId: number, round: number) {
+  return linkedRoundSetting(bookId, round)
+}
+
+export function getWorkbookRoundSetting(bookId: number, round?: number): WorkbookRoundSetting {
+  const live = LIVE_ROUND_SETTINGS[bookId]
+  return linkedRoundSetting(bookId, round) ?? (live && resolveLiveSetting(bookId, live)) ?? buildBookSpecificSetting(bookId)
 }
 
 export function getWorkbookRoundSettingByPreviewId(previewId: number) {

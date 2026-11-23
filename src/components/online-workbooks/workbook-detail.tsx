@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { ReviewTeacherDetail } from "./review-teacher-detail"
+import { reviewAiDialogCopy } from "@/lib/review-ai-dialog"
 import { readReviews } from "@/lib/review-client"
 import { agencyStudentTestToken } from "@/lib/student-test-context"
 import Link from "next/link"
@@ -127,7 +128,7 @@ function LegacyWorkbookDetail({ id }: { id: string }) {
   const [flowerAmount, setFlowerAmount] = React.useState(record.flowers)
   const [selectedFlower, setSelectedFlower] = React.useState<number | null>(null)
   const [saved, setSaved] = React.useState(record.status !== "작성전")
-  const [modal, setModal] = React.useState<"reject" | "flower" | "parent" | "aiOverwrite" | "aiUnavailable" | null>(null)
+  const [modal, setModal] = React.useState<"reject" | "flower" | "parent" | "ai" | null>(null)
   const [notice, setNotice] = React.useState("")
 
   React.useEffect(() => {
@@ -174,17 +175,8 @@ function LegacyWorkbookDetail({ id }: { id: string }) {
     void upsertStudentSubmittedAgencyWorkbook(nextRecord)
   }
 
-  const handleAiFeedback = () => {
-    if (aiUsed >= 2) {
-      setModal("aiUnavailable")
-      return
-    }
-    if (aiUsed === 1) {
-      setModal("aiOverwrite")
-      return
-    }
-    generateSampleFeedback()
-  }
+  const aiDialog = reviewAiDialogCopy(aiUsed, false, displayMode === "items")
+  const handleAiFeedback = () => setModal("ai")
 
   const saveFeedback = () => {
     if (!feedbackValid || feedbackLocked) return
@@ -220,7 +212,7 @@ function LegacyWorkbookDetail({ id }: { id: string }) {
   }
 
   const confirmReject = () => {
-    if (status !== "작성전") return
+    if (status !== "작성전" || aiUsed > 0) return
     setModal(null)
     void rejectAgencyWorkbook(record).then(() => router.push("/agency/online-workbooks"))
   }
@@ -264,7 +256,7 @@ function LegacyWorkbookDetail({ id }: { id: string }) {
           <div className="mt-2 flex justify-between text-xs"><span className={feedbackValid ? "text-emerald-600" : "text-rose-500"}>{feedback.length}/10자 이상 입력</span><span className="text-slate-400">AI 사용 {aiUsed}/2회</span></div>
           <div className="mt-6 flex flex-wrap justify-end gap-2">
             <Button variant="outline" onClick={() => router.push("/agency/online-workbooks")} className="gap-2 border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-50"><RotateCcw className="size-4" />취소</Button>
-            {status === "작성전" && <Button variant="outline" onClick={() => setModal("reject")} className="gap-2 border-rose-300 bg-white text-rose-600 shadow-sm hover:bg-rose-50"><Undo2 className="size-4" />학생 반려</Button>}
+            {status === "작성전" && aiUsed === 0 && <Button variant="outline" onClick={() => setModal("reject")} className="gap-2 border-rose-300 bg-white text-rose-600 shadow-sm hover:bg-rose-50"><Undo2 className="size-4" />학생 반려</Button>}
             <Button variant="outline" onClick={() => { setSelectedFlower(null); setModal("flower") }} disabled={flowerAmount > 0} className="gap-2 border-amber-300 bg-white text-amber-700 shadow-sm hover:bg-amber-50 disabled:border-slate-200 disabled:text-slate-400"><Flower2 className="size-4" />섬초롱꽃 지급</Button>
             <Button onClick={saveFeedback} disabled={!feedbackValid || saved || feedbackLocked} className="gap-2 bg-slate-700 text-white shadow-sm hover:bg-slate-800 disabled:bg-slate-400"><Save className="size-4" />저장</Button>
             <Button onClick={sendFeedback} disabled={!saved || status !== "작성완료"} className="gap-2 bg-blue-600 text-white shadow-sm hover:bg-blue-700 disabled:bg-[#8ba7ef]"><Send className="size-4" />학생에게 전송</Button>
@@ -273,9 +265,7 @@ function LegacyWorkbookDetail({ id }: { id: string }) {
         </Card>
       </div>
 
-      {modal === "aiOverwrite" && <AiAlertModal title="AI 자동 작성" onClose={() => setModal(null)} onConfirm={generateSampleFeedback} cancelable><p>기존 작성된 내용을 새로 작성된 내용으로 덮어쓰시겠습니까? (남은 횟수: 1회)</p><p>※ 확인을 누르면 이전 내용은 되돌릴 수 없습니다. 필요하면 별도로 저장해 두세요.</p><p>AI 자동 작성은 생성만으로 횟수가 차감되며, 저장하지 않고 나가면 기록이 남지 않습니다.</p></AiAlertModal>}
-
-      {modal === "aiUnavailable" && <AiAlertModal title="AI 자동 작성 불가" onClose={() => setModal(null)} onConfirm={() => setModal(null)}><p>AI 자동 작성 기능은 차수별 최대 2회까지만 이용할 수 있습니다.</p><p>AI 자동 작성은 생성만으로 횟수가 차감되며, 저장하지 않고 나가면 기록이 남지 않습니다.</p></AiAlertModal>}
+      {modal === "ai" && <AiAlertModal title={aiDialog.title} onClose={() => setModal(null)} onConfirm={aiDialog.confirmable ? generateSampleFeedback : () => setModal(null)} cancelable={aiDialog.confirmable}><p className="whitespace-pre-line">{aiDialog.lines.join("\n")}</p></AiAlertModal>}
 
       {modal === "reject" && <AgencyConfirmDialog title="학생 온라인 독후감 반려" onClose={() => setModal(null)} onConfirm={confirmReject} confirmLabel="반려하기"><p>반려 처리 시 제출 내용이 사라집니다. 학생이 제출한 온라인 독후감은 목록에서 사라지고, 학생은 다시 작성 가능한 상태로 돌아갑니다. 계속 진행하시겠어요?</p></AgencyConfirmDialog>}
 
