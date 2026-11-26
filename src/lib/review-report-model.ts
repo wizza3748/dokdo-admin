@@ -3,7 +3,10 @@ import { assessmentCriteria, validAiScores, validScores, type ReviewCommon, type
 // @ts-expect-error Node tests load TypeScript sources directly.
 import { weightedReviewScore } from "./review-score-policy.ts"
 // @ts-expect-error Node tests load TypeScript sources directly.
-import { commonReviewAssessment, familyReportCriteria, reviewAreaLabel } from "./review-assessment-config.ts"
+import { reviewAreaLabel } from "./review-assessment-config.ts"
+
+// @ts-expect-error Node tests load TypeScript sources directly.
+import { familyCriteriaForBook } from "./review-family-criteria.ts"
 
 export function reportAreaScores(common: ReviewCommon, record: ReviewRecord, first?: ReviewRecord) {
   if (!validAiScores(common.level, record.aiScores, record) || !validScores(common.level, record.teacherScores, record)) return null
@@ -11,18 +14,19 @@ export function reportAreaScores(common: ReviewCommon, record: ReviewRecord, fir
   const criteria = assessmentCriteria(common.level, record)
   // One activity keeps the same rubric across rounds; do not compare incompatible scales.
   if (first && JSON.stringify(assessmentCriteria(common.level, first)) !== JSON.stringify(criteria)) return null
-  const guide = familyReportCriteria(record.assessment ?? commonReviewAssessment)
+  const guide = familyCriteriaForBook(common.level)
   return [...new Set(criteria.map(c => c.area))].map(area => {
     const details = criteria.filter(c => c.area === area)
     const sum = (r: ReviewRecord, kind: "aiScores" | "teacherScores") => kind === "aiScores" ? r.aiScores![area] : details.reduce((total, c) => total + r.teacherScores![c.id], 0)
     const ai = sum(record, "aiScores"), teacher = sum(record, "teacherScores")
     const current = weightedReviewScore(ai, teacher)
     const firstScore = first ? weightedReviewScore(sum(first, "aiScores"), sum(first, "teacherScores")) : current
-    return { area: reviewAreaLabel(area), details: guide.filter(c => c.area === area), max: details.reduce((total, c) => total + c.max, 0), ai, teacher, current, first: firstScore, final: record.round === 2 ? weightedReviewScore(firstScore, current) : current }
+    return { area: reviewAreaLabel(area), details: guide.filter(c => c.area === reviewAreaLabel(area)), max: details.reduce((total, c) => total + c.max, 0), ai, teacher, current, first: firstScore }
   })
 }
 export type ReportArea = NonNullable<ReturnType<typeof reportAreaScores>>[number]
-export function reportDate(value?: string, monthOnly = false) {
+export function reportDate(value?: string, monthOnly: boolean | "long" = false) {
   if (!value || Number.isNaN(Date.parse(value))) return "—"
+  if (monthOnly === "long") return new Intl.DateTimeFormat("ko-KR", { dateStyle: "long", timeZone: "Asia/Seoul" }).format(new Date(value))
   return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: monthOnly ? "long" : "2-digit", ...(monthOnly ? {} : { day: "2-digit" as const }) }).format(new Date(value))
 }

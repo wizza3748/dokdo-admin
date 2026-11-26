@@ -1,5 +1,7 @@
 import { commandReview, readReviews, type ReviewRole } from "@/lib/review-client"
-import { canAwardReview, canSendReview, sampleReviewAi, type ReviewDatabase } from "@/lib/review-domain"
+import { canAwardReview, canSendReview, type ReviewDatabase } from "@/lib/review-domain"
+import { reviewAiResultCommand } from "./review-ai-preview"
+import { reviewBookMaterials } from "./review-ai-materials"
 import type { OnlineWorkbook } from "@/lib/online-workbooks"
 import { dateLabel, weekLabel, weekStart } from "./pro-calendar"
 import { autoCandidates, proUsage } from "./pro-domain"
@@ -48,5 +50,10 @@ export async function performReviewListAction(recordId: string, action: "ai" | "
   if (!record || !common || record.feedbackStatus !== "작성전") throw new Error("일괄 AI 생성 대상이 아닙니다.")
   const runId = crypto.randomUUID()
   await commandReview({ type: "ai-start", recordId }, role, runId)
-  return commandReview({ type: "ai-result", recordId, runId, result: sampleReviewAi(common, record) }, role)
+  const first = db.records.find(r => r.id === record.linkedRecordId)
+  const command = await reviewAiResultCommand(common, record, first, reviewBookMaterials(common), runId)
+  const updated = await commandReview(command, role)
+  const run = updated.records.find(r => r.id === recordId)?.aiHistory.find(h => h.requestId === runId)
+  if (run?.status !== "success") throw new Error(run?.reason ?? "피드백 생성 결과를 확인해 주세요.")
+  return updated
 }

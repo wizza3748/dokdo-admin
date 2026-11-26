@@ -103,11 +103,6 @@ export const REVIEW_ASSESSMENT_CONFIG = {
   ],
 }
 
-/** The existing family report still publishes the pre-revision guide for these eight scoring keys. */
-export function familyReportCriteria(assessment: ReviewAssessmentSnapshot) {
-  return assessment.version === bookLevelVersion ? commonCriteria : assessment.criteria
-}
-
 export function snapshotReviewAssessment(level: number): ReviewAssessmentSnapshot {
   return structuredClone({ version: REVIEW_ASSESSMENT_CONFIG.version, ...reviewAssessmentGroup(level) })
 }

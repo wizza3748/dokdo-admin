@@ -1,34 +1,239 @@
 import Image from "next/image"
-import { Fragment, type ReactNode } from "react"
-import { assessmentCriteria, plainReviewText, reviewFeedbackItems, scoreLabel, type ReviewCommon, type ReviewRecord } from "@/lib/review-domain"
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { flushSync } from "react-dom"
+import { paginateReport, type ReportPagePart } from "./review-report-pagination"
+import { reviewFeedbackItems, plainReviewText, scoreTotal, type ReviewCommon, type ReviewRecord } from "@/lib/review-domain"
+import { weightedReviewScore, weightNote, roundingNote } from "@/lib/review-score-policy"
 import { reportDate, type ReportArea } from "@/lib/review-report-model"
-import { reviewAreaLabel, reviewCriterionLabel } from "@/lib/review-assessment-config"
-import { reviewScoreExplanation } from "@/lib/review-score-policy"
+import { familyCriteriaForBook } from "@/lib/review-family-criteria"
+import { safeReviewHtml } from "@/lib/review-html"
 import { ReviewText } from "./review-ui"
 import css from "./review-report-screen.module.css"
 
-const fmt = (n?: number) => n === undefined ? "—" : scoreLabel(n)
-const palette = { first: "#aebcc7", current: "#4db9ba", final: "#0783ba" }
+const points = (score: number) => score.toFixed(1) + "점"
+type Identity = { common: ReviewCommon; record: ReviewRecord }
 
-export function ReviewReportScreen({ common, record, first, areas }: { common: ReviewCommon; record: ReviewRecord; first?: ReviewRecord; areas: ReportArea[] }) {
-  const second = record.round === 2
-  const report = record.report!
-  const rounds = first ? [first, record] : [record]
-  const criteria = assessmentCriteria(common.level, record)
-  const pageTotal = second ? 6 : 5
-  const page = (number: number, title: string, children: ReactNode) => <article className={css.sheet} aria-label={title}><header className={css.runningHeader}><span>{common.studentName} · 《{common.bookTitle}》　{common.template.title}</span><span>{record.round}차 작성 완료 · {reportDate(record.submittedAt)}</span><span>{number} / {pageTotal}</span></header>{children}</article>
-  return <div className={css.pages}>
-    <article className={`${css.sheet} ${css.cover}`} aria-label="평가 보고서 표지"><Image src="/student-assets/dokdo-logo.svg" alt="독도" width={74} height={64} /><div><p>독후감 평가 보고서 <b>{record.round}차</b></p><h1>{common.bookTitle}</h1><h2>{common.level}레벨 · {common.template.title}</h2><dl><dt>학생명</dt><dd>{common.studentName}</dd><dt>학원명</dt><dd>{common.institution || "—"}</dd><dt>제출일</dt><dd>{reportDate(record.submittedAt)}</dd></dl></div></article>
-    {page(2, "평가 결과와 총평", <><p className={css.eyebrow}>평가 결과</p><h2 className={css.title}>{second ? "글을 다시 쓰며 달라진 점" : "내 글을 함께 살펴봐요"}</h2><div className={css.scoreGrid}><section className={css.mainScore}><p>{second ? "최종 점수" : "1차 점수"}</p><strong>{fmt(second ? report.finalScore : report.score)}</strong><span> / 100점</span></section><div className={css.scoreDetails}>{second && <section><h3>작성 회차별</h3><div><small>1차 점수</small><strong>{fmt(report.firstScore)}점</strong></div><span>→</span><div><small>2차 점수</small><strong>{fmt(report.score)}점</strong></div>{(report.improvement ?? 0) > 0 && <b className={css.improvement}>+ {fmt(report.improvement)}점 향상</b>}</section>}<section><h3>평가 주체별</h3><div><small>{second ? "AI 평가 총점" : "AI 1차 점수"}</small><strong>{fmt(second ? report.weightedAi : report.ai)}점</strong></div><div><small>{second ? "선생님 평가 총점" : "선생님 1차 점수"}</small><strong>{fmt(second ? report.weightedTeacher : report.teacher)}점</strong></div></section></div></div><div className={css.explanation}><h3>평가 점수 산출 방법</h3><p>{reviewScoreExplanation(record.round)}</p></div><div className={css.comment}><h3>선생님 평가</h3><section><h4>{record.round}차 총평</h4><ReviewText value={record.reportFeedback || "저장된 총평이 없습니다."} /></section></div></>)}
-    {page(3, "영역별 평가 결과", <><h2 className={css.title}>영역별 평가 결과</h2><p className={css.graphNote}>꼭짓점 숫자는 {second ? "최종" : "1차"} 성취도</p><ReportRadar areas={areas} second={second} /><p className={css.graphNote}>바깥쪽에 가까울수록 성취도가 높아요.<br />회차별 점수는 아래 표에서 확인하세요.</p><div className={css.legend}>{(second ? ["first", "current", "final"] as const : ["current"] as const).map(key => <span key={key}><i style={{background: second ? palette[key] : palette.final}} />{second ? key === "first" ? "1차" : key === "current" ? "2차" : "최종" : "1차"}</span>)}</div><table className={css.areaTable}><thead><tr><th>평가 영역</th>{second ? <><th>1차</th><th>2차</th><th>최종</th><th>1차 → 최종</th></> : <th>1차</th>}</tr></thead><tbody>{areas.map(a => <tr key={a.area}><th>{reviewAreaLabel(a.area)}</th>{(second ? ["first", "current", "final"] as const : ["current"] as const).map(key => <td key={key}><strong style={{color: second ? palette[key] : palette.final}}>{fmt(a[key] / a.max * 100)}%</strong><small>{fmt(a[key])} / {a.max}</small></td>)}{second && <td><div className={css.bars}><i style={{width:`${a.first/a.max*100}%`}} /><i style={{width:`${a.final/a.max*100}%`}} /></div></td>}</tr>)}</tbody></table></>)}
-    {rounds.map((r, index) => <Fragment key={r.id}>{page(4+index, `${r.round}차 작성 글과 피드백`, <><h2 className={css.title}>{r.round}차</h2><div className={css.writingGrid}><section><header><h3>내가 쓴 글</h3><small>{reportDate(r.submittedAt)} 제출</small></header><ReviewText value={r.finalBody} /></section><section><header><h3>선생님 피드백</h3></header><h4>선생님 한마디</h4><ReviewText value={r.feedback} />{reviewFeedbackItems(common.template,r.itemFeedback).filter(f=>f.visible && plainReviewText(f.text)).map(f=><div key={f.itemId}><h4>{common.template.items.find(i=>i.id===f.itemId)?.title}</h4><ReviewText value={f.text} /></div>)}</section></div></>)}</Fragment>)}
-    {page(pageTotal, "평가 기준 안내", <><h2 className={css.title}>평가 기준 안내</h2><p className={css.criteriaNote}>독후감은 아래의 기준으로 평가합니다.<br />배점은 각 기준에 부여된 점수이며, 학생이 받은 점수가 아닙니다.</p><table className={css.criteria}><thead><tr>{["평가 영역","세부 기준","평가 기준 설명","배점"].map(label=><th key={label}>{label}</th>)}</tr></thead><tbody>{areas.map(a=><Fragment key={a.area}>{a.details.map((c,i)=><tr key={c.id}>{i===0 && <th rowSpan={a.details.length}>{reviewAreaLabel(a.area)}</th>}<td>{reviewCriterionLabel(c)}</td><td>{c.description}</td><td>{c.max}</td></tr>)}</Fragment>)}</tbody><tfoot><tr><th colSpan={3}>총점 · 배점 합계</th><td>{criteria.reduce((sum,c)=>sum+c.max,0)}</td></tr></tfoot></table></>)}
+type Section = { title: string; intro?: ReactNode; body: ReactNode }
+
+type PageHeaderProps = { identity: string; date: string; number: number; total: number }
+
+function PageHeader({ identity, date, number, total }: PageHeaderProps) {
+  return <header className={css.running}>
+    <span>{identity}</span><span>{date}</span><span className={css.pageNumber}>{number} / {total}</span>
+  </header>
+}
+
+function Sheet({ section, part, ...header }: PageHeaderProps & { section: Section; part?: ReportPagePart }) {
+  return <section className={css.sheet} aria-label={section.title}>
+    <PageHeader {...header} />
+    {!part?.continuation && (section.intro ?? <h2 className={css.title}>{section.title}</h2>)}
+    {part?.html === undefined ? <div data-page-body>{section.body}</div> :
+      <div data-page-body dangerouslySetInnerHTML={{ __html: part.html }} />}
+  </section>
+}
+
+function printString(value: string) {
+  return '"' + value.replace(/["\\]/g, "\\$&").replace(/[\r\n\f]/g, " ") + '"'
+}
+
+function Radar({ areas, second }: { areas: ReportArea[]; second: boolean }) {
+  const center = { x: 149, y: 137 }
+  const point = (index: number, ratio: number) => {
+    const angle = -Math.PI / 2 + index * 2 * Math.PI / areas.length
+    const radius = 96 * ratio
+    return { x: center.x + radius * Math.cos(angle), y: center.y + radius * Math.sin(angle) }
+  }
+  const polygon = (values: number[]) => values.map((value, i) => {
+    const p = point(i, value)
+    return p.x + "," + p.y
+  }).join(" ")
+  const series = second ? (["first", "current"] as const) : (["current"] as const)
+  return <figure className={css.figure}>
+    <svg viewBox="0 0 338 255" role="img" aria-label={second ? "1차·2차 영역별 점수 비교" : "1차 영역별 점수"}>
+      {[1, .75, .5, .25].map(r => <polygon key={r} points={polygon(areas.map(() => r))} fill="none" stroke="#cbd5df" />)}
+      {areas.map((area, i) => {
+        const vertex = point(i, 1)
+        const label = point(i, 1.1)
+        const side = i === 1 || i === 4
+        const anchor = side ? (i === 1 ? "start" : "end") : "middle"
+        const y = i === 0 ? label.y - 10 : label.y + (side ? 3 : 16)
+        return <g key={area.area}>
+          <line x1={center.x} y1={center.y} x2={vertex.x} y2={vertex.y} stroke="#d7dfe7" />
+          <text x={label.x} y={y} textAnchor={anchor}>{area.area}</text>
+        </g>
+      })}
+      {series.map(key => <g key={key} data-series={second && key === "current" ? "2차" : "1차"}>
+        <polygon points={polygon(areas.map(a => a[key] / a.max))} fill="none" stroke="#1c2837" strokeWidth="2.2" strokeDasharray={key === "first" ? "5 4" : undefined} />
+        {areas.map((area, i) => {
+          const p = point(i, area[key] / area.max)
+          return <circle key={area.area} cx={p.x} cy={p.y} r={second && key === "current" ? 3.8 : 3} stroke="#1c2837" strokeWidth="1.7" fill={second && key === "current" ? "white" : "#1c2837"} />
+        })}
+      </g>)}
+    </svg>
+    {second && <figcaption className={css.legend}><span><i />1차</span><span><i />2차</span></figcaption>}
+  </figure>
+}
+
+function Change({ value, card = false }: { value: number; card?: boolean }) {
+  if (value === 0) return <>{card ? points(0) : "–"}</>
+  return <span className={value > 0 ? css.up : css.down}>{value > 0 ? "▲ " : "▼ "}{points(Math.abs(value))}</span>
+}
+
+function Scores({ record, first, areas }: { record: ReviewRecord; first?: ReviewRecord; areas: ReportArea[] }) {
+  const rounds = (first ? [first, record] : [record]).map(r => {
+    const ai = scoreTotal(r.aiScores!), teacher = scoreTotal(r.teacherScores!)
+    return { round: r.round, ai, teacher, score: weightedReviewScore(ai, teacher) }
+  })
+  const current = rounds[rounds.length - 1].score, previous = rounds[0].score
+  const rows = [...areas.map(a => ({ label: a.area, max: a.max, first: a.first, current: a.current })),
+    { label: "총점", max: 100, first: previous, current }]
+  return <>
+    <section className={css.results} aria-label="평가 결과">
+      <h2 className={css.title}>평가 결과</h2>
+      <div className={css.scoreOverview}>
+        <div className={css.scoreCard}>
+          <span>{record.round}차 점수</span>
+          <div><strong>{current.toFixed(1)}</strong><span> / 100점</span></div>
+          {first && <p>1차 {points(previous)} → <Change value={current - previous} card /></p>}
+        </div>
+        <div className={css.tablePanel}>
+          <table className={css.roundsTable} aria-label="평가자 점수"><thead><tr>
+            {first && <th scope="col" aria-label="차수" />}
+            <th scope="col">AI 평가</th><th scope="col">선생님 평가 <span className={css.weight}>×2</span></th>
+            <th scope="col">{first ? "회차 점수" : "1차 점수"}</th>
+          </tr></thead><tbody>{rounds.map(r => <tr key={r.round}>
+            {first && <th scope="row">{r.round}차</th>}
+            <td>{points(r.ai)}</td><td>{points(r.teacher)}</td><td>{points(r.score)}</td>
+          </tr>)}</tbody></table>
+          <p className={css.note}>{weightNote}</p>
+        </div>
+      </div>
+    </section>
+    <section className={css.areaSection} aria-label="영역별 점수">
+      <div className={css.scoreHeader}><h2 className={css.title}>영역별 점수</h2>{first && <small>그래프: 1차 · 2차 점수</small>}</div>
+      <div className={css.areaResults}><Radar areas={areas} second={!!first} />
+        <div className={css.tablePanel}>
+          <table className={css.data} aria-label="영역별 점수표">
+            <thead><tr>{(first ? ["영역", "1차", "2차", "변화", "2차 성취도"] : ["영역", "점수", "성취도"]).map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+            <tbody>{rows.map(a => <tr key={a.label}><th scope="row">{a.label} <span>({a.max}점)</span></th>
+              {first && <td>{points(a.first)}</td>}<td>{points(a.current)}</td>
+              {first && <td><Change value={a.current - a.first} /></td>}<td>{Math.round(a.current / a.max * 100)}%</td>
+            </tr>)}</tbody>
+          </table>
+          <p className={css.note}>{roundingNote}</p>
+        </div>
+      </div>
+    </section>
+  </>
+}
+
+function TeacherEvaluation({ record }: { record: ReviewRecord }) {
+  // Only mark an existing paragraph label. Scores, quotes and other teacher edits are saved text.
+  const clean = safeReviewHtml(record.reportFeedback ?? "")
+    .replace(/<(p|div)>(?:\s|&nbsp;|<br>)*<\/\1>/gi, "")
+    .replace(/(?:\r?\n[ \t]*){2,}/g, "\n")
+  const paragraphLabel = /(^|\n|<br>|<(?:p|div)>)([ \t]*(?:<(?:strong|b|em|i|u|s)>)*)(내용 요약|감상과 깨달음|발상과 독창성|구성과 조직력|표현력|종합)(:|(?=(?:<\/(?:strong|b|em|i|u|s)>)+:))/g
+  const firstLabel = clean.search(paragraphLabel)
+  const marked = clean.replace(paragraphLabel, (_, boundary: string, formatting: string, label: string, colon: string, offset: number) => {
+    const separator = offset === firstLabel ? "" : ` data-separator="${label === "종합" ? "summary" : "area"}"`
+    return `${boundary}${formatting}<span class="${css.areaLabel}"${separator}>${label}${colon}</span>`
+  })
+  return <div className={css.areaComments} data-report-flow dangerouslySetInnerHTML={{ __html: marked }} />
+}
+
+function Writing({ common, round }: { common: ReviewCommon; round: ReviewRecord }) {
+  const items = reviewFeedbackItems(common.template, round.itemFeedback).filter(item => item.visible && plainReviewText(item.text))
+  return <div className={css.writing}>
+    <article className={css.studentWriting} data-report-flow>
+      <header className={css.writingHeader}><h3>내가 쓴 글</h3><span>{reportDate(round.submittedAt, "long")} 제출</span></header>
+      <ReviewText value={round.finalBody} />
+    </article>
+    <article className={css.teacherWriting} data-report-flow>
+      <h3>선생님 피드백</h3><h4>선생님 한마디</h4><ReviewText value={round.feedback} />
+      {items.map(item => <section key={item.itemId}><h4>{common.template.items.find(q => q.id === item.itemId)?.title}</h4><ReviewText value={item.text} /></section>)}
+    </article>
   </div>
 }
 
-function ReportRadar({areas,second}:{areas:ReportArea[];second:boolean}) {
-  const ordered = areas.length === 5 ? [areas[0],areas[4],areas[3],areas[2],areas[1]] : areas
-  const point = (i:number,r:number,radius=140) => {const angle=-Math.PI/2+i*Math.PI*2/ordered.length;return {x:280+Math.cos(angle)*radius*r,y:195+Math.sin(angle)*radius*r}}
-  const polygon=(ratio:number)=>ordered.map((_,i)=>{const p=point(i,ratio);return `${p.x},${p.y}`}).join(" ")
-  return <svg className={css.radar} viewBox="0 0 560 390" role="img" aria-label="영역별 성취도 방사형 그래프">{[1,.8,.6,.4,.2].map(r=><polygon key={r} points={polygon(r)} fill="none" stroke="#dae2e7" />)}{ordered.map((a,i)=>{const p=point(i,1),l=point(i,1,178);return <g key={a.area}><line x1="280" y1="195" x2={p.x} y2={p.y} stroke="#e5eaef"/><text x={l.x} y={l.y} textAnchor="middle" fill="#466579" fontSize="13">{reviewAreaLabel(a.area)}</text><text x={l.x} y={l.y+20} textAnchor="middle" fill="#087daf" fontSize="17" fontWeight="700">{fmt(a[second ? "final" : "current"]/a.max*100)}%</text></g>})}{[.2,.4,.6,.8,1].map(r=><text key={r} x="285" y={195-140*r+3} fontSize="8" fill="#91a0aa">{r*100}%</text>)}{(second ? ["first","current","final"] as const : ["current"] as const).map(key=><g key={key}><polygon points={ordered.map((a,i)=>{const p=point(i,a[key]/a.max);return `${p.x},${p.y}`}).join(" ")} fill={palette.final} fillOpacity={key==="final" || !second ? .12 : 0} stroke={second ? palette[key] : palette.final} strokeWidth={key==="final" || !second ? 2.5 : 1.8}/>{ordered.map((a,i)=>{const p=point(i,a[key]/a.max);return <circle key={a.area} cx={p.x} cy={p.y} r="3" fill={second ? palette[key] : palette.final}/>})}</g>)}</svg>
+function FamilyGuide({ level }: { level: number }) {
+  const criteria = familyCriteriaForBook(level)
+  return <><table className={css.guide}><thead><tr><th scope="col">평가 영역</th><th scope="col">세부 기준</th><th scope="col">세부 평가 기준</th></tr></thead>
+    {[...new Set(criteria.map(c => c.area))].map(area => {
+      const group = criteria.filter(c => c.area === area)
+      return <tbody key={area}>{group.map((c, i) => <tr key={c.id}>{i === 0 && <th scope="rowgroup" rowSpan={group.length}>{area} ({group.reduce((sum, v) => sum + v.max, 0)}점)</th>}
+        <th scope="row">{c.number} {c.name} ({c.max}점)</th><td>{c.description}</td></tr>)}</tbody>
+    })}<tfoot><tr><td colSpan={3}>총점 100점</td></tr></tfoot></table>
+    <div className={css.guideNotes} data-guide-note><p>{weightNote}</p><p>AI 평가 점수는 처음 생성할 때 확정되며 바뀌지 않아요.</p></div>
+  </>
+}
+
+export function ReviewReportScreen({ common, record, first, areas }: Identity & { first?: ReviewRecord; areas: ReportArea[] }) {
+  const rounds = first ? [first, record] : [record]
+  const institution = common.institution?.trim() || record.report?.institutionName?.trim()
+  const identity = common.studentName + " · 《" + common.bookTitle + "》 " + common.template.title
+  const date = record.round + "차 작성 완료 · " + reportDate(record.submittedAt, "long")
+  const sections: Section[] = [
+    { title: "영역별 평가", body: <TeacherEvaluation record={record} /> },
+    ...rounds.map(r => ({
+      title: r.round + "차 작성글과 피드백",
+      intro: <h2 className={css.writingRound}>{r.round}차</h2>,
+      body: <Writing common={common} round={r} />,
+    })),
+    { title: "평가 기준 안내", intro: <><h2 className={css.title}>평가 기준 안내</h2>
+      <p className={css.guideIntro}>이 보고서는 {common.level < 4 ? "1~3" : "4~6"}레벨 도서용 기준으로 평가했어요.</p></>,
+      body: <FamilyGuide level={common.level} /> },
+  ]
+  const measurement = useRef<HTMLDivElement>(null)
+  const [parts, setParts] = useState<ReportPagePart[] | null>(null)
+  useLayoutEffect(() => {
+    const stage = measurement.current!
+    let active = true, frame = 0
+    const layout = () => {
+      if (!active || !stage.clientHeight) return
+      const pages = paginateReport(stage)
+      setParts(previous => previous && JSON.stringify(previous) === JSON.stringify(pages) ? previous : pages)
+    }
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(layout) }
+    const rootStyle = document.documentElement.style
+    rootStyle.setProperty("--review-print-identity", printString(identity))
+    rootStyle.setProperty("--review-print-date", printString(date))
+    layout()
+    const observer = new ResizeObserver(schedule)
+    Array.from(stage.children).forEach(el => observer.observe(el))
+    stage.addEventListener("load", schedule, true)
+    void document.fonts.ready.then(() => { if (active) schedule() })
+    const forPrint = () => { flushSync(layout) }
+    window.addEventListener("beforeprint", forPrint)
+    return () => {
+      active = false
+      observer.disconnect()
+      cancelAnimationFrame(frame)
+      stage.removeEventListener("load", schedule, true)
+      window.removeEventListener("beforeprint", forPrint)
+      rootStyle.removeProperty("--review-print-identity")
+      rootStyle.removeProperty("--review-print-date")
+    }
+  }, [common, record, first, identity, date])
+  const pages = parts ?? sections.map((_, section) => ({ section }))
+  const total = 1 + pages.length
+  return <>
+    <main className={css.pages} aria-label={record.round + "차 독후감 평가 보고서"}>
+      <section className={css.sheet + " " + css.overview} aria-label="보고서 첫 쪽">
+        <header className={css.masthead}>
+          <div className={css.coverBar}>
+            <Image src="/student-assets/dokdo-logo.svg" alt="독도" width={52} height={44} priority />
+            <span>독후감 평가 보고서 {record.round}차</span>
+          </div>
+          <h1>{common.bookTitle}</h1>
+          <p>{common.level}레벨 · {common.template.title}</p>
+          <dl className={css.identity}>{[["학생", common.studentName], ...(institution ? [["학원", institution]] : []), ["제출일", reportDate(record.submittedAt)]].map(([k,v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+        </header>
+        <Scores record={record} first={first} areas={areas} />
+      </section>
+      {pages.map((part, i) => <Sheet key={i} section={sections[part.section]} part={part} identity={identity} date={date} number={i + 2} total={total} />)}
+    </main>
+    <div ref={measurement} className={css.measurement} aria-hidden inert>
+      {sections.map((section, i) => <Sheet key={section.title} section={section} identity={identity} date={date} number={i + 2} total={sections.length + 1} />)}
+    </div>
+  </>
 }

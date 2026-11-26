@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto"
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
+import { setTimeout as delay } from "node:timers/promises"
 
 type StoreOptions = {
   env?: Readonly<Record<string, string | undefined>>
@@ -238,8 +239,23 @@ export class PrototypeStore {
       if (next !== state || raw === null) {
         await mkdir(this.directory, { recursive: true })
         const temporary = `${queueKey}.${randomUUID()}.tmp`
-        await writeFile(temporary, JSON.stringify(next), "utf8")
-        await rename(temporary, queueKey)
+        try {
+          await writeFile(temporary, JSON.stringify(next), "utf8")
+          for (let attempt = 0; ; attempt++) {
+            try {
+              await rename(temporary, queueKey)
+              break
+            } catch (error) {
+              // A Windows reader can briefly deny replacement. Keep the previous file intact.
+              const code = (error as NodeJS.ErrnoException).code ?? ""
+              if (process.platform !== "win32" || attempt >= 7 || !["EPERM", "EACCES", "EBUSY"].includes(code)) throw error
+              await delay(15 * 2 ** attempt)
+            }
+          }
+        } catch (error) {
+          await rm(temporary, { force: true }).catch(() => undefined)
+          throw error
+        }
       }
       return next
     })

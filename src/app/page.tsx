@@ -7,7 +7,7 @@ function WorkbookQaRow({ id, title, href, note, links = [] }: { id: string; titl
   return <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40">
     <div className="p-5 text-center"><a href={`https://sloop-dev.atlassian.net/browse/${id}`} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:underline">{id}</a></div>
     <div className="border-l border-slate-50 p-5 text-[15px] font-semibold text-slate-700">
-      <Link href={href} prefetch={false} className="hover:underline">{title}</Link>
+      <Link href={href} prefetch={false} className={id === "DD-1823" ? "block w-fit max-w-full hover:underline" : "hover:underline"}>{title}</Link>
       {note && <span className="ml-2 text-xs font-normal text-slate-500">{note}</span>}
       {links.length > 0 && <div className="mt-1 flex flex-wrap gap-x-3">{links.map(([label, url]) => <Link key={label} href={url} prefetch={false} className="text-sm font-medium text-blue-600 hover:underline">{label}</Link>)}</div>}
     </div>
@@ -31,6 +31,7 @@ export default function Home() {
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">일감 ID</div>
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center border-l border-slate-100">제목</div>
               </div>
+              <WorkbookQaRow id="DD-1823" title="[공통-QA41, 47] 온라인독후감 1차·2차 피드백 프롬프트 교체 및 평가 보고서 단기 개편" href="/online-review/report/review-seed-two-rounds-r2?role=admin" links={[["1차 보고서", "/online-review/report/review-seed-two-rounds-r1?role=admin"]]} />
               <WorkbookQaRow id="DD-1822" title="[기관-QA42] 도서 레벨별 채점 기준표 조회 개선" href="/agency/online-workbooks/assessment-level-3-r1?role=admin&panel=assessment&assessmentExample=1" note="3레벨 · 조회 전용" links={[["4레벨 · 2차 평가", "/agency/online-workbooks/assessment-level-4-r2?role=admin&panel=assessment&assessmentExample=1"]]} />
 <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group"><div className="p-5 text-center"><a href="https://sloop-dev.atlassian.net/browse/DD-1811" target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline">DD-1811</a></div><div className="p-5 text-[15px] font-semibold text-slate-700 border-l border-slate-50"><Link href={ADMIN_MONTHLY_PATH} className="hover:underline">월간 피드백 기능 추가</Link></div></div>
               <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group">
@@ -119,6 +120,7 @@ export default function Home() {
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">일감 ID</div>
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center border-l border-slate-100">제목</div>
               </div>
+              <WorkbookQaRow id="DD-1823" title="[공통-QA41, 47] 온라인독후감 1차·2차 피드백 프롬프트 교체 및 평가 보고서 단기 개편" href="/agency/online-workbooks/review-seed-agency-14894-r1?panel=report-feedback" links={[["2차 영역별 평가", "/agency/online-workbooks/review-seed-second-submitted-r2?panel=report-feedback"]]} />
               <WorkbookQaRow id="DD-1820" title="[기관-QA29·30·38·39-2] AI 안내 문구 및 사용 횟수 표기 통일" href="/agency/online-workbooks" links={[
                 ["최초 생성", "/agency/online-workbooks/review-seed-new-submitted-r1?dialog=ai"],
                 ["재생성", "/agency/online-workbooks/review-seed-agency-14894-r1?dialog=ai"],
@@ -185,6 +187,7 @@ export default function Home() {
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center">일감 ID</div>
                 <div className="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-center border-l border-slate-100">제목</div>
               </div>
+              <WorkbookQaRow id="DD-1823" title="[공통-QA41, 47] 온라인독후감 1차·2차 피드백 프롬프트 교체 및 평가 보고서 단기 개편" href="/online-review/report/review-seed-two-rounds-r2?role=student" links={[["1차 보고서", "/online-review/report/review-seed-two-rounds-r1?role=student"]]} />
               <WorkbookQaRow id="DD-1819" title="[학생-QA32] 고쳐쓰기 질문 펼침 기능 개선" href="/student/online-workbook/example/draft" links={[["2차 고쳐쓰기", "/student/online-workbook/example/second-draft"]]} />
               <WorkbookQaRow id="DD-1821" title="[학생-QA25] 완독 도서에서 독후감 바로가기 추가" href="/reading/index?bookId=601&round=1&qa=completed-book&demoStudent=normal&view=book" links={[["마지막 회차 재독 완료", "/reading/index?bookId=601&round=1&qa=completed-book&demoStudent=normal&view=reread-complete"]]} />
               <div className="grid grid-cols-[120px_1fr] border-b border-slate-50 hover:bg-blue-50/40 transition-colors group">

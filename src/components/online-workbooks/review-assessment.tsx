@@ -86,7 +86,7 @@ export function ReviewAssessment({ common, record, scores, onChange, readOnly = 
 function ScoreHelp({ group }: { group: ReviewAssessmentSnapshot }) {
   const levels = `${group.minLevel}~${group.maxLevel}레벨`
   const label = group.label === levels ? levels : `${group.label}(${levels})`
-  return <Popover><PopoverTrigger asChild><button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-[#0877b9] hover:underline"><Info className="size-3.5" />점수 계산 기준</button></PopoverTrigger><PopoverContent align="end" className="w-80 space-y-2 text-sm leading-6 text-[#596773]"><p><strong className="text-[#263747]">차수 점수</strong><br />(AI 점수 + 선생님 점수 × 2) ÷ 3</p><p><strong className="text-[#263747]">최종 평가</strong><br />(1차 점수 + 2차 점수 × 2) ÷ 3</p><p>중간 값은 반올림하지 않으며, 표시할 때만 소수점 첫째 자리로 반올림합니다. 소수점이 0이면 정수로 표시합니다.</p><p className="border-t pt-2">{label}의 평가 기준 및 배점을 적용합니다.</p></PopoverContent></Popover>
+  return <Popover><PopoverTrigger asChild><button type="button" className="inline-flex items-center gap-1 text-xs font-medium text-[#0877b9] hover:underline"><Info className="size-3.5" />점수 계산 기준</button></PopoverTrigger><PopoverContent align="end" className="w-80 space-y-2 text-sm leading-6 text-[#596773]"><p><strong className="text-[#263747]">차수 점수</strong><br />(AI 점수 + 선생님 점수 × 2) ÷ 3</p><p>중간 값은 반올림하지 않으며, 표시할 때만 소수점 첫째 자리로 반올림합니다. 소수점이 0이면 정수로 표시합니다.</p><p className="border-t pt-2">{label}의 평가 기준 및 배점을 적용합니다.</p></PopoverContent></Popover>
 }
 
 function ScoreSummary({ label, value, primary = false }: { label: string; value?: number; primary?: boolean }) {
@@ -94,7 +94,7 @@ function ScoreSummary({ label, value, primary = false }: { label: string; value?
 }
 
 function SecondRoundResult({ report }: { report: ReviewReport }) {
-  return <section aria-label="2차 평가 결과" className="rounded-xl border border-[#bae0ff] bg-[#f5fbff] p-4"><div className="mb-3 flex items-center justify-between"><h4 className="font-bold text-[#123b5a]">평가 결과</h4><span className="rounded-full bg-[#d9f0ff] px-2.5 py-1 text-xs font-semibold text-[#0877b9]">확정</span></div><div className="grid gap-3 sm:grid-cols-2"><ResultGroup title="성장 비교"><ResultValue label="1차 점수" value={report.firstScore} /><ResultValue label="2차 점수" value={report.score} />{(report.improvement ?? 0) > 0 && <ResultValue label="향상 수치" value={report.improvement} signed primary />}</ResultGroup><ResultGroup title="최종 평가"><ResultValue label="AI 평가 총점" value={report.weightedAi} /><ResultValue label="선생님 평가 총점" value={report.weightedTeacher} /><ResultValue label="최종 점수" value={report.finalScore} primary /></ResultGroup></div></section>
+  return <section aria-label="2차 평가 결과" className="rounded-xl border border-[#bae0ff] bg-[#f5fbff] p-4"><div className="mb-3 flex items-center justify-between"><h4 className="font-bold text-[#123b5a]">평가 결과</h4><span className="rounded-full bg-[#d9f0ff] px-2.5 py-1 text-xs font-semibold text-[#0877b9]">확정</span></div><div><ResultGroup title="성장 비교"><ResultValue label="1차 점수" value={report.firstScore} /><ResultValue label="2차 점수" value={report.score} />{(report.improvement ?? 0) > 0 && <ResultValue label="향상 수치" value={report.improvement} signed primary />}</ResultGroup></div></section>
 }
 
 function ResultGroup({ title, children }: { title: string; children: React.ReactNode }) {

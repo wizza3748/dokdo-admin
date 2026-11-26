@@ -80,7 +80,7 @@ test("2차 완료 목 데이터는 1차 보고서와 차수별 처리 이력을 
   assert.equal(second.linkedRecordId, first.id)
   assert.notDeepEqual(second.answers, first.answers)
   assert.equal(first.report!.finalScore, undefined)
-  assert.ok(Math.abs(second.report!.finalScore! - (first.report!.score + 2 * second.report!.score) / 3) < 1e-10)
+  assert.equal(second.report!.improvement, second.report!.score - first.report!.score)
   assert.equal(first.flowers, 15)
   assert.equal(second.flowers, 20)
   assert.ok(first.parentSentAt && second.parentSentAt)
@@ -97,11 +97,11 @@ test("2차 완료 목 데이터는 1차 보고서와 차수별 처리 이력을 
   }
   assert.ok(second.itemFeedback.every(item => item.text.includes("1차 피드백")))
   assert.ok(!first.reportFeedback!.includes("\n\n"))
-  assert.equal(second.reportFeedback!.split("\n\n").length, 2)
-  assert.match(second.reportFeedback!, /\n\n\[성장 요약\]/)
+  assert.equal(second.reportFeedback!.split("\n").length, 6)
+  assert.match(second.reportFeedback!, /\n종합: /)
 })
 
-test("기존 보고서 샘플의 빈 줄만 줄이고 선생님 수정 문구는 그대로 보존한다", () => {
+test("출처를 식별할 수 없는 저장 문장과 초안은 개행도 그대로 보존한다", () => {
   const f = fixture(true); f.write(); f.generate()
   const current = sampleReviewAi(f.db.reviews[0], f.db.records[0]).reportFeedback!
   const oldSample = current.replace(/\n/g, "\n\n")
@@ -109,8 +109,8 @@ test("기존 보고서 샘플의 빈 줄만 줄이고 선생님 수정 문구는
   db.records[0].reportFeedback = oldSample
   db.records[0].aiDraft!.reportFeedback = oldSample
   const compact = hydrateLegacyReviewFeedback(db)
-  assert.equal(compact.records[0].reportFeedback, current)
-  assert.equal(compact.records[0].aiDraft!.reportFeedback, current)
+  assert.equal(compact.records[0].reportFeedback, oldSample)
+  assert.equal(compact.records[0].aiDraft!.reportFeedback, oldSample)
   assert.deepEqual(compact.records[0].aiScores, db.records[0].aiScores)
   assert.equal(compact.records[0].aiUsed, db.records[0].aiUsed)
   db.records[0].reportFeedback = "선생님이 직접 수정한 보고서 총평입니다.\n\n이 문단은 그대로 유지합니다."
@@ -515,8 +515,8 @@ test("보고서 생성 가능 스냅샷과 1차 보고서 불변·2차 가중 �
   f.write("qa-r2"); f.generate("qa-r2"); f.save("qa-r2")
   assert.deepEqual(f.db.records[0].report, firstReport)
   const second = f.db.records[1]
-  assert.equal(second.report!.weightedAi, (firstReport!.ai + second.report!.ai * 2) / 3)
-  assert.equal(second.report!.finalScore, (second.report!.weightedAi! + second.report!.weightedTeacher! * 2) / 3)
+  assert.equal(second.report!.firstScore, firstReport!.score)
+  assert.equal(second.report!.finalScore, undefined)
   assert.equal(f.db.records[0].flowers, 15); assert.equal(second.flowers, 0)
   assert.equal(second.parentSentAt, undefined)
   f.run({ type: "send", recordId: second.id }, teacher); f.run({ type: "seen", recordId: second.id })
@@ -587,7 +587,7 @@ test("보고서용 총평은 차수별로 생성하고 선생님 저장값을 �
   const f = fixture(true); f.write()
   const record = f.db.records[0]
   const generated = sampleReviewAi(f.db.reviews[0], record)
-  assert.ok(generated.reportFeedback?.includes("1차 독후감"))
+  assert.match(generated.reportFeedback!, /^내용 요약: /)
   assert.notEqual(generated.reportFeedback, generated.feedback)
   f.run({ type: "ai-start", recordId: record.id }, teacher, "report-copy")
   f.run({ type: "ai-result", recordId: record.id, runId: "report-copy", result: generated }, teacher)
@@ -597,8 +597,8 @@ test("보고서용 총평은 차수별로 생성하고 선생님 저장값을 �
   assert.equal(f.db.records[0].feedback, generated.feedback)
   assert.ok(f.db.records[0].report)
   const second = sampleReviewAi(f.db.reviews[0], { ...record, round: 2 })
-  assert.ok(second.reportFeedback?.includes("2차 독후감"))
-  assert.ok(second.reportFeedback?.includes("[성장 요약]"))
+  assert.equal(second.reportFeedback?.split("\n종합: ").length, 2)
+  assert.doesNotMatch(second.reportFeedback!, /내용 요약\(/)
   assert.ok(second.items.every(item => item.text.includes("1차 피드백")))
   const noReport = sampleReviewAi({ ...f.db.reviews[0], reportEnabled: false }, record)
   assert.equal(noReport.reportFeedback, undefined)

@@ -7,6 +7,9 @@ import { calculateReviewScores, reviewScoreLabel } from "./review-score-policy.t
 // @ts-expect-error Node domain tests load TypeScript sources directly.
 import { activeFeedbackSchedule } from "./review-schedule.ts"
 
+// @ts-expect-error Node domain tests load TypeScript sources directly.
+import { familyCriteria } from "./review-family-criteria.ts"
+
 export type ReviewActor = { role: "student" | "agency" | "class" | "admin" | "external"; studentId?: string; institutionId?: string; classId?: string; name: string }
 export type ReviewItem = { id: string; title: string; description: string; example?: string }
 export type ItemFeedback = { itemId: string; text: string; visible: boolean }
@@ -58,10 +61,11 @@ export function reviewActivityDate(review: Pick<ReviewCommon, "createdAt" | "mon
   const [year, month] = review.month.split("-").map(Number)
   return { year, month, day: 1, monthKey: review.month }
 }
-export type ReviewReport = { version: 1; calculationVersion?: string; generatedAt: string; ai: number; teacher: number; score: number; firstScore?: number; improvement?: number; weightedAi?: number; weightedTeacher?: number; finalScore?: number }
+export type ReviewReport = { version: 1; institutionName?: string; calculationVersion?: string; generatedAt: string; ai: number; teacher: number; score: number; firstScore?: number; improvement?: number; weightedAi?: number; weightedTeacher?: number; finalScore?: number }
 export type ReviewRecord = {
   assessment?: ReviewAssessmentSnapshot;
   legacyAiScores?: ReviewScores;
+  aiDetailScores?: number[];
   templateSelectionPending?: boolean;
   legacyScoreDetailsAllocated?: boolean;
   id: string; reviewId: string; round: 1 | 2; linkedRecordId?: string; writingStatus: "writing" | "submitted";
@@ -361,20 +365,30 @@ export function expandLegacyReviewScores(db: ReviewDatabase): ReviewDatabase {
   return { ...db, records: db.records.map(r => r.round === 1 ? firsts.get(r.reviewId)! : migrate(r, firsts.get(r.reviewId)?.assessment)) }
 }
 export const scoreTotal = (scores: ReviewScores) => Object.values(scores).reduce((sum, value) => sum + value, 0)
-/** Fill missing report copy and compact exact old samples only. Never replace teacher edits. */
+/** Reconstruct only an identifiable seed save. Free-form teacher writing has no reliable score markers. */
 export function hydrateLegacyReviewFeedback(db: ReviewDatabase): ReviewDatabase {
-  return { ...db, records: db.records.map(record => {
-    const review = db.reviews.find(review => review.id === record.reviewId)
-    if (!review?.reportEnabled) return record
-    const missingSaved = !!record.report && record.reportFeedback === undefined
-    const missingDraft = !!record.aiDraft && record.aiDraft.reportFeedback === undefined
-    const reportFeedback = sampleReviewAi(review, record).reportFeedback
-    const isOldSample = (value?: string) => !!value && value !== reportFeedback && value.replace(/\n{2,}/g, "\n") === reportFeedback?.replace(/\n{2,}/g, "\n")
-    const updateSaved = missingSaved || isOldSample(record.reportFeedback)
-    const updateDraft = missingDraft || isOldSample(record.aiDraft?.reportFeedback)
-    if (!updateSaved && !updateDraft) return record
-    return { ...record, reportFeedback: updateSaved ? reportFeedback : record.reportFeedback, aiDraft: updateDraft && record.aiDraft ? { ...record.aiDraft, reportFeedback } : record.aiDraft }
-  }) }
+  let changed = false
+  const records = db.records.map(record => {
+    if (!record.report || !record.reportFeedback?.startsWith("《")) return record
+    const review = db.reviews.find(item => item.id === record.reviewId)
+    const save = record.history.filter(item => item.action === "save-feedback").at(-1)
+    if (!review?.seeded || !save?.requestId.startsWith(`seed:${review.id}:`)) return record
+    const old = record.reportFeedback.split(/\n+/)
+    if (old.shift() !== `《${review.bookTitle}》을/를 읽고 ${record.round}차 독후감을 작성하였습니다. 영역별 평가 내용은 다음과 같습니다.`) return record
+    if (record.round === 2 && old.at(-1) === `[성장 요약] ${REVIEW_FEEDBACK_SAMPLES.second.growth}`) old.pop()
+    const areas = assessmentAreas(review.level, record)
+    const updated = sampleReviewAi(review, record).reportFeedback
+    if (!updated || old.length !== areas.length) return record
+    const recognizable = areas.every(({ id, max }, i) => {
+      const sentence = updated.split("\n")[i].split(": ").slice(1).join(": ")
+      const labels = [id, reviewAreaLabel(id)]
+      return labels.some(label => old[i] === `${label}(${scoreLabel(record.aiScores?.[id] ?? 0)}/${max}점): ${sentence}`)
+    })
+    if (!recognizable) return record
+    changed = true
+    return { ...record, reportFeedback: updated }
+  })
+  return changed ? { ...db, records } : db
 }
 export function canAccessReview(review: ReviewCommon, actor: ReviewActor, pro?: import("./pro-types").ProState) {
   const managedCase = pro?.cases.find(c => c.reviewId === review.id)
@@ -406,7 +420,7 @@ type ReviewCommandBase = {
   | { type: "flower"; recordId: string; amount: number }
   | { type: "schedule-feedback"; recordId: string; scheduledAt: string; expectedRevision: string }
   | { type: "cancel-feedback-schedule"; recordId: string; scheduleId: string }
-  | { type: "ai-result"; recordId: string; runId: string; result?: { feedback: string; reportFeedback?: string; items: ItemFeedback[]; scores?: ReviewScores; unscorableReason?: string }; error?: string }
+  | { type: "ai-result"; recordId: string; runId: string; result?: { feedback: string; reportFeedback?: string; items: ItemFeedback[]; scores?: ReviewScores; detailScores?: number[]; unscorableReason?: string }; error?: string }
   | { type: "save-feedback"; recordId: string; feedback: string; reportFeedback?: string; items: ItemFeedback[]; scores?: ReviewScores; decision?: "request" | "complete" }
 
 function requireCondition(ok: unknown, message: string): asserts ok { if (!ok) throw new Error(message) }
@@ -536,11 +550,19 @@ function applyReviewCommandInternal(database: ReviewDatabase, command: ReviewCom
     requireCondition(run, "진행 중인 AI 실행을 찾을 수 없습니다.")
     const result = command.result && { ...command.result, items: reviewFeedbackItems(review.template, command.result.items) }
     const unscorableReason = !command.error ? result?.unscorableReason?.trim() : undefined
-    const valid = result && typeof result.feedback === "string" && plainReviewText(result.feedback).length >= 10 && validateItems(review, result.items) && result.items.every(i => !i.visible || plainReviewText(i.text)) && (!review.reportEnabled || (typeof result.reportFeedback === "string" && plainReviewText(result.reportFeedback).length >= 10 && (validAiScores(review.level, record.aiScores, record) || validAiScores(review.level, result.scores, record))))
+    const detailed = result?.detailScores
+    const validDetails = detailed === undefined || (Array.isArray(detailed) && detailed.length === familyCriteria.length
+      && familyCriteria.every((c, i) => Number.isInteger(detailed[i]) && detailed[i] >= 0 && detailed[i] <= c.max)
+      && assessmentAreas(review.level, record).every(a => result?.scores?.[a.id] === familyCriteria.reduce((sum, c, i) => sum + (c.area === reviewAreaLabel(a.id) ? detailed[i] : 0), 0))
+      && (!record.aiDetailScores || record.aiDetailScores.every((score, i) => score === detailed[i])))
+    const valid = result && validDetails && typeof result.feedback === "string" && plainReviewText(result.feedback).length >= 10 && validateItems(review, result.items) && result.items.every(i => !i.visible || plainReviewText(i.text)) && (!review.reportEnabled || (typeof result.reportFeedback === "string" && plainReviewText(result.reportFeedback).length >= 10 && (validAiScores(review.level, record.aiScores, record) || validAiScores(review.level, result.scores, record))))
     run.status = !unscorableReason && valid && !command.error ? "success" : "failure"
     if (run.status === "success" && result) {
       record.aiUsed++; record.aiDraft = { feedback: result.feedback, items: result.items, reportFeedback: review.reportEnabled ? result.reportFeedback : undefined }
-      if (review.reportEnabled && !record.aiScores) record.aiScores = result.scores
+      if (review.reportEnabled && !record.aiScores) {
+        record.aiScores = result.scores
+        if (result.detailScores) record.aiDetailScores = [...result.detailScores]
+      }
     } else run.reason = command.error || (unscorableReason ? `채점 불가: ${unscorableReason}` : "빈 결과·항목 ID·평가 점수를 확인해 주세요.")
   } else if (command.type === "save-feedback") {
     requireCondition(record.writingStatus === "submitted" && record.feedbackStatus !== "전송완료", "피드백을 수정할 수 없습니다.")
@@ -560,7 +582,7 @@ function applyReviewCommandInternal(database: ReviewDatabase, command: ReviewCom
     if (record.round === 1) { review.secondDecision = command.decision; review.decidedBy = actor.name; review.decidedAt = at }
     if (review.reportEnabled) {
       if (command.reportFeedback !== undefined) requireCondition(typeof command.reportFeedback === "string" && plainReviewText(command.reportFeedback).length >= 10, "보고서용 총평을 10자 이상 입력해 주세요.")
-      record.reportFeedback = command.reportFeedback ?? record.aiDraft?.reportFeedback ?? record.reportFeedback
+      record.reportFeedback = command.reportFeedback ?? record.reportFeedback ?? record.aiDraft?.reportFeedback
     }
     record.feedback = command.feedback; record.itemFeedback = items; record.savedAt = at; record.feedbackStatus = "작성완료"; record.aiDraft = undefined; review.progress = `${prefix}-saved`
   } else if (command.type === "send") {
@@ -585,16 +607,15 @@ export function sampleReviewAi(review: ReviewCommon, record: ReviewRecord) {
   const scores = record.aiScores ?? Object.fromEntries(assessmentAreas(review.level, record).map(a => [a.id, Number((a.max * (record.round === 1 ? .7 : .8)).toFixed(1))]))
   const areas = [...new Set(criteria.map(criterion => criterion.area))]
   const reportFeedback = review.reportEnabled ? [
-    `《${review.bookTitle}》을/를 읽고 ${record.round}차 독후감을 작성하였습니다. 영역별 평가 내용은 다음과 같습니다.`,
     ...areas.map(area => {
       const details = criteria.filter(criterion => criterion.area === area)
       const max = details.reduce((sum, criterion) => sum + criterion.max, 0)
       const score = scores[area] ?? 0
       const ratio = score / max
       const text = ratio >= .9 ? "해당 영역의 요구를 충족하며 내용을 명확하고 구체적으로 표현하였습니다." : ratio < .6 ? "해당 영역에서 필요한 내용을 구체적으로 작성하는 연습이 필요합니다. 핵심 내용을 정리하고 이유를 덧붙여 설명해 보아야 합니다." : REVIEW_FEEDBACK_SAMPLES.areas[area]
-      return `${reviewAreaLabel(area)}(${scoreLabel(score)}/${max}점): ${text ?? "해당 영역의 내용을 구체적으로 설명하는 연습이 필요합니다."}`
+      return `${reviewAreaLabel(area)}: ${text ?? "해당 영역의 내용을 구체적으로 설명하는 연습이 필요합니다."}`
     }),
-    ...(record.round === 2 ? [`\n[성장 요약] ${REVIEW_FEEDBACK_SAMPLES.second.growth}`] : []),
+    `종합: ${record.round === 2 ? REVIEW_FEEDBACK_SAMPLES.second.growth : "책의 내용과 자신의 생각을 함께 담았습니다. 생각이 나온 이유를 글의 한 장면과 연결해 보면 좋겠습니다."}`,
   ].join("\n") : undefined
   return {
     feedback: `${lowerFeedback ? copy.lower : copy.upper}\n\n${copy.mission}`,

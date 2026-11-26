@@ -2,33 +2,21 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 // @ts-expect-error Node tests load TypeScript sources directly.
-import { calculateReviewScores, reviewImprovementMessage, reviewScoreExplanation, reviewScoreLabel } from "../src/lib/review-score-policy.ts"
+import { calculateReviewScores, weightNote, roundingNote, reviewScoreLabel } from "../src/lib/review-score-policy.ts"
 // @ts-expect-error Node tests load TypeScript sources directly.
 import { createSeededReviewDatabase, normalizeReviewReportScores, type ReviewSeed } from "../src/lib/review-domain.ts"
 // @ts-expect-error Node tests load TypeScript sources directly.
 import { reviewAreaLabel, reviewCriterionLabel } from "../src/lib/review-assessment-config.ts"
 
-test("평가 주체와 작성 차수에 각각 1:2를 적용하고 중간 값을 반올림하지 않는다", () => {
+test("각 차수에서 AI와 선생님 점수에 1:2를 적용하고 향상 폭은 원점수로 계산한다", () => {
   const score = calculateReviewScores(80, 90, { ai: 60, teacher: 70 })
   assert.equal(score.firstScore, 200 / 3)
   assert.equal(score.score, 260 / 3)
-  assert.equal(score.weightedAi, 220 / 3)
-  assert.equal(score.weightedTeacher, 250 / 3)
-  assert.equal(score.finalScore, (220 / 3 + 250 / 3 * 2) / 3)
-  assert.ok(Math.abs(score.finalScore! - (score.firstScore! + score.score * 2) / 3) < 1e-10)
-  assert.equal(reviewScoreLabel(score.finalScore!), "80")
+  assert.equal(score.improvement, score.score - score.firstScore!)
+  assert.ok(!("finalScore" in score))
   assert.equal(reviewScoreLabel(score.firstScore!), "66.7")
   assert.equal(reviewScoreLabel(0), "0")
   assert.equal(calculateReviewScores(0, 0).score, 0)
-})
-
-test("향상 때만 안내하며 1차 안내에는 2차 가중치를 설명하지 않는다", () => {
-  assert.equal(reviewImprovementMessage(29), "29점 향상되었어요.")
-  assert.equal(reviewImprovementMessage(1.26), "1.3점 향상되었어요.")
-  for (const value of [0, -0, -1, -29]) assert.equal(reviewImprovementMessage(value), null)
-  assert.equal(reviewScoreExplanation(1), "1차 독후감 점수는 AI 평가보다 선생님 평가에 두 배 가중치를 두어 산출한 점수입니다.")
-  assert.doesNotMatch(reviewScoreExplanation(1), /2차/)
-  assert.equal(reviewScoreExplanation(2), "독후감 평가 점수는 학생의 작성 회차(1차·2차)와 평가 주체(AI·선생님)에 따라 각각 산출합니다.\n최종 점수는 이 중 2차 점수와 선생님 평가 점수에 두 배 가중치를 두어 산출합니다. 즉, 선생님의 피드백을 반영해 수정한 2차 글에 더 비중을 두어, 학생의 성장 잠재력에 중점을 둔 점수입니다.")
 })
 
 const seed: ReviewSeed = {
@@ -44,7 +32,8 @@ test("전송 완료된 기존 보고서는 파생 점수만 갱신하고 재조�
   const before = structuredClone(db)
   const next = normalizeReviewReportScores(db)
   assert.deepEqual(db, before)
-  assert.notEqual(next.records[1].report!.finalScore, 1)
+  assert.equal(next.records[1].report!.finalScore, 1)
+  assert.notEqual(next.records[1].report!.firstScore, 1)
   assert.equal(normalizeReviewReportScores(next), next)
   next.records.forEach((r, i) => {
     const { report, ...rest } = r, { report: oldReport, ...oldRest } = before.records[i]
@@ -71,22 +60,13 @@ test("표시 명칭만 바꾸고 저장 기준명과 점수 연결 키는 보존
   assert.deepEqual(db, before)
 })
 
-test("보고서 산출 안내와 평가 주체별 점수는 화면·인쇄 공통 본문에 존재한다", () => {
-  const source = readFileSync(new URL("../src/components/online-workbooks/review-report.tsx", import.meta.url), "utf8")
-  assert.match(source, /reviewScoreExplanation\(record.round\)/)
-  assert.match(source, /second && <section className=\{styles.subjectScores\}/)
-  assert.match(source, /improvement && <p/)
-  assert.match(source, /AI 평가 총점/)
-  assert.match(source, /className=\{styles.achievement\}/)
-  assert.match(source, /n\(area\[key\] \/ area.max \* 100\)/)
-  assert.match(source, /className=\{styles.areaPoints\}/)
-  assert.doesNotMatch(source, /styles.scoreTable/)
-  assert.match(source, /<dt className=\{second \? undefined : styles.srOnly\}/)
-  assert.match(source, /second && <div className=\{styles.legend\}/)
-  assert.match(source, /reviewScoreExplanation\(record.round\)\}<\/p><\/section>\s*<\/div>\s*<section className=\{styles.areaSection\}/)
-  assert.ok(source.indexOf("<section className={styles.scoreExplanation}") < source.indexOf("<section className={styles.areaSection}"))
-  assert.ok(source.indexOf("<section className={styles.areaSection}") < source.indexOf("<section className={styles.commentSection}"))
-  assert.match(source, /styles.assessmentTable/)
-  const css = readFileSync(new URL("../src/components/online-workbooks/review-report.module.css", import.meta.url), "utf8")
-  assert.doesNotMatch(css, /\.(?:subjectScores|scoreExplanation)\s*\{[^}]*display:\s*none/)
+test("같은 보고서 본문으로 인쇄하며 두 안내와 차수별 결과를 표시한다", () => {
+  const source = readFileSync(new URL("../src/components/online-workbooks/review-report-screen.tsx", import.meta.url), "utf8")
+  assert.equal(weightNote, "선생님 평가를 AI 평가보다 두 배 중요하게 반영해요.")
+  assert.ok(source.includes("{weightNote}"))
+  assert.equal(roundingNote, "점수는 반올림해 표시해 합계와 0.1점 차이가 날 수 있어요.")
+  assert.ok(source.includes("{roundingNote}"))
+  assert.doesNotMatch(source, /finalScore|weightedTeacher|weightedAi|aiDraft/)
+  const scores = calculateReviewScores(89, 93, { ai: 86, teacher: 88 })
+  assert.deepEqual([scores.firstScore!, scores.score, scores.improvement!].map(reviewScoreLabel), ["87.3", "91.7", "4.3"])
 })

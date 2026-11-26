@@ -32,10 +32,11 @@ test("모든 레벨의 보고서가 기관관리자와 동일한 5개 영역·8�
   }
 })
 
-test("영역별 최종 합계는 1차·2차 가중 총점과 같고 원본은 변경하지 않는다", () => {
+test("차수별 영역 합계는 각 차수 원점수와 같고 원본은 변경하지 않는다", () => {
   const f = fixture(5), before = structuredClone(f)
   const areas = reportAreaScores(f.common, f.second, f.first)!
-  assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.final, 0) - ((60 + 80 * 2) / 3 + (80 + 100 * 2) / 3 * 2) / 3) < 1e-10)
+  assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.first, 0) - 220 / 3) < 1e-10)
+  assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.current, 0) - 280 / 3) < 1e-10)
   assert.deepEqual(f, before)
 })
 
@@ -54,7 +55,7 @@ test("점수 감소·실제 0점도 그대로 계산한다", () => {
   const aiZero = Object.fromEntries(assessmentAreas(common.level).map(a => [a.id, 0]))
   const areas = reportAreaScores(common, { ...second, aiScores: aiZero, teacherScores: zero }, first)!
   assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.current - a.first, 0) + 220 / 3) < 1e-10)
-  assert.ok(Math.abs(areas.reduce((sum, a) => sum + a.final, 0) - 220 / 9) < 1e-10)
+  assert.equal(areas.reduce((sum, a) => sum + a.current, 0), 0)
 })
 
 test("표지와 제출일은 한국 시간 기준이며 잘못된 날짜를 만들지 않는다", () => {
@@ -62,4 +63,19 @@ test("표지와 제출일은 한국 시간 기준이며 잘못된 날짜를 만�
   assert.equal(reportDate("2026-08-31T16:00:00Z"), "2026. 09. 01.")
   assert.equal(reportDate(), "—")
   assert.equal(reportDate("invalid"), "—")
+})
+
+test("부록 A 검증점수의 반올림은 회차 합계·영역·변화에 각각 마지막에 적용한다", () => {
+  const { common, first, second } = fixture(4)
+  function setScores(record: ReviewRecord, ai: number[], teacher: number[]) {
+    const criteria = assessmentCriteria(4, record)
+    record.teacherScores = Object.fromEntries(criteria.map((c, i) => [c.id, teacher[i]]))
+    record.aiScores = Object.fromEntries(assessmentAreas(4, record).map(a => [a.id, criteria.reduce((sum, c, i) => sum + (c.area === a.id ? ai[i] : 0), 0)]))
+  }
+  setScores(first, [8,15,15,15,7,7,4,3], [8,17,17,17,8,8,4,3])
+  setScores(second, [8,17,14,15,8,7,4,3], [9,17,16,17,9,8,4,3])
+  const areas = reportAreaScores(common, second, first)!
+  const a = areas.reduce((n, v) => n + v.first, 0), b = areas.reduce((n, v) => n + v.current, 0)
+  assert.deepEqual([a,b,b-a,areas.reduce((n,v) => n + Number(v.first.toFixed(1)),0)].map(n=>n.toFixed(1)), ["79.3","80.7","1.3","79.2"])
+  assert.deepEqual(new Set(areas.map(v=>Math.sign(v.current-v.first))),new Set([1,-1,0]))
 })

@@ -20,7 +20,8 @@ import { demoIdentityQuery, readReviews, useReviews, type ReviewRole } from "@/l
 import { agencyStudentTestToken } from "@/lib/student-test-context"
 import { reviewAiDialogCopy } from "@/lib/review-ai-dialog"
 import { canAwardReview, canRejectReview, canSendReview, reviewFeedbackItems, reviewIncludesItemFeedback, plainReviewText, reportState, scoreLabel, validAiScores, validItemFeedback, validScores, type ItemFeedback, type ReviewCommon, type ReviewRecord, type ReviewScores } from "@/lib/review-domain"
-import { previewReviewAi } from "@/lib/review-ai-preview"
+import { reviewAiResultCommand } from "@/lib/review-ai-preview"
+import { reviewBookMaterials } from "@/lib/review-ai-materials"
 import { ReviewAssessment } from "./review-assessment"
 import { TeacherReferencePanel } from "./teacher-reference-panel"
 import { TeacherStudentWriting } from "./teacher-student-writing"
@@ -78,7 +79,9 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
     setReportFeedback(current => current === previousSource ? reportFeedbackSource : current)
     previousReportFeedbackSource.current = reportFeedbackSource
   }, [reportFeedbackSource])
-  const [reportFeedbackOpen, setReportFeedbackOpen] = React.useState(false)
+  const [entry] = React.useState(() => new URLSearchParams(typeof window === "undefined" ? "" : window.location.search))
+  const [reportFeedbackOpen, setReportFeedbackOpen] = React.useState(() => entry.get("panel") === "report-feedback")
+  const reportFeedbackSection = React.useRef<HTMLDetailsElement>(null)
   const [itemValues, setItems] = React.useState<ItemFeedback[]>(reviewFeedbackItems(common.template, record.aiDraft?.items ?? record.itemFeedback))
   const items = displaySaved ? reviewFeedbackItems(common.template, record.itemFeedback) : itemValues
   const [scoreValues, setScores] = React.useState<ReviewScores>(record.teacherScores ?? {})
@@ -86,7 +89,6 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
   const [decisionValue, setDecision] = React.useState(common.secondDecision ?? "")
   const decision = displaySaved ? common.secondDecision ?? "" : decisionValue
   const [modal, setModal] = React.useState<"send" | "parent" | "flower" | "reject" | "leave" | null>(null)
-  const [entry] = React.useState(() => new URLSearchParams(typeof window === "undefined" ? "" : window.location.search))
   const [aiDialogOpen, setAiDialogOpen] = React.useState(() => entry.get("dialog") === "ai" && (!isPro || !!proCase?.selectedAt))
   const [firstReferenceOpen, setFirstReferenceOpen] = React.useState(false)
   const closeFirstReference = React.useCallback(() => setFirstReferenceOpen(false), [])
@@ -97,6 +99,7 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
   const assessmentSection = React.useRef<HTMLDetailsElement>(null)
   React.useEffect(() => {
     if (entry.get("panel") === "assessment") assessmentSection.current?.scrollIntoView({ block: "start" })
+    if (entry.get("panel") === "report-feedback") reportFeedbackSection.current?.scrollIntoView({ block: "start" })
   }, [entry])
   const [amount, setAmount] = React.useState<number | null>(null)
   const [busy, setBusy] = React.useState(false)
@@ -129,13 +132,8 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
     const requestId = crypto.randomUUID()
     const started = await hook.run({ type: "ai-start", recordId: record.id, proDesignate }, requestId)
     if (started) {
-      const generated = previewReviewAi(common, { ...record, itemFeedback: items, aiDraft: undefined })
-      const candidate = { ...generated, items: generated.items.map(item => {
-        const current = items.find(existing => existing.itemId === item.itemId)
-        const visible = includeItemFeedback && (current?.visible ?? true)
-        return { ...item, visible, text: visible ? item.text : (current?.text ?? "") }
-      }) }
-      const finished = await hook.run({ type: "ai-result", recordId: record.id, runId: requestId, result: candidate })
+      const command = await reviewAiResultCommand(common, { ...record, itemFeedback: items, aiDraft: undefined }, first, reviewBookMaterials(common), requestId)
+      const finished = await hook.run(command)
       const updated = finished?.records.find(r => r.id === record.id)
       if (updated?.aiHistory.at(-1)?.status === "success" && updated.aiDraft) {
         setFeedback(updated.aiDraft.feedback); setItems(updated.aiDraft.items)
@@ -268,13 +266,22 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
             </div>
           </div>
         </fieldset>}
+    {common.reportEnabled ? <details ref={assessmentSection} open={assessmentOpen} onToggle={event => setAssessmentOpen(event.currentTarget.open)} className="group/assessment border-t border-[#e8e8e8] pt-4">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md py-2 font-bold focus-visible:outline-2 focus-visible:outline-[#1890ff] [&::-webkit-details-marker]:hidden"><ChevronDown aria-hidden className="size-4 shrink-0 -rotate-90 transition-transform group-open/assessment:rotate-0" />평가 점수</summary>
+      <div className="mt-3"><p className="mb-2 text-sm text-[#667581]">보고서 1쪽 · 평가 결과와 그래프</p><ReviewAssessment common={common} record={record} scores={scores} onChange={setScores} readOnly={locked} hideHeading /></div>
+    </details> : null}
+    {common.reportEnabled && <details ref={reportFeedbackSection} open={reportFeedbackOpen} onToggle={event => setReportFeedbackOpen(event.currentTarget.open)} className="group/report-feedback border-t border-[#e8e8e8] pt-4">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md py-2 font-bold focus-visible:outline-2 focus-visible:outline-[#1890ff] [&::-webkit-details-marker]:hidden"><ChevronDown aria-hidden className="size-4 shrink-0 -rotate-90 transition-transform group-open/report-feedback:rotate-0" />영역별 평가</summary>
+      <div className="mt-3 space-y-3"><div className="flex items-center justify-between gap-3"><p className="text-sm text-[#667581]">보고서 2쪽 · 학부모가 읽는 평가</p><span className={`whitespace-nowrap text-xs font-medium ${plainReviewText(reportFeedback).length >= 10 ? "text-[#27865a]" : "text-[#d4380d]"}`}>{plainReviewText(reportFeedback).length}자 / 최소 10자</span></div>{locked ? <div className="rounded-lg border border-[#dfe4e8] bg-[#fafbfc] p-4"><ReviewText value={reportFeedback || "저장된 영역별 평가가 없습니다."} /></div> : <ReviewEditor academy label="영역별 평가" value={reportFeedback} onChange={setReportFeedback} />}</div>
+    </details>}
         <details open={feedbackOpen} onToggle={event => setFeedbackOpen(event.currentTarget.open)} className="group/feedback-summary">
-          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-md py-2 focus-visible:outline-2 focus-visible:outline-[#1890ff] [&::-webkit-details-marker]:hidden"><span className="flex items-center gap-2 font-bold"><ChevronDown aria-hidden className="size-4 shrink-0 -rotate-90 transition-transform group-open/feedback-summary:rotate-0" /><span><span className="mr-1 text-[#ff4d4f]">*</span>[학생용] 총평</span></span><span className={`text-xs font-medium ${plainReviewText(feedback).length >= 10 ? "text-[#27865a]" : "text-[#d4380d]"}`}>{plainReviewText(feedback).length}자 / 최소 10자</span></summary>
-          <div className="mt-3">{locked ? <div className="rounded-lg border border-[#dfe4e8] bg-[#fafbfc] p-4"><ReviewText value={feedback || "등록된 총평이 없습니다."} /></div> : <ReviewEditor academy label="[학생용] 총평" value={feedback} onChange={setFeedback} />}</div>
+          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-md py-2 focus-visible:outline-2 focus-visible:outline-[#1890ff] [&::-webkit-details-marker]:hidden"><span className="flex items-center gap-2 font-bold"><ChevronDown aria-hidden className="size-4 shrink-0 -rotate-90 transition-transform group-open/feedback-summary:rotate-0" /><span><span className="mr-1 text-[#ff4d4f]">*</span>선생님 피드백 · 총평</span></span><span className={`text-xs font-medium ${plainReviewText(feedback).length >= 10 ? "text-[#27865a]" : "text-[#d4380d]"}`}>{plainReviewText(feedback).length}자 / 최소 10자</span></summary>
+          <div className="mt-3"><p className="mb-2 text-sm text-[#667581]">내가 쓴 글 옆 피드백 칸 맨 위</p>{locked ? <div className="rounded-lg border border-[#dfe4e8] bg-[#fafbfc] p-4"><ReviewText value={feedback || "등록된 총평이 없습니다."} /></div> : <ReviewEditor academy label="선생님 피드백 · 총평" value={feedback} onChange={setFeedback} />}</div>
         </details>
         {includeItemFeedback ? <section className="border-t border-[#e8e8e8] pt-5">
           <details open={itemFeedbackOpen} onToggle={event => setItemFeedbackOpen(event.currentTarget.open)} className="group/feedback">
-          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-md py-2 focus-visible:outline-2 focus-visible:outline-[#1890ff] [&::-webkit-details-marker]:hidden"><span className="flex items-center gap-2 font-bold"><ChevronDown aria-hidden className="size-4 -rotate-90 transition-transform group-open/feedback:rotate-0" />[학생용] 항목별 피드백</span><span className="text-xs font-medium text-[#0877b9]">{items.filter(item => item.visible).length}개 중 {items.length}개 표시</span></summary>
+          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 rounded-md py-2 focus-visible:outline-2 focus-visible:outline-[#1890ff] [&::-webkit-details-marker]:hidden"><span className="flex items-center gap-2 font-bold"><ChevronDown aria-hidden className="size-4 -rotate-90 transition-transform group-open/feedback:rotate-0" />선생님 피드백 · 항목별</span><span className="text-xs font-medium text-[#0877b9]">전체 {items.length}개 중 {items.filter(item => item.visible).length}개 표시</span></summary>
+          <p className="mb-2 text-sm text-[#667581]">내가 쓴 글 옆 피드백 칸</p>
           <section aria-label="[학생용] 항목별 피드백 작성" className="mt-2 overflow-hidden rounded-lg border border-[#dfe4e8] bg-white">
           {items.map((f, index) => {
             const item = common.template.items.find(i => i.id === f.itemId)!
@@ -306,14 +313,7 @@ function TeacherEditor({ common, record, hook, role }: { common: ReviewCommon; r
           </section>
         </details>
         </section> : null}
-    {common.reportEnabled ? <details ref={assessmentSection} open={assessmentOpen} onToggle={event => setAssessmentOpen(event.currentTarget.open)} className="group/assessment border-t border-[#e8e8e8] pt-4">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md py-2 font-bold focus-visible:outline-2 focus-visible:outline-[#1890ff] [&::-webkit-details-marker]:hidden"><ChevronDown aria-hidden className="size-4 shrink-0 -rotate-90 transition-transform group-open/assessment:rotate-0" />[보고서용] {record.round}차 평가</summary>
-      <div className="mt-3"><ReviewAssessment common={common} record={record} scores={scores} onChange={setScores} readOnly={locked} hideHeading /></div>
-    </details> : null}
-    {common.reportEnabled && <details open={reportFeedbackOpen} onToggle={event => setReportFeedbackOpen(event.currentTarget.open)} className="group/report-feedback border-t border-[#e8e8e8] pt-4">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md py-2 font-bold focus-visible:outline-2 focus-visible:outline-[#1890ff] [&::-webkit-details-marker]:hidden"><ChevronDown aria-hidden className="size-4 shrink-0 -rotate-90 transition-transform group-open/report-feedback:rotate-0" />[보고서용] 총평</summary>
-      <div className="mt-3 space-y-3"><div className="flex items-center justify-between gap-3"><p className="text-sm text-[#667581]">저장한 내용이 해당 차수 평가보고서의 총평에 반영됩니다.</p><span className={`whitespace-nowrap text-xs font-medium ${plainReviewText(reportFeedback).length >= 10 ? "text-[#27865a]" : "text-[#d4380d]"}`}>{plainReviewText(reportFeedback).length}자 / 최소 10자</span></div>{locked ? <div className="rounded-lg border border-[#dfe4e8] bg-[#fafbfc] p-4"><ReviewText value={reportFeedback || "등록된 보고서용 총평이 없습니다."} /></div> : <ReviewEditor academy label="[보고서용] 총평" value={reportFeedback} onChange={setReportFeedback} />}</div>
-    </details>}
+
       </section>
     </div>
     </div>

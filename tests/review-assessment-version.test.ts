@@ -101,7 +101,7 @@ test("선생님 일부 점수만 입력된 이전 평가도 AI 기준을 기준�
   assert.equal(Object.keys(sampleReviewAi(db.reviews[0], next).scores!).length, 5)
 })
 
-test("첫 생성은 도서 레벨 1·3과 4·6의 원문 구간을 선택하고 학부모 표는 기존 문구를 제공한다", () => {
+test("첫 생성은 도서 레벨 1·3과 4·6의 원문 구간을 선택하고 학부모 표는 도서 레벨별 설명을 제공한다", () => {
   for (const [level, group] of [[1, "level-1-3"], [3, "level-1-3"], [4, "level-4-6"], [6, "level-4-6"]] as const) {
     const db = createSeededReviewDatabase([{ ...seed, common: { ...seed.common, level } }])
     const record = db.records[0], criteria = record.assessment!.criteria
@@ -113,7 +113,10 @@ test("첫 생성은 도서 레벨 1·3과 4·6의 원문 구간을 선택하고 
     assert.match(criteria[5].bands![0].description, level < 4 ? /한 항목 안에서 이웃한 문장/ : /처음과 끝이 글을 여닫는 역할/)
     for (const c of criteria.slice(6)) assert.deepEqual(c.bands!.map(b => b.score), ["5", "4", "3", "2", "1"])
     assert.ok(validScores(level, Object.fromEntries(criteria.map(c => [c.id, 0])), record))
-    assert.deepEqual(reportAreaScores(db.reviews[0], record)!.flatMap(a => a.details), commonReviewAssessment.criteria)
+    const family = reportAreaScores(db.reviews[0], record)!.flatMap(a => a.details)
+    assert.match(family[1].description, level < 4 ? /흐름에 따라/ : /이야기의 구조나 글의 짜임/)
+    assert.equal(family[3].name, "발상의 창의성")
+    assert.equal(family[5].name, "구성력")
   }
 })
 

@@ -36,6 +36,7 @@ import {
   type FeedbackStatus,
   type OnlineWorkbook,
 } from "@/lib/online-workbooks"
+import { generateLegacyWorkbookDraft } from "@/lib/review-legacy-ai"
 import { eligibleReviewListAction, performReviewListAction, reviewListActionExclusion } from "@/lib/review-list-adapter"
 import { feedbackScheduleBlockReason, matchesReviewSchedule, reviewScheduleFilter, reviewScheduleFilterOptions, type ReviewScheduleFilter } from "@/lib/review-schedule-presentation"
 import { agencyStudentTestToken } from "@/lib/student-test-context"
@@ -385,13 +386,25 @@ export function AgencyWorkbookList({ role = "agency" }: { role?: "agency" | "cla
       if (action === "parent") return record.status === "전송완료" && !record.parentSent && record.parentContactRegistered !== false
       return record.flowers === 0
     })
-    const updatedRecords = eligibleRecords.map((record) => {
-      if (action === "ai") return { ...record, aiUsed: Math.min(2, record.aiUsed + 1), feedbackText: record.feedbackText || `『${record.bookTitle}』의 중요한 내용을 잘 정리했어요. 기억에 남는 장면을 자신의 생각과 연결한 점이 좋습니다. 다음에는 장면의 근거를 한 가지 더 덧붙여 보세요.` }
-      if (action === "send") return { ...record, status: "전송완료" as const }
-      if (action === "parent") return { ...record, parentSent: true }
-      return { ...record, flowers: selectedFlower ?? 0 }
-    })
-    if (updatedRecords.length) applyRecordUpdates(updatedRecords)
+    const updatedRecords: OnlineWorkbook[] = []
+    for (const record of eligibleRecords) {
+      if (action === "ai") {
+        try {
+          const draft = await generateLegacyWorkbookDraft(record)
+          await upsertStudentSubmittedAgencyWorkbook(draft, { requireShared: true })
+          updatedRecords.push(draft)
+        }
+        catch (error) { outcomes.push(record.studentName + ": " + (error instanceof Error ? error.message : "생성 실패")) }
+        continue
+      }
+      if (action === "send") updatedRecords.push({ ...record, status: "전송완료" })
+      else if (action === "parent") updatedRecords.push({ ...record, parentSent: true })
+      else updatedRecords.push({ ...record, flowers: selectedFlower ?? 0 })
+    }
+    if (updatedRecords.length) {
+      if (action === "ai") setRecords(await getAgencyWorkbookListAsync(role))
+      else applyRecordUpdates(updatedRecords)
+    }
     const excludedCount = selectedRecords.length - eligibleRecords.length
     const labels = { ai: "AI 피드백 생성", send: "학생 전송", parent: "학부모 발송", flower: `섬초롱꽃 ${selectedFlower ?? 0}개 지급` }
     setNotice(`${outcomes.join(" / ")}${updatedRecords.length ? ` / 기존 ${updatedRecords.length}건 ${labels[action]} 완료` : ""}${excludedCount ? ` 조건에 맞지 않는 ${excludedCount}건은 제외했습니다.` : ""}`)

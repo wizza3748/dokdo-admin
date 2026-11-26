@@ -35,9 +35,10 @@ export interface OnlineWorkbook {
   parentSent: boolean
   parentContactRegistered?: boolean
   feedbackText?: string
+  aiFeedbackDraft?: string
   rejected?: boolean
   displayMode?: WorkbookRoundDisplayMode
-  questions?: Array<{ title: string; description?: string; answer: string }>
+  questions?: Array<{ title: string; description?: string; example?: string; answer: string }>
 }
 
 const students = [
@@ -314,6 +315,7 @@ function getRuntimeStudentSubmittedAgencyWorkbooks(existingIds: Set<string>): On
         questions: template.questions.map((question, index) => ({
           title: question.title,
           description: question.description,
+          example: question.example,
           answer: runtime.answers?.[index] ?? "",
         })),
       }]
@@ -391,10 +393,19 @@ export async function syncStudentSubmittedAgencyWorkbooks() {
   window.dispatchEvent(new CustomEvent(AGENCY_WORKBOOK_CHANGE_EVENT))
 }
 
-export async function upsertStudentSubmittedAgencyWorkbook(record: OnlineWorkbook) {
+export async function upsertStudentSubmittedAgencyWorkbook(record: OnlineWorkbook, options: { requireShared?: boolean } = {}) {
   if (typeof window === "undefined") return
 
   const normalizedRecord = normalizeStudentSubmittedRecord(record)
+  const writeShared = async () => {
+    const response = await fetch(SHARED_SUBMISSIONS_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(normalizedRecord),
+    })
+    if (!response.ok) throw new Error("피드백을 저장하지 못했습니다. 다시 시도해 주세요.")
+  }
+  if (options.requireShared) await writeShared()
   const records = readStoredStudentSubmittedAgencyWorkbooks()
   const existingIndex = records.findIndex((item) => item.id === normalizedRecord.id)
   const nextRecords = existingIndex === -1
@@ -403,14 +414,12 @@ export async function upsertStudentSubmittedAgencyWorkbook(record: OnlineWorkboo
 
   window.localStorage.setItem(STUDENT_MOCK_STORAGE_KEYS.agencyWorkbookSubmissions, JSON.stringify(nextRecords))
   window.dispatchEvent(new CustomEvent(AGENCY_WORKBOOK_CHANGE_EVENT))
-  try {
-    await fetch(SHARED_SUBMISSIONS_API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(normalizedRecord),
-    })
-  } catch {
-    // The submission is still preserved in this origin's local mock state.
+  if (!options.requireShared) {
+    try {
+      await writeShared()
+    } catch {
+      // The submission is still preserved in this origin's local mock state.
+    }
   }
   // Notify again after the shared write, so another tab cannot keep a pre-save snapshot.
   const { reviewReads } = await import("@/lib/review-refresh")

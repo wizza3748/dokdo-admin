@@ -190,6 +190,8 @@ function LegacyStudentWorkbookFlow({ id }: { id: string }) {
       parentSent: false,
       questions: template.questions.map((question, index) => ({
         title: question.title,
+        description: question.description,
+        example: question.example,
         answer: answers[index] ?? "",
       })),
     })

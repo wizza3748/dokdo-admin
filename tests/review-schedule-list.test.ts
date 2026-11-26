@@ -258,6 +258,6 @@ test("전용 예시의 학생 상세·목록 보고서·차수별 보고서 이�
   assert.match(detail, /studentId=\$\{encodeURIComponent\(id\)\}\$\{testQuery\}/)
   assert.match(detail, /pro-management\?role=\$\{hook\.role\}\$\{testQuery\}/)
   assert.match(list, /online-review\/report\/\$\{record\.id\}\?role=\$\{role\}\$\{studentTest/)
-  assert.match(report, /const studentTest = role === "agency" \? agencyStudentTestToken\(\) : ""/)
-  assert.match(report, /studentTest \? `&studentTest=\$\{encodeURIComponent\(studentTest\)\}`/)
+  assert.match(report, /demoIdentityQuery\(role\)/)
+  assert.ok(report.includes('first.id + "?role=" + role + query'))
 })
